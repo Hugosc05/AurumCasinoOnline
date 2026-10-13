@@ -8,6 +8,7 @@
  *   (la contraseña se pide por teclado sin mostrarse, o se lee de ADMIN_PASSWORD)
  *
  *   npm run admin:create -- --promote nombre_de_usuario
+ *   npm run admin:create -- --reset-password nombre_de_usuario
  */
 import { randomUUID } from 'node:crypto';
 import { stdin, stdout } from 'node:process';
@@ -55,12 +56,34 @@ async function main(): Promise<void> {
       username: { type: 'string' },
       email: { type: 'string' },
       promote: { type: 'string' },
+      'reset-password': { type: 'string' },
     },
   });
   const config = loadConfig();
   const db = new Database(config.dbFile);
   migrate(db);
   seed(db);
+
+  if (values['reset-password']) {
+    const target = values['reset-password'];
+    let pw = process.env.ADMIN_PASSWORD ?? '';
+    if (!pw) {
+      pw = await promptHidden(`Nueva contraseña para "${target}": `);
+      const again = await promptHidden('Repite la contraseña: ');
+      if (pw !== again) throw new Error('Las contraseñas no coinciden');
+    }
+    passwordSchema.parse(pw);
+    const user = db.get<{ id: string }>('SELECT id FROM users WHERE username = ?', target);
+    if (!user) throw new Error(`No existe el usuario "${target}"`);
+    db.run('UPDATE users SET password_hash = ? WHERE id = ?', await hashPassword(pw), user.id);
+    db.run('DELETE FROM sessions WHERE user_id = ?', user.id);
+    db.run(
+      'INSERT INTO audit_log (actor_id, action, target, details_json, ip, created_at) VALUES (NULL, ?, ?, ?, ?, ?)',
+      'cli.reset_password', user.id, null, 'cli', nowIso(),
+    );
+    console.log(`✔ Contraseña de "${target}" restablecida; sus sesiones se han cerrado.`);
+    return;
+  }
 
   if (values.promote) {
     const r = db.run(`UPDATE users SET role = 'admin' WHERE username = ?`, values.promote);

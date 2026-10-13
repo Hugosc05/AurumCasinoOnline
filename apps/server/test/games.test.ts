@@ -116,7 +116,7 @@ describe('blackjack (servidor)', () => {
 
   it('no permite dos manos simultáneas y recupera la mano abierta', async () => {
     const { client } = await registerUser(s.base);
-    let r: Awaited<ReturnType<Client['post']>>;
+    let r: { status: number; body: any };
     do {
       r = await client.post('/api/games/blackjack/start', { bet: 20, idempotencyKey: key() });
     } while (r.body.state.phase === 'settled');
@@ -131,7 +131,7 @@ describe('blackjack (servidor)', () => {
   it('rechaza acciones sobre manos ajenas', async () => {
     const a = await registerUser(s.base);
     const b = await registerUser(s.base);
-    let r: Awaited<ReturnType<Client['post']>>;
+    let r: { status: number; body: any };
     do {
       r = await a.client.post('/api/games/blackjack/start', { bet: 20, idempotencyKey: key() });
     } while (r.body.state.phase === 'settled');

@@ -104,7 +104,8 @@ export function displayValue(view: TableView, owner: Owner): string | null {
   if (cards.length === 0) return null;
   const v = handValue(cards);
   if (cards.length === 2 && v.total === 21 && owner !== 'dealer' && view.hands.length === 1) return 'Blackjack';
-  if (v.soft && v.total < 21) return `${v.total - 10} / ${v.total}`;
+  // Mano blanda en juego: se muestran ambos valores; terminada, solo el mejor.
+  if (v.soft && v.total < 21 && !view.settled && (owner === 'dealer' || view.active === null || view.active === owner)) return `${v.total - 10} / ${v.total}`;
   return String(v.total);
 }
 

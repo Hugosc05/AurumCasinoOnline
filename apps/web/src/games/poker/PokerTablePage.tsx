@@ -246,7 +246,7 @@ export default function PokerTablePage() {
         void pump();
       }),
       socket.on('poker.left', (m) => {
-        if (m.tableId === tableId) notify('success', `Te has levantado. Vuelven a tu saldo ${credits(Number(m.cashOut))} créditos.`);
+        if (m.tableId === tableId && Number(m.cashOut) > 0) notify('success', `Te has levantado. Vuelven a tu saldo ${credits(Number(m.cashOut))} créditos.`);
       }),
       socket.on('error', (m) => {
         if (String(m.ref ?? '').startsWith('poker')) {

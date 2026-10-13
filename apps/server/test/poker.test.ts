@@ -12,7 +12,7 @@ afterAll(async () => {
 
 describe('póker en tiempo real', () => {
   it('lobby con mesas reales y sin presencia inventada', async () => {
-    const r = await fetch(`${s.base}/api/lobby`).then((x) => x.json());
+    const r = (await fetch(`${s.base}/api/lobby`).then((x) => x.json())) as { tables: unknown[]; online: number };
     expect(r.tables.length).toBeGreaterThanOrEqual(3);
     expect(r.online).toBe(0);
   });
@@ -50,7 +50,7 @@ describe('póker en tiempo real', () => {
     if (last) for (const seat of last.seats.filter(Boolean)) if (!seat.isYou) expect(seat.isBot).toBe(true);
 
     ws.send(JSON.stringify({ t: 'poker.leave', tableId: 'esmeralda' }));
-    await next((m) => m.t === 'poker.left', 10000);
+    const left = await next((m) => m.t === 'poker.left', 10000);
     ws.close();
     const db = s.app.ctx.db;
     expect(verifyLedger(db, user.id).ok).toBe(true);
@@ -58,7 +58,32 @@ describe('póker en tiempo real', () => {
     expect(seated).toBe(0);
     const tx = db.all<{ reason: string }>('SELECT reason FROM wallet_transactions WHERE user_id = ? ORDER BY id', user.id).map((t) => t.reason);
     expect(tx).toContain('poker_buyin');
-    expect(tx).toContain('poker_cashout');
+    // Si perdió todas sus fichas no hay nada que devolver; si no, se abona exactamente lo que tenía en la mesa.
+    if (left.cashOut > 0) {
+      expect(tx).toContain('poker_cashout');
+      const last = db.get<{ amount: number }>(`SELECT amount FROM wallet_transactions WHERE user_id = ? AND reason = 'poker_cashout' ORDER BY id DESC LIMIT 1`, user.id)!;
+      expect(last.amount).toBe(left.cashOut);
+    }
+  });
+
+  it('una desconexión no bloquea la mesa: los turnos del ausente se resuelven solos', async () => {
+    const a = await registerUser(s.base);
+    const wa = await openWs(s, a.client.cookie);
+    wa.ws.send(JSON.stringify({ t: 'poker.sit', tableId: 'zafiro', buyIn: 2000 }));
+    await wa.next((m) => m.t === 'balance');
+    wa.ws.close(); // se va sin levantarse
+    const watcher = await openWs(s, '');
+    watcher.ws.send(JSON.stringify({ t: 'poker.watch', tableId: 'zafiro' }));
+    let ends = 0;
+    const deadline = Date.now() + 15000;
+    while (ends < 3 && Date.now() < deadline) {
+      const m = await watcher.next((x) => x.t === 'poker.update', 6000);
+      if (m.events.some((e: { type: string }) => e.type === 'hand_end')) ends += 1;
+    }
+    expect(ends).toBeGreaterThanOrEqual(3);
+    const seat = (await watcher.next((x) => x.t === 'poker.update' || x.t === 'poker.snapshot', 6000)).snapshot.seats.find((x: { isBot: boolean } | null) => x && !x.isBot);
+    if (seat) expect(seat.connected).toBe(false);
+    watcher.ws.close();
   });
 
   it('rechaza acciones fuera de turno y entradas fuera de límites', async () => {

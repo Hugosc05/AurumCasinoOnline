@@ -289,7 +289,7 @@ export function Layout() {
   const loc = useLocation();
   const { speed } = useSession();
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col overflow-x-clip">
       <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-oro focus:px-4 focus:py-2 focus:text-noche">
         Saltar al contenido
       </a>
