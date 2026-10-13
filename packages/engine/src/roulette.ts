@@ -31,6 +31,12 @@ export type DozenColumnKind = 'dozen' | 'column';
 export type EvenKind = 'red' | 'black' | 'even' | 'odd' | 'low' | 'high';
 export type RouletteBetKind = InsideKind | DozenColumnKind | EvenKind;
 
+/** Apuesta sin importe (posición en el tapete). */
+export type RouletteBetSpec =
+  | { kind: InsideKind; numbers: number[] }
+  | { kind: DozenColumnKind; index: 1 | 2 | 3 }
+  | { kind: EvenKind };
+
 export type RouletteBet =
   | { kind: InsideKind; numbers: number[]; amount: number }
   | { kind: DozenColumnKind; index: 1 | 2 | 3; amount: number }
