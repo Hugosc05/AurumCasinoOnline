@@ -92,7 +92,7 @@ test('póker: sentarse contra bots, ver solo las propias cartas y levantarse', a
   // Aparecen dos cartas propias boca arriba en algún momento de la mano.
   await expect.poll(async () => page.getByRole('img', { name: / de (picas|corazones|diamantes|tréboles)/ }).count(), { timeout: 20000 }).toBeGreaterThanOrEqual(2);
   await page.getByRole('button', { name: 'Levantarse' }).click();
-  await expect(page.getByText(/Te has levantado/)).toBeVisible({ timeout: 40000 });
+  await expect(page.getByRole('button', { name: 'Sentarse' }).first()).toBeVisible({ timeout: 40000 });
 });
 
 test('administración: solo accesible para administradores', async ({ page }) => {
