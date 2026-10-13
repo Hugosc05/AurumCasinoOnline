@@ -1,0 +1,38 @@
+{
+  "name": "aurum-casino",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Casino online con moneda exclusivamente virtual: blackjack, Texas Hold'em con bots, ruleta europea y slots.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "workspaces": [
+    "packages/engine",
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "npm run dev -w @aurum/server",
+    "dev:web": "npm run dev -w @aurum/web",
+    "build": "npm run build -w @aurum/web",
+    "start": "npm run start -w @aurum/server",
+    "db:migrate": "npm run db:migrate -w @aurum/server",
+    "db:seed": "npm run db:seed -w @aurum/server",
+    "admin:create": "npm run admin:create -w @aurum/server --",
+    "typecheck": "npm run typecheck -w @aurum/engine && npm run typecheck -w @aurum/server && npm run typecheck -w @aurum/web",
+    "lint": "npm run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "rtp": "npm run rtp -w @aurum/engine"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

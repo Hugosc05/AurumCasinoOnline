@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.local
+apps/server/data/
+*.db
+*.db-wal
+*.db-shm
+test-results/
+playwright-report/
+.DS_Store
+Thumbs.db
