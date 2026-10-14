@@ -1,11 +1,12 @@
 import { DEFAULT_BLACKJACK_RULES, type BjAction, type BjEvent, type BjOutcome, type BjPublicState } from '@aurum/engine';
 import { AnimatePresence, motion } from 'motion/react';
 import { Eraser, Hand, Layers, PlusCircle, Repeat2, Split, Square } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChipStack } from '../../components/Chip';
 import { ChipRack, GameHeader, OddsNote, SkipButton } from '../../components/GameKit';
 import { useFlyingChips } from '../../components/FlyingChips';
 import { CardBack } from '../../components/PlayingCard';
+import { Celebration, type CelebrationHandle } from '../../components/Celebration';
 import { ShuffleAnimation } from '../../components/ShuffleAnimation';
 import { Stage } from '../../components/Stage';
 import { TableCard } from '../../components/TableCard';
@@ -53,7 +54,7 @@ const ACTION_LABEL: Record<BjAction, string> = { hit: 'Pedir', stand: 'Plantarse
 const ACTION_KEY: Record<BjAction, string> = { hit: 'h', stand: 's', double: 'd', split: 'p' };
 
 export default function BlackjackPage() {
-  const { user, setBalance, speed, motion: level } = useSession();
+  const { user, setBalance, speed, motion: level, effects } = useSession();
   const { notify, celebrate } = useNotify();
   const { layer, fly } = useFlyingChips(speed);
   const narrow = useNarrow();
@@ -69,6 +70,8 @@ export default function BlackjackPage() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [view, setView] = useState<TableView>(EMPTY_VIEW);
+  // Los totales solo cuentan cartas cuya cara ya se ve (no mientras vuelan o giran).
+  const [shownIds, setShownIds] = useState<ReadonlySet<string>>(() => new Set());
   const [round, setRound] = useState<{ id: string; seq: number; state: BjPublicState } | null>(null);
   const [bet, setBet] = useState(0);
   const [lastBet, setLastBet] = useState(0);
@@ -78,11 +81,30 @@ export default function BlackjackPage() {
   const [pending, setPending] = useState<BjAction | 'deal' | null>(null);
   const [shoe, setShoe] = useState<{ remaining: number; size: number } | null>(null);
   const [skippable, setSkippable] = useState(false);
+  /** Cartas en proceso de recogida hacia la bandeja de descartes. */
+  const [collecting, setCollecting] = useState(false);
+  const [discarded, setDiscarded] = useState(0);
+  /** La carta oculta del crupier se revela con un giro destacado. */
+  const [dramaticReveal, setDramaticReveal] = useState(false);
+  /** Estado narrado de la mano (turno del crupier, te plantas…). */
+  const [status, setStatus] = useState<string | null>(null);
+  const fx = useRef<CelebrationHandle>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const seq = useRef<Sequencer | null>(null);
   if (!seq.current) seq.current = new Sequencer(speed);
   seq.current.setSpeed(speed);
 
   useEffect(() => () => seq.current?.cancel(), []);
+  // Se olvidan las cartas que ya no están en la mesa (o que vuelven a estar boca abajo).
+  useEffect(() => {
+    setShownIds((prev) => {
+      const keep = new Set(view.cards.filter((c) => c.faceUp && prev.has(c.id)).map((c) => c.id));
+      return keep.size === prev.size ? prev : keep;
+    });
+  }, [view]);
+  const markShown = useCallback((id: string) => setShownIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))), []);
+  const valueView = useMemo<TableView>(() => ({ ...view, cards: view.cards.filter((c) => shownIds.has(c.id)) }), [view, shownIds]);
 
   // Recuperación de una mano en curso (recarga de página o reconexión).
   useEffect(() => {
@@ -110,8 +132,8 @@ export default function BlackjackPage() {
       for (const e of res.events) {
         switch (e.type) {
           case 'shuffle':
-            steps.push({ name: 'barajar', duration: DURATION.shuffle, run: () => { setPose({ pose: 'shuffle', reach: 0 }); setShuffling(true); } });
-            steps.push({ name: 'fin-barajar', duration: 120, run: () => { setShuffling(false); setPose({ pose: 'idle', reach: 0 }); } });
+            steps.push({ name: 'barajar', duration: DURATION.shuffle, run: () => { setPose({ pose: 'shuffle', reach: 0 }); setShuffling(true); setDiscarded(0); setStatus('Barajando el zapato'); } });
+            steps.push({ name: 'fin-barajar', duration: 120, run: () => { setShuffling(false); setPose({ pose: 'idle', reach: 0 }); setStatus(null); } });
             break;
           case 'deal':
             steps.push({
@@ -135,8 +157,9 @@ export default function BlackjackPage() {
             steps.push({ name: 'doblar', duration: 380, run: () => { audio.play('chips'); setView((v) => applyEvent(v, e)); } });
             break;
           case 'reveal':
-            steps.push({ name: 'preparar-revelado', duration: 200, run: () => setPose({ pose: 'reveal', reach: -30 }) });
-            steps.push({ name: 'revelar', duration: DURATION.flip + 260, run: () => setView((v) => applyEvent(v, e)) });
+            steps.push({ name: 'turno-crupier', duration: 420, run: () => { setPose({ pose: 'reveal', reach: -30 }); setStatus('Turno del crupier'); setDramaticReveal(true); } });
+            steps.push({ name: 'revelar', duration: DURATION.flip * 1.35 + 420, run: () => setView((v) => applyEvent(v, e)) });
+            steps.push({ name: 'fin-revelado', duration: 0, run: () => setDramaticReveal(false) });
             break;
           case 'active':
             steps.push({ name: 'turno', duration: 0, run: () => setView((v) => applyEvent(v, e)) });
@@ -158,6 +181,8 @@ export default function BlackjackPage() {
       steps.push({ name: 'reposo', duration: 250, run: () => setPose((p) => (p.pose === 'pay' || p.pose === 'collect' ? { pose: 'nod', reach: 0 } : { pose: 'idle', reach: 0 })) });
       await seq.current!.play(steps);
       setSkippable(false);
+      setStatus(null);
+      setDramaticReveal(false);
       setShoe({ remaining: res.state.shoeRemaining, size: res.state.shoeSize });
       setRound({ id: res.roundId, seq: res.seq, state: res.state });
       if (res.state.phase === 'settled') {
@@ -168,6 +193,16 @@ export default function BlackjackPage() {
         else if (outcomes.includes('win')) audio.play('winMedium');
         else if (outcomes.every((o) => o === 'push')) audio.play('push');
         else audio.play('lose');
+        // Efectos proporcionados al resultado real de cada mano.
+        const geo = geomRef.current;
+        res.state.hands.forEach((h, i) => {
+          const c = handCenter(i, res.state.hands.length, geo);
+          const pt = { x: c.x / geo.stage.w, y: c.y / geo.stage.h };
+          if (h.outcome === 'blackjack') {
+            fx.current?.play('burst', [pt]);
+            audio.play('coins', 250);
+          } else if (h.outcome === 'win') fx.current?.play('sparkle', [pt]);
+        });
         setPhase('settled');
         window.setTimeout(() => setPose({ pose: 'idle', reach: 0 }), 1200);
       } else {
@@ -198,8 +233,22 @@ export default function BlackjackPage() {
     setBet(next);
   };
 
-  const newHand = (keepBet: boolean): void => {
+  /** Recoge las cartas de la mano anterior hacia la bandeja de descartes (boca abajo). */
+  const collectCards = async (): Promise<void> => {
+    const n = viewRef.current.cards.length;
+    if (n === 0) return;
+    setCollecting(true);
+    setPose({ pose: 'collect', reach: 0 });
+    audio.play('cardSlide');
+    await new Promise((r) => window.setTimeout(r, Math.max(30, 520 * speed)));
+    setDiscarded((d) => d + n);
     setView(EMPTY_VIEW);
+    setCollecting(false);
+    setPose({ pose: 'idle', reach: 0 });
+  };
+
+  const newHand = (keepBet: boolean): void => {
+    void collectCards();
     setRound(null);
     setPhase('betting');
     if (!keepBet) setBet(0);
@@ -212,13 +261,15 @@ export default function BlackjackPage() {
       return;
     }
     setPending('deal');
-    if (phase === 'settled') {
-      setView(EMPTY_VIEW);
-      setBet(amount);
-    }
     if (user && !user.unlimited && user.balance !== null) setBalance({ balance: user.balance - amount, unlimited: false });
     try {
-      const res = await api.post<RoundResponse>('/api/games/blackjack/start', { bet: amount, idempotencyKey: newKey() });
+      // La petición y la recogida de la mano anterior van en paralelo.
+      const request = api.post<RoundResponse>('/api/games/blackjack/start', { bet: amount, idempotencyKey: newKey() });
+      if (phase === 'settled') {
+        setBet(amount);
+        await collectCards();
+      }
+      const res = await request;
       setLastBet(amount);
       setView({ ...EMPTY_VIEW, hands: [{ bet: amount, doubled: false }] });
       setPending(null);
@@ -235,6 +286,7 @@ export default function BlackjackPage() {
     if (!round || pending || seq.current?.busy || phase !== 'player') return;
     if (!round.state.legalActions.includes(action)) return;
     setPending(action);
+    setStatus(action === 'stand' ? 'Te plantas' : action === 'double' ? 'Doblas la apuesta: una sola carta' : action === 'split' ? 'Divides la pareja' : null);
     const extra = action === 'double' || action === 'split' ? round.state.hands[round.state.active]!.bet : 0;
     if (extra && user && !user.unlimited && user.balance !== null) setBalance({ balance: user.balance - extra, unlimited: false });
     try {
@@ -277,7 +329,7 @@ export default function BlackjackPage() {
 
   const handCount = Math.max(1, view.hands.length);
   const legal = phase === 'player' && round ? round.state.legalActions : [];
-  const dealerValue = displayValue(view, 'dealer');
+  const dealerValue = displayValue(valueView, 'dealer');
   const showBetSpot = view.hands.length === 0;
 
   return (
@@ -321,10 +373,31 @@ export default function BlackjackPage() {
             )}
           </AnimatePresence>
 
+          {/* Bandeja de descartes */}
+          <div className="absolute" style={{ left: g.discard.x - 58, top: g.discard.y - 70 }} aria-label={`Descartes: ${discarded} cartas`}>
+            <div className="relative h-[140px] w-[116px] rounded-xl border border-black/40 bg-gradient-to-b from-[#2d1d10]/80 to-[#140b05]/80 shadow-[inset_0_2px_0_rgba(255,220,170,0.15)]">
+              {Array.from({ length: Math.min(6, Math.ceil(discarded / 4)) }, (_, i) => (
+                <div key={i} className="absolute left-[12px] h-[92px] w-[92px] rotate-90" style={{ top: 22 - i * 2 }}>
+                  <div className="h-[92px] w-[66px] translate-x-[13px]"><CardBack /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Estado narrado de la mano */}
+          <AnimatePresence>
+            {status && (
+              <motion.div key={status} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute -translate-x-1/2 rounded-full border border-oro/40 bg-black/65 px-4 py-1.5 text-sm text-oro-claro" style={{ left: DEALER_ROW.x, top: DEALER_ROW.y + 82 }} role="status">
+                {status}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Cartas */}
           {view.cards.map((c) => {
             const p = cardPosition(c, view, g);
             const isActive = view.active !== null && c.owner === view.active && handCount > 1;
+            const outcome = c.owner === 'dealer' ? undefined : view.hands[c.owner]?.outcome;
             return (
               <TableCard
                 key={c.id}
@@ -335,9 +408,14 @@ export default function BlackjackPage() {
                 rotate={p.rotate}
                 z={(c.owner === 'dealer' ? 10 : 30) + c.index}
                 from={c.fromShoe ? SHOE : null}
+                collectTo={collecting ? g.discard : null}
                 width={CARD_W}
                 speed={speed}
-                highlight={isActive}
+                highlight={isActive || (outcome !== undefined && (outcome === 'win' || outcome === 'blackjack'))}
+                dim={outcome === 'lose' || outcome === 'bust'}
+                shake={outcome === 'bust'}
+                dramatic={dramaticReveal && c.owner === 'dealer' && c.index === 1}
+                onFaceShown={() => markShown(c.id)}
               />
             );
           })}
@@ -345,13 +423,16 @@ export default function BlackjackPage() {
           {/* Manos del jugador: valor, apuesta y resultado */}
           {view.hands.map((h, i) => {
             const c = handCenter(i, handCount, g);
-            const value = displayValue(view, i as 0 | 1);
+            const value = displayValue(valueView, i as 0 | 1);
             const outcomeGood = h.outcome === 'win' || h.outcome === 'blackjack';
             const centerX = STAGE.w / 2;
+            // El total se coloca a la izquierda de la carta más a la izquierda (sin taparse con ella).
+            const first = view.cards.find((vc) => vc.owner === i && vc.index === 0);
+            const leftEdge = first ? cardPosition(first, view, g).x - CARD_W / 2 : c.x - CARD_W / 2;
             return (
               <div key={i}>
                 {value && (
-                  <div className={cx('absolute rounded-full border px-3 py-1 font-display text-lg', view.active === i ? 'border-oro-claro bg-black/70 text-oro-claro' : 'border-white/15 bg-black/55 text-marfil')} style={{ left: c.x - 130, top: c.y + 40 }}>
+                  <div className={cx('absolute rounded-full border px-3 py-1 font-display text-lg', view.active === i ? 'border-oro-claro bg-black/70 text-oro-claro' : 'border-white/15 bg-black/55 text-marfil')} style={{ left: leftEdge - 10, top: c.y + 40, transform: 'translateX(-100%)', whiteSpace: 'nowrap' }}>
                     {value}
                   </div>
                 )}
@@ -408,6 +489,7 @@ export default function BlackjackPage() {
             </div>
           )}
 
+          <Celebration ref={fx} level={effects} />
           {shuffling && (
             <ShuffleAnimation x={g.shuffleAt.x} y={g.shuffleAt.y} to={SHOE} width={CARD_W} speed={speed} onDone={() => setShuffling(false)} />
           )}

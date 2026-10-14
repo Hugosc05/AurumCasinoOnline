@@ -5,7 +5,7 @@ import { speedFor, type MotionLevel } from '../lib/anim/tokens';
 import { socket } from '../lib/ws';
 import type { Balance, Preferences, User } from './types';
 
-const DEFAULT_PREFS: Preferences = { sound: true, volume: 0.6, music: false, animations: 'full', showOddsNotes: true };
+const DEFAULT_PREFS: Preferences = { sound: false, volume: 0.6, music: false, animations: 'full', effects: 'full', showOddsNotes: true };
 const GUEST_KEY = 'aurum.guestPrefs';
 
 interface SessionValue {
@@ -13,6 +13,8 @@ interface SessionValue {
   loading: boolean;
   prefs: Preferences;
   motion: MotionLevel;
+  /** Nivel efectivo de efectos visuales (partículas): nunca supera el nivel de movimiento. */
+  effects: MotionLevel;
   speed: number;
   login(identifier: string, password: string): Promise<User>;
   register(username: string, email: string, password: string): Promise<User>;
@@ -78,6 +80,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const prefs = user?.preferences ?? guestPrefs;
   const motion: MotionLevel = prefs.animations === 'off' ? 'off' : osReduced || prefs.animations === 'reduced' ? 'reduced' : 'full';
+  const rank = { off: 0, reduced: 1, full: 2 } as const;
+  const wantedEffects: MotionLevel = prefs.effects ?? 'full';
+  const effects: MotionLevel = rank[wantedEffects] <= rank[motion] ? wantedEffects : motion;
 
   useEffect(() => {
     audio.configure(prefs.sound, prefs.volume);
@@ -142,8 +147,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<SessionValue>(
-    () => ({ user, loading, prefs, motion, speed: speedFor(motion), login, register, logout, refresh, setBalance, updatePrefs }),
-    [user, loading, prefs, motion, login, register, logout, refresh, setBalance, updatePrefs],
+    () => ({ user, loading, prefs, motion, effects, speed: speedFor(motion), login, register, logout, refresh, setBalance, updatePrefs }),
+    [user, loading, prefs, motion, effects, login, register, logout, refresh, setBalance, updatePrefs],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -80,7 +80,8 @@ Las migraciones y los datos de demostración se aplican solos al arrancar el ser
 - **Backend**: Node.js, Express 5, `ws`, Zod, Helmet.
 - **Datos**: SQLite integrado en Node con migraciones SQL versionadas y repositorio propio; preparado para migrar a PostgreSQL (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
 - **Pruebas**: Vitest y Playwright.
-- **Audio**: sonidos sintetizados en el navegador con Web Audio (originales, sin licencias de terceros).
+- **Audio**: sonidos sintetizados en el navegador con Web Audio (originales, sin licencias de terceros). **Desactivado por defecto**; se activa con el altavoz de la cabecera.
+- **Efectos**: partículas de celebración proporcionales al premio, regulables o desactivables en Perfil → Ajustes.
 
 ## Estructura
 

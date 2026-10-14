@@ -51,13 +51,19 @@ La altura aparente se expresa con escala (máx. +12 %) y una sombra desenfocada 
 - **Ruleta**: la rueda decelera exponencialmente; la bola gira en sentido contrario por la pista, frena, desciende con rebotes amortiguados entre separadores y queda solidaria con la rueda en el bolsillo decidido.
 - **Rodillos**: anticipación hacia arriba, aceleración, crucero con desenfoque, frenado y asentamiento; los símbolos que pasan son los de la tira real en su orden.
 
+## Cartas
+
+Un único componente (`PlayingCard`) para todos los juegos. Caras en SVG sin fuentes: índices trazados, pips del palo, figuras originales simétricas. Por debajo de 64 px en pantalla se usa la variante compacta (rango y palo grandes). El volteo es en dos fases: gira hasta 90°, cambia de cara y completa el giro, de modo que en el DOM solo existe una cara a la vez y una carta oculta nunca expone su valor.
+
 ## Jerarquía de celebración
 
-1. Pequeña: resaltado de la combinación y contador.
-2. Media: + luces de la marquesina y anillo pulsante.
-3. Grande / extraordinaria: + resplandor del marco y sonido largo.
+La intensidad depende solo de la categoría real del premio que devuelve el servidor:
 
-Nunca hay partículas a pantalla completa ni destellos continuos.
+1. Normal (`small`): resaltado de la combinación, contador y destello.
+2. Destacado (`medium`/`big`): + partículas con monedas, brillo del marco y luces de la marquesina.
+3. Excepcional (`mega`, ≥ 50 × la apuesta): + fuegos artificiales y cartel con el multiplicador.
+
+Las partículas se detienen solas (sin bucles infinitos), están limitadas a 650 a la vez y se pueden reducir o desactivar en **Efectos de celebración**; nunca superan el nivel de animación elegido. Las derrotas no tienen celebración ni sonidos que inviten a seguir.
 
 ## Errores, esperas y concurrencia
 
@@ -73,4 +79,4 @@ Blackjack y póker usan una geometría vertical propia por debajo de 640 px; el 
 
 ## Sonido
 
-Motor único (`lib/audio.ts`) con sonidos sintetizados: deslizamiento, aterrizaje y volteo de cartas, riffle, fichas, rodadura y golpes de la bola, rodillos, botones, victoria, derrota y logros. No suena nada antes de la primera interacción; volumen y silencio se guardan en la cuenta.
+Motor único (`lib/audio.ts`) con sonidos sintetizados: deslizamiento, aterrizaje y volteo de cartas, riffle, fichas, rodadura y golpes de la bola, rodillos, botones, victoria, derrota y logros. **Desactivado por defecto**: no suena nada hasta que el usuario lo activa (icono del altavoz en la cabecera, en la consola de las slots o en Perfil → Ajustes). Volumen y silencio se guardan en la cuenta. Cada sonido tiene una separación mínima y hay un máximo de 16 voces simultáneas, así que los repartos rápidos no saturan. No hay música ni bucles insistentes.

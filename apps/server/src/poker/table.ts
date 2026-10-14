@@ -78,7 +78,7 @@ function animationMs(events: readonly PokerEvent[]): number {
   let ms = 0;
   for (const e of events) {
     switch (e.type) {
-      case 'hand_start': ms += 1300; break;
+      case 'hand_start': ms += 1800; break; // recogida + barajado en el cliente
       case 'blind': ms += 250; break;
       case 'deal_hole': ms += 130; break;
       case 'action': ms += 400; break;

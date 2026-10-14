@@ -10,9 +10,9 @@ Para E2E hace falta descargar una vez el navegador: `npx playwright install chro
 
 ## Resultado de la última ejecución
 
-Ejecutado el 13/10/2026 en Linux con Node 22.22:
+Ejecutado el 14/10/2026 en Linux con Node 22.22:
 
-- `npm test`: **14 archivos, 153 pruebas, todas correctas**.
+- `npm test`: **16 archivos, 267 pruebas, todas correctas**.
 - `npm run test:e2e`: **7 pruebas, todas correctas** (Chromium incluido con Playwright 1.56; escritorio y móvil Pixel 7).
 - `npm run typecheck`: sin errores.
 
@@ -51,9 +51,17 @@ Las diez categorías y su orden, rueda A-5, sin escaleras circulares, escalera d
 ### Interfaz (`apps/web/src/**/*.test.ts`, 23)
 Secuenciador de animaciones (orden, velocidad, anti doble clic, saltar ejecuta todos los efectos, cancelar, errores, animaciones desactivadas), trayectoria de la ruleta (termina en el bolsillo del servidor para los 37 números, deceleración continua, continuidad), tapete (todas las zonas generan apuestas válidas para el servidor), recorrido de rodillos (empieza y termina en las ventanas correctas siguiendo la tira real), modelos visuales de blackjack y póker.
 
+### Cartas (`apps/web/src/components/cards/cards.test.tsx`, 111)
+Para las 52 cartas: rango y palo correctos, color del palo en índices y pips, número de pips, as y figuras, índice inferior girado, ausencia de elementos `<text>` (no dependen de fuentes), variante compacta e identificadores SVG únicos. Una carta boca abajo no expone rango ni palo en el DOM, y la variante compacta se elige según el tamaño real en pantalla.
+
+### Presentación de slots (`apps/web/src/games/slots/presentation.test.ts`, 3)
+En 3000 tiradas: las líneas dibujadas son exactamente las del motor (ni inventadas ni omitidas), cada celda resaltada está en el recorrido real de la línea, la suma presentada es el premio liquidado, un único evento de total, celebración según la categoría real y orden de mayor a menor premio.
+
 ### Extremo a extremo (`e2e/`, 7)
 Registro, cierre e inicio de sesión; ruleta; blackjack; slots; póker contra bots (ver las propias cartas y levantarse); acceso de administración; móvil sin desbordamiento horizontal y menú.
 
 ## Comprobaciones manuales realizadas
 
 Con capturas automatizadas en Chromium (escritorio 1440 × 900 y móvil 390 × 844): reparto y volteo de cartas, barajado, giro de ruleta con la bola terminando en el número del servidor, apuestas ganadoras resaltadas y perdedoras retiradas, rodillos con parada escalonada y línea premiada, mesa de póker con bots actuando y controles del jugador, panel de administración. No se ha medido el rendimiento en equipos modestos reales.
+
+Versión 1.1 (14/10/2026), con capturas fotograma a fotograma en Chromium (1440 × 1000 y 412 × 915): galería de las 52 cartas a 96, 64 y 46 px; blackjack (extracción del zapato, vuelo, volteo, revelado dramático, derrota atenuada, recogida a la bandeja, totales sincronizados con las caras); póker (barajado central, reparto privado, cartas de rivales ocultas, retiradas que vuelven al crupier, flop/turn/river, fichas al bote); slots (parada escalonada, línea premiada coincidente con el motor y sus marcadores, atenuación, estados del botón); partículas de destello, ráfaga y fuegos artificiales en un banco de pruebas aislado. No se ha podido provocar un premio grande ni extraordinario real en la aplicación (el cartel correspondiente queda sin comprobar visualmente) ni escuchar el audio (entorno sin altavoces).

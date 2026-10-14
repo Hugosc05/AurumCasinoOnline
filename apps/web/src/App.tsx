@@ -17,6 +17,7 @@ const ProfilePage = lazy(() => import('./pages/Profile'));
 const LeaderboardPage = lazy(() => import('./pages/Leaderboard'));
 const PromotionsPage = lazy(() => import('./pages/Promotions'));
 const AdminApp = lazy(() => import('./admin/AdminApp'));
+const CardGallery = lazy(() => import('./dev/CardGallery'));
 
 /** Protección de rutas privadas en el cliente (la autorización real está en el servidor). */
 function RequireAuth({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
@@ -32,6 +33,7 @@ export function App() {
   return (
     <Suspense fallback={<Spinner />}>
       <Routes>
+        {import.meta.env.DEV && <Route path="/dev/cartas" element={<CardGallery />} />}
         <Route path="/admin/*" element={<RequireAuth admin><AdminApp /></RequireAuth>} />
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />

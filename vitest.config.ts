@@ -6,6 +6,7 @@ export default defineConfig({
       'packages/engine/test/**/*.test.ts',
       'apps/server/test/**/*.test.ts',
       'apps/web/src/**/*.test.ts',
+      'apps/web/src/**/*.test.tsx',
     ],
     environment: 'node',
     testTimeout: 20000,

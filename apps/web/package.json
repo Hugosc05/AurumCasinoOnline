@@ -1,6 +1,6 @@
 {
   "name": "@aurum/web",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@aurum/engine": "1.0.0",
+    "@aurum/engine": "1.1.0",
     "@fontsource-variable/bodoni-moda": "5.3.0",
     "@fontsource-variable/manrope": "5.3.0",
     "lucide-react": "0.577.0",

@@ -7,15 +7,18 @@ export interface Preferences {
   volume: number;
   music: boolean;
   animations: 'full' | 'reduced' | 'off';
+  effects: 'full' | 'reduced' | 'off';
   /** Mostrar recordatorio de independencia de resultados. */
   showOddsNotes: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  sound: true,
+  // El sonido está desactivado hasta que el usuario lo habilite.
+  sound: false,
   volume: 0.6,
   music: false,
   animations: 'full',
+  effects: 'full',
   showOddsNotes: true,
 };
 
@@ -24,6 +27,7 @@ export const preferencesSchema = z.object({
   volume: z.number().min(0).max(1).optional(),
   music: z.boolean().optional(),
   animations: z.enum(['full', 'reduced', 'off']).optional(),
+  effects: z.enum(['full', 'reduced', 'off']).optional(),
   showOddsNotes: z.boolean().optional(),
 }).strict();
 

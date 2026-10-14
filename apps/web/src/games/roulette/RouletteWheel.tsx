@@ -169,6 +169,7 @@ export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWhe
     }
     if (t >= run.plan.duration) {
       run.loop.stop(300);
+      audio.play('wheelStop');
       running.current = null;
       raf.current = null;
       run.resolve();
@@ -197,6 +198,7 @@ export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWhe
           resolve();
           return;
         }
+        audio.play('spinStart');
         running.current = { plan, start: performance.now(), resolve, skip: false, loop: audio.loop('roll'), lastTickPocket: -1, dropped: false };
         raf.current = requestAnimationFrame(tick);
       });

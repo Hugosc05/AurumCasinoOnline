@@ -25,7 +25,12 @@ type SoundName =
   | 'lose'
   | 'push'
   | 'achievement'
-  | 'error';
+  | 'error'
+  | 'spinStart'
+  | 'wheelStop'
+  | 'lineWin'
+  | 'firework'
+  | 'coins';
 
 export interface LoopHandle {
   setIntensity(v: number): void;
@@ -41,6 +46,9 @@ class AudioEngine {
   private enabled = true;
   private volume = 0.6;
   private unlocked = false;
+  /** Último instante (s de AudioContext) en que sonó cada efecto: evita solapamientos molestos. */
+  private last = new Map<SoundName, number>();
+  private voices: number[] = [];
 
   configure(enabled: boolean, volume: number): void {
     this.enabled = enabled;
@@ -112,6 +120,14 @@ class AudioEngine {
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime + delayMs / 1000;
+    // Antisolapamiento: separación mínima por tipo de sonido y límite de voces simultáneas.
+    const minGap: Partial<Record<SoundName, number>> = { chip: 0.04, chips: 0.08, cardSlide: 0.05, cardLand: 0.05, cardFlip: 0.06, ballTick: 0.03, reelStop: 0.06, lineWin: 0.25, winSmall: 0.4, winMedium: 0.6, winBig: 1.2, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03 };
+    const prev = this.last.get(name);
+    if (prev !== undefined && Math.abs(t - prev) < (minGap[name] ?? 0.05)) return;
+    this.voices = this.voices.filter((end) => end > ctx.currentTime);
+    if (this.voices.length >= 16 && name !== 'winBig' && name !== 'achievement') return;
+    this.voices.push(t + 0.6);
+    this.last.set(name, t);
     const jitter = (): number => 0.94 + Math.random() * 0.12;
     switch (name) {
       case 'click':
@@ -175,6 +191,25 @@ class AudioEngine {
         break;
       case 'error':
         this.tone(220, t, 0.14, 'square', 0.04);
+        break;
+      case 'spinStart':
+        this.burst(t, 0.35, 600, 0.7, 0.12, 'bandpass', 1800);
+        this.tone(330, t, 0.12, 'triangle', 0.05, 440);
+        break;
+      case 'wheelStop':
+        this.tone(1250, t, 0.06, 'triangle', 0.07);
+        this.burst(t, 0.05, 2500, 2, 0.08);
+        break;
+      case 'lineWin':
+        this.tone(1047 * jitter(), t, 0.22, 'triangle', 0.06);
+        this.tone(1568, t + 0.06, 0.25, 'sine', 0.04);
+        break;
+      case 'firework':
+        this.burst(t, 0.5, 900, 0.5, 0.14, 'lowpass', 200);
+        this.burst(t + 0.02, 0.25, 4000 * jitter(), 1, 0.06, 'highpass');
+        break;
+      case 'coins':
+        for (let i = 0; i < 8; i += 1) this.tone(2600 + Math.random() * 1800, t + i * 0.05 + Math.random() * 0.02, 0.07, 'sine', 0.035);
         break;
     }
   }

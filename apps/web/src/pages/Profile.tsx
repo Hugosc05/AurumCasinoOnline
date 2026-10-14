@@ -143,7 +143,12 @@ export default function ProfilePage() {
               <p className="mt-2 text-xs text-niebla">Si tu sistema tiene activada la reducción de movimiento, Aurum usa como mínimo el modo reducido.</p>
             </div>
             <div>
-              <p className="mb-2 text-marfil">Sonido</p>
+              <p className="mb-2 text-marfil">Efectos de celebración</p>
+              <Segmented label="Partículas y celebraciones" value={prefs.effects ?? 'full'} onChange={(v) => void updatePrefs({ effects: v })} options={[{ value: 'full', label: 'Completos' }, { value: 'reduced', label: 'Discretos' }, { value: 'off', label: 'Desactivados' }]} />
+              <p className="mt-2 text-xs text-niebla">Destellos, partículas y fuegos artificiales al ganar. Nunca superan el nivel de animación elegido arriba.</p>
+            </div>
+            <div>
+              <p className="mb-2 text-marfil">Sonido <span className="text-xs text-niebla">(desactivado por defecto)</span></p>
               <div className="flex flex-wrap items-center gap-4">
                 <Segmented label="Sonido" value={prefs.sound ? 'on' : 'off'} onChange={(v) => void updatePrefs({ sound: v === 'on' })} options={[{ value: 'on', label: 'Activado' }, { value: 'off', label: 'Silencio' }]} />
                 <label className="flex items-center gap-3 text-sm text-niebla">

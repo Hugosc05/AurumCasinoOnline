@@ -133,7 +133,7 @@ export interface PokerGeometry {
   rotation: number;
 }
 
-export const POKER_LANDSCAPE: PokerGeometry = { w: 1000, h: 620, cx: 500, cy: 300, rx: 420, ry: 236, dealer: { x: 500, y: 92 }, pot: { x: 500, y: 380 }, boardY: 284, boardGap: 80, rotation: Math.PI / 2 };
+export const POKER_LANDSCAPE: PokerGeometry = { w: 1000, h: 620, cx: 500, cy: 300, rx: 420, ry: 236, dealer: { x: 500, y: 92 }, pot: { x: 500, y: 346 }, boardY: 284, boardGap: 80, rotation: Math.PI / 2 };
 export const POKER_PORTRAIT: PokerGeometry = { w: 660, h: 940, cx: 330, cy: 460, rx: 250, ry: 375, dealer: { x: 330, y: 150 }, pot: { x: 330, y: 560 }, boardY: 450, boardGap: 76, rotation: Math.PI / 2 };
 
 export const TABLE = { w: POKER_LANDSCAPE.w, h: POKER_LANDSCAPE.h, cx: POKER_LANDSCAPE.cx, cy: POKER_LANDSCAPE.cy };

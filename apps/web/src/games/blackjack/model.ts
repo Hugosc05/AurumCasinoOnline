@@ -10,6 +10,8 @@ export interface BjGeometry {
   hand2: [{ x: number; y: number }, { x: number; y: number }];
   dealerBox: { left: number; top: number };
   shuffleAt: { x: number; y: number };
+  /** Bandeja de descartes (cartas recogidas). */
+  discard: { x: number; y: number };
   arc: string;
 }
 
@@ -22,6 +24,7 @@ export const LANDSCAPE: BjGeometry = {
   hand2: [{ x: 330, y: 462 }, { x: 670, y: 462 }],
   dealerBox: { left: 370, top: -8 },
   shuffleAt: { x: 500, y: 300 },
+  discard: { x: 150, y: 150 },
   arc: 'M150 320 Q 500 440 850 320',
 };
 
@@ -34,6 +37,7 @@ export const PORTRAIT: BjGeometry = {
   hand2: [{ x: 175, y: 500 }, { x: 465, y: 500 }],
   dealerBox: { left: 150, top: -8 },
   shuffleAt: { x: 320, y: 330 },
+  discard: { x: 80, y: 120 },
   arc: 'M60 350 Q 320 440 580 350',
 };
 

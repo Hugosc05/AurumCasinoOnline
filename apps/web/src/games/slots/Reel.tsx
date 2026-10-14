@@ -20,7 +20,7 @@ interface Props {
 
 const Cell = memo(function Cell({ symbol, size, lit, dim }: { symbol: SlotSymbol; size: number; lit: boolean; dim: boolean }) {
   return (
-    <div className={cx('relative flex items-center justify-center transition-[opacity,filter] duration-300', dim && 'opacity-35 saturate-50')} style={{ height: size }}>
+    <div className={cx('relative flex items-center justify-center transition-[opacity,filter] duration-300', dim && 'opacity-60 saturate-[.7]')} style={{ height: size }}>
       <div className={cx(lit && 'motion-safe:animate-[pulse_0.9s_ease-in-out_infinite]')} style={{ transform: lit ? 'scale(1.08)' : undefined, transition: 'transform 300ms' }}>
         <SlotSymbolArt symbol={symbol} size={size * 0.78} />
       </div>

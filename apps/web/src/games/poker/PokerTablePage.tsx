@@ -7,6 +7,7 @@ import { ChipStack } from '../../components/Chip';
 import { OddsNote, SkipButton } from '../../components/GameKit';
 import { CardBack } from '../../components/PlayingCard';
 import { ShuffleAnimation } from '../../components/ShuffleAnimation';
+import { Celebration, type CelebrationHandle } from '../../components/Celebration';
 import { Stage } from '../../components/Stage';
 import { TableCard } from '../../components/TableCard';
 import { Button, Modal, Spinner } from '../../components/ui';
@@ -16,11 +17,24 @@ import { credits, cx } from '../../lib/format';
 import { socket } from '../../lib/ws';
 import { useNotify } from '../../state/notify';
 import { useSession } from '../../state/session';
-import { EMPTY_VIS, POKER_LANDSCAPE, POKER_PORTRAIT, applyPokerEvent, boardSlot, seatPosition, towardCenter, visFromSnapshot, type PokerVis } from './model';
+import { EMPTY_VIS, POKER_LANDSCAPE, POKER_PORTRAIT, applyPokerEvent, boardSlot, seatPosition, towardCenter, visFromSnapshot, type PokerGeometry, type PokerVis } from './model';
 import type { SeatView, Snapshot, UpdateMsg } from './types';
 
+/** Tamaños coherentes: comunitarias y propias parecidas; las rivales algo menores (están más lejos). */
+/** Distancia relativa (asiento → centro) a la que se dejan las apuestas; la del jugador, por encima de sus cartas. */
+const BET_RIVAL = 0.57;
+/** Las apuestas del jugador se dejan a la izquierda de sus cartas (no encima, ni sobre el bote). */
+function betSpot(p: { x: number; y: number }, hero: boolean, g: PokerGeometry): { x: number; y: number } {
+  if (!hero) return towardCenter(p, BET_RIVAL, g);
+  const c = towardCenter(p, 0.36, g);
+  return { x: c.x - 104, y: c.y };
+}
+const BOARD_W = 64;
+const HERO_W = 66;
+const RIVAL_W = 54;
+
 const STEP_MS: Partial<Record<PokerEvent['type'], number>> = {
-  hand_start: 1150, blind: 260, deal_hole: 140, action: 420, collect: 460, return: 350, showdown: 1500, award: 1300,
+  hand_start: 1250, blind: 260, deal_hole: 140, action: 420, collect: 460, return: 350, showdown: 1500, award: 1300,
 };
 
 interface Flight {
@@ -121,13 +135,16 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
 export default function PokerTablePage() {
   const { tableId = '' } = useParams();
   const nav = useNavigate();
-  const { user, speed } = useSession();
+  const { user, speed, effects } = useSession();
   const { notify } = useNotify();
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [vis, setVis] = useState<PokerVis>(EMPTY_VIS);
+  const visRef = useRef<PokerVis>(EMPTY_VIS);
   const [connected, setConnected] = useState(socket.status === 'open');
   const [flights, setFlights] = useState<Flight[]>([]);
   const [shuffling, setShuffling] = useState(false);
+  const [collectingCards, setCollectingCards] = useState(false);
+  const fx = useRef<CelebrationHandle>(null);
   const [pending, setPending] = useState(false);
   const [sitOpen, setSitOpen] = useState(false);
   const [buyIn, setBuyIn] = useState(0);
@@ -162,7 +179,9 @@ export default function PokerTablePage() {
   const applySnapshot = useCallback((s: Snapshot) => {
     latest.current = s;
     setSnap(s);
-    setVis(visFromSnapshot(s));
+    const fresh = visFromSnapshot(s);
+    visRef.current = fresh;
+    setVis(fresh);
     setClockOffset(s.serverTime - Date.now());
     setPending(false);
   }, []);
@@ -189,39 +208,57 @@ export default function PokerTablePage() {
         setAnimating(true);
         const own = msg.snapshot.you.seat;
         const ownCards = own !== null ? (msg.snapshot.hand?.players.find((p) => p.seat === own)?.hole.filter(Boolean) as string[] | undefined) ?? null : null;
-        const steps: SequenceStep[] = msg.events.map((e) => ({
-          name: e.type,
-          duration: e.type === 'street' ? (e.street === 'flop' ? 1100 : 700) : STEP_MS[e.type] ?? 0,
-          run: () => {
-            setVis((v) => {
+        const steps: SequenceStep[] = [];
+        for (const e of msg.events) {
+          // Al empezar una mano nueva, primero se recogen las cartas de la anterior hacia el crupier.
+          if (e.type === 'hand_start' && (Object.keys(visRef.current.dealt).length > 0 || visRef.current.board.length > 0)) {
+            steps.push({ name: 'recoger', duration: 480, run: () => { setCollectingCards(true); audio.play('cardSlide'); } });
+          }
+          steps.push({
+            name: e.type,
+            duration: e.type === 'street' ? (e.street === 'flop' ? 1100 : 700) : STEP_MS[e.type] ?? 0,
+            run: () => {
+              // Los efectos (fichas en vuelo, sonidos) se lanzan una sola vez, fuera del actualizador de estado.
+              const v = visRef.current;
               const geo = geomRef.current;
               const posFor = (seat: number) => seatPosition(own === null ? seat : (seat - own + n) % n, n, geo);
               if (e.type === 'blind' || (e.type === 'action' && e.added > 0)) {
-                addFlight(posFor(e.seat), towardCenter(posFor(e.seat), 0.57, geo), e.type === 'blind' ? e.amount : e.added);
+                addFlight(posFor(e.seat), betSpot(posFor(e.seat), e.seat === own, geo), e.type === 'blind' ? e.amount : e.added);
                 audio.play('chips');
               } else if (e.type === 'action') {
                 audio.play(e.action === 'fold' ? 'cardSlide' : 'click');
               }
-              if (e.type === 'collect') audio.play('chips');
+              if (e.type === 'collect') {
+                for (const [seat, amount] of Object.entries(v.bets)) addFlight(betSpot(posFor(Number(seat)), Number(seat) === own, geo), geo.pot, amount);
+                audio.play('chips');
+              }
               if (e.type === 'award') {
                 for (const w of e.winners) addFlight(geo.pot, posFor(w.seat), w.amount);
-                audio.play(e.winners.some((w) => w.seat === own) ? 'winMedium' : 'chips');
+                const heroWon = e.winners.some((w) => w.seat === own);
+                audio.play(heroWon ? 'winMedium' : 'chips');
+                if (heroWon && own !== null) {
+                  const p = posFor(own);
+                  fx.current?.play('sparkle', [{ x: p.x / geo.w, y: p.y / geo.h }]);
+                }
               }
-              if (e.type === 'return') addFlight(towardCenter(posFor(e.seat), 0.57, geo), posFor(e.seat), e.amount);
+              if (e.type === 'return') addFlight(betSpot(posFor(e.seat), e.seat === own, geo), posFor(e.seat), e.amount);
               if (e.type === 'hand_start') {
+                setCollectingCards(false);
                 setShuffling(true);
                 setBestCards([]);
+                audio.riffle(700 * speed, 150);
               }
-              if (e.type === 'showdown') {
-                const best = e.hands.flatMap((h) => h.best);
-                setBestCards(best);
-              }
-              return applyPokerEvent(v, e, own, ownCards);
-            });
-          },
-        }));
+              if (e.type === 'street') audio.play('cardSlide');
+              if (e.type === 'showdown') setBestCards(e.hands.flatMap((h) => h.best));
+              const next = applyPokerEvent(v, e, own, ownCards);
+              visRef.current = next;
+              setVis(next);
+            },
+          });
+        }
         await seq.current.play(steps);
         setShuffling(false);
+        setCollectingCards(false);
       }
       applySnapshot(msg.snapshot);
     }
@@ -350,7 +387,7 @@ export default function PokerTablePage() {
             <AnimatePresence>
               {potShown > 0 && (
                 <motion.div key="pot" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center">
-                  <ChipStack amount={potShown} size={34} />
+                  <ChipStack amount={potShown} size={32} max={4} />
                   <span className="mt-1 rounded-full bg-black/60 px-3 py-0.5 font-display text-base text-oro-claro">Bote {credits(potShown)}</span>
                 </motion.div>
               )}
@@ -365,13 +402,14 @@ export default function PokerTablePage() {
           {/* Cartas comunitarias */}
           {vis.board.map((c, i) => {
             const p = boardSlot(i, g);
-            return <TableCard key={`${vis.handId}-b${i}`} card={c} faceUp x={p.x} y={p.y} z={40 + i} from={DEALER_POS} width={66} speed={speed} highlight={bestCards.includes(c)} dim={bestCards.length > 0 && !bestCards.includes(c)} />;
+            return <TableCard key={`${vis.handId}-b${i}`} card={c} faceUp x={p.x} y={p.y} z={40 + i} from={DEALER_POS} extractVector={{ x: 0, y: 18 }} collectTo={collectingCards ? DEALER_POS : null} width={BOARD_W} speed={speed} highlight={bestCards.includes(c)} dim={bestCards.length > 0 && !bestCards.includes(c)} />;
           })}
 
           {/* Cartas privadas */}
           {Object.entries(vis.dealt).flatMap(([s, count]) => {
             const seat = Number(s);
-            if (vis.folded[seat] && !vis.revealed[seat]) return [];
+            // Las cartas de quien se retira van al montón de descartes (boca abajo) en lugar de desaparecer.
+            const mucked = !!vis.folded[seat] && !vis.revealed[seat];
             return Array.from({ length: count }, (_, i) => {
               const p = holeCardPos(seat, i);
               const card = vis.revealed[seat]?.[i] ?? null;
@@ -385,9 +423,12 @@ export default function PokerTablePage() {
                   rotate={p.rotate}
                   z={50 + i}
                   from={DEALER_POS}
-                  width={seat === heroSeat ? 62 : 50}
+                  width={seat === heroSeat ? HERO_W : RIVAL_W}
+                  extractVector={{ x: 0, y: 18 }}
+                  collectTo={collectingCards || mucked ? DEALER_POS : null}
                   speed={speed}
                   highlight={!!card && bestCards.includes(card)}
+                  dim={!!vis.folded[seat]}
                   sound={i === 0 && seat === heroSeat}
                 />
               );
@@ -396,7 +437,7 @@ export default function PokerTablePage() {
 
           {/* Apuestas frente a cada asiento */}
           {Object.entries(vis.bets).map(([s, amount]) => {
-            const p = towardCenter(posOf(Number(s)), 0.57, g);
+            const p = betSpot(posOf(Number(s)), Number(s) === heroSeat, g);
             return (
               <motion.div key={`bet-${s}`} className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: p.x, top: p.y, zIndex: 45 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <ChipStack amount={amount} size={28} max={6} />
@@ -435,7 +476,8 @@ export default function PokerTablePage() {
             />
           ))}
 
-          {shuffling && <ShuffleAnimation x={DEALER_POS.x} y={DEALER_POS.y + 40} to={DEALER_POS} width={40} speed={speed * 0.55} onDone={() => setShuffling(false)} />}
+          {shuffling && <ShuffleAnimation x={g.cx} y={g.boardY} to={DEALER_POS} width={BOARD_W * 0.82} speed={speed * 0.55} onDone={() => setShuffling(false)} />}
+          <Celebration ref={fx} level={effects} />
           <div className="absolute right-4 top-4">
             <SkipButton visible={animating && queue.current.length === 0 && seq.current.busy} onSkip={() => seq.current.skip()} />
           </div>

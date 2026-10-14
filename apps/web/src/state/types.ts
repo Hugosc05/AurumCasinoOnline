@@ -3,6 +3,8 @@ export interface Preferences {
   volume: number;
   music: boolean;
   animations: 'full' | 'reduced' | 'off';
+  /** Partículas y celebraciones visuales. */
+  effects: 'full' | 'reduced' | 'off';
   showOddsNotes: boolean;
 }
 
