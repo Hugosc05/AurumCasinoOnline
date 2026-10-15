@@ -1,93 +1,119 @@
 import type { SlotSymbol } from '@aurum/engine';
-import { animate, type AnimationPlaybackControls } from 'motion/react';
-import { forwardRef, memo, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, memo, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { cx } from '../../lib/format';
 import { SlotSymbolArt } from './symbols';
 
 export interface ReelHandle {
-  /** Recorre `path` (de abajo arriba visualmente: los símbolos bajan) y se asienta en la ventana final. */
-  spin(path: SlotSymbol[], durationMs: number, delayMs: number, onStop: () => void): Promise<void>;
-  skip(): void;
+  /**
+   * Coloca el rodillo (llamado en cada fotograma por el bucle de la máquina).
+   * `pos` es la posición envuelta en [0, L): símbolo de la fila superior.
+   * `blur` es el nivel de desenfoque de movimiento (0, 1, 2).
+   */
+  place(pos: number, blur: 0 | 1 | 2): void;
+  /** Destello breve al detenerse (directo sobre el DOM, sin volver a renderizar). */
+  thud(): void;
 }
 
 interface Props {
-  visible: SlotSymbol[];
+  strip: readonly SlotSymbol[];
+  /** Parada en reposo (para la colocación inicial y para situar los resaltados). */
+  stop: number;
   cell: number;
-  highlight: Set<number>;
+  /** Filas (0..2) de la ventana que forman parte de un premio. */
+  highlight: ReadonlySet<number>;
   dimOthers: boolean;
   anticipation: boolean;
+  /** Fila resaltada como premio principal (línea en curso): animación más marcada. */
+  winKey: number;
 }
 
-const Cell = memo(function Cell({ symbol, size, lit, dim }: { symbol: SlotSymbol; size: number; lit: boolean; dim: boolean }) {
+/** Desenfoque de movimiento: dos niveles (cambiar el filtro tiene coste; se cambia pocas veces). */
+const BLUR_PX = [0, 0, 2.2] as const;
+
+const Cell = memo(function Cell({ symbol, size, lit, dim, winKey }: { symbol: SlotSymbol; size: number; lit: boolean; dim: boolean; winKey: number }) {
   return (
-    <div className={cx('relative flex items-center justify-center transition-[opacity,filter] duration-300', dim && 'opacity-60 saturate-[.7]')} style={{ height: size }}>
-      <div className={cx(lit && 'motion-safe:animate-[pulse_0.9s_ease-in-out_infinite]')} style={{ transform: lit ? 'scale(1.08)' : undefined, transition: 'transform 300ms' }}>
+    <div className="relative flex items-center justify-center" style={{ height: size }}>
+      {lit && <div key={`g${winKey}`} className="slot-win-glow pointer-events-none absolute inset-1 rounded-xl" aria-hidden />}
+      <div key={lit ? `w${winKey}` : 'n'} className={cx('relative transition-[opacity,filter] duration-300', lit && 'slot-win-pop', dim && 'opacity-65 saturate-[.7]')}>
         <SlotSymbolArt symbol={symbol} size={size * 0.78} />
       </div>
-      {lit && <div className="pointer-events-none absolute inset-1 rounded-xl ring-2 ring-oro-claro/90 shadow-[0_0_24px_rgba(235,217,166,0.45)_inset]" />}
+      {lit && <div className="pointer-events-none absolute inset-1 rounded-xl ring-2 ring-oro-claro/90" aria-hidden />}
     </div>
   );
 });
 
-export const Reel = forwardRef<ReelHandle, Props>(function Reel({ visible, cell, highlight, dimOthers, anticipation }, ref) {
-  const stripRef = useRef<HTMLDivElement>(null);
-  const [path, setPath] = useState<SlotSymbol[] | null>(null);
-  const [blur, setBlur] = useState(false);
-  const ctl = useRef<AnimationPlaybackControls | null>(null);
-  const blurTimers = useRef<number[]>([]);
+/**
+ * Rodillo con la tira completa dibujada una sola vez. Durante el giro solo cambia
+ * un `transform` (sin renderizar React en cada fotograma), así que el movimiento
+ * es fluido incluso en equipos modestos.
+ *
+ * La tira se dibuja con un símbolo de margen arriba y tres abajo para envolver
+ * sin cortes: índice DOM = índice de la tira + 1.
+ */
+export const Reel = memo(
+  forwardRef<ReelHandle, Props>(function Reel({ strip, stop, cell, highlight, dimOthers, anticipation, winKey }, ref) {
+    const L = strip.length;
+    const stripRef = useRef<HTMLDivElement>(null);
+    const blurRef = useRef<HTMLDivElement>(null);
+    const lastBlur = useRef<0 | 1 | 2>(0);
+    const pos = useRef(stop);
 
-  useImperativeHandle(ref, () => ({
-    async spin(p, durationMs, delayMs, onStop) {
-      setPath(p);
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
+    const cells = useMemo(() => [strip[L - 1]!, ...strip, strip[0]!, strip[1]!, strip[2]!], [strip, L]);
+
+    const apply = (p: number, blur: 0 | 1 | 2): void => {
       const el = stripRef.current;
       if (!el) return;
-      const y0 = -(p.length - 3) * cell;
-      el.style.transform = `translateY(${y0}px)`;
-      if (durationMs <= 0) {
-        el.style.transform = 'translateY(0px)';
-        setPath(null);
-        onStop();
-        return;
+      pos.current = p;
+      el.style.transform = `translate3d(0, ${-(p + 1) * cell}px, 0)`;
+      const px = BLUR_PX[blur];
+      if (px !== BLUR_PX[lastBlur.current] && blurRef.current) {
+        // El filtro se aplica a la ventana (3 celdas), no a la tira entera: el navegador
+        // solo vuelve a dibujar un área pequeña al activarlo o quitarlo.
+        blurRef.current.style.filter = px ? `blur(${px}px)` : '';
       }
-      blurTimers.current.forEach(clearTimeout);
-      blurTimers.current = [
-        window.setTimeout(() => setBlur(true), delayMs + durationMs * 0.12),
-        window.setTimeout(() => setBlur(false), delayMs + durationMs * 0.82),
-      ];
-      const settle = Math.min(14, cell * 0.12);
-      ctl.current = animate(
-        el,
-        { y: [y0, y0 - settle, settle, 0] },
-        {
-          duration: durationMs / 1000,
-          delay: delayMs / 1000,
-          times: [0, 0.07, 0.95, 1],
-          ease: ['easeOut', [0.45, 0.02, 0.15, 1], 'easeOut'],
-        },
-      );
-      await ctl.current;
-      ctl.current = null;
-      blurTimers.current.forEach(clearTimeout);
-      setBlur(false);
-      setPath(null);
-      el.style.transform = 'translateY(0px)';
-      onStop();
-    },
-    skip() {
-      ctl.current?.complete();
-    },
-  }));
+      lastBlur.current = blur;
+    };
 
-  const list = path ?? visible;
-  return (
-    <div className={cx('relative overflow-hidden rounded-xl bg-gradient-to-b from-[#fdfaf3] via-[#f3ecdc] to-[#e2d6bc] transition-shadow duration-300', anticipation && 'shadow-[0_0_0_2px_#ebd9a6,0_0_30px_rgba(235,217,166,0.6)]')} style={{ height: cell * 3, width: cell }}>
-      <div ref={stripRef} className={cx('will-change-transform', blur && 'blur-[1.5px]')}>
-        {list.map((s, i) => (
-          <Cell key={path ? `p${i}` : `w${i}`} symbol={s} size={cell} lit={!path && highlight.has(i)} dim={!path && dimOthers && !highlight.has(i)} />
-        ))}
+    const rootRef = useRef<HTMLDivElement>(null);
+    useImperativeHandle(ref, () => ({
+      place: apply,
+      thud: () => {
+        const el = rootRef.current;
+        if (!el) return;
+        el.classList.remove('reel-thud');
+        void el.offsetWidth; // reinicia la animación CSS
+        el.classList.add('reel-thud');
+      },
+    }));
+
+    // Colocación en reposo y al cambiar el tamaño de celda.
+    useLayoutEffect(() => {
+      apply(stop, 0);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stop, cell]);
+
+    return (
+      <div
+        ref={rootRef}
+        className={cx(
+          'reel relative overflow-hidden rounded-xl bg-gradient-to-b from-[#fdfaf3] via-[#f3ecdc] to-[#e2d6bc] transition-shadow duration-300',
+          anticipation && 'reel-anticipation',
+        )}
+        style={{ height: cell * 3, width: cell }}
+      >
+        <div ref={blurRef} className="absolute inset-0 overflow-hidden">
+        <div ref={stripRef} className="will-change-transform" style={{ transform: `translate3d(0, ${-(stop + 1) * cell}px, 0)` }}>
+          {cells.map((s, i) => {
+            const row = i - 1 - stop;
+            const inWindow = row >= 0 && row < 3;
+            const lit = inWindow && highlight.has(row);
+            return <Cell key={i} symbol={s} size={cell} lit={lit} dim={inWindow && dimOthers && !lit} winKey={lit ? winKey : -1} />;
+          })}
+        </div>
+        </div>
+        {/* Curvatura del cilindro: sombra arriba y abajo, brillo central */}
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.42),rgba(0,0,0,0.06)_20%,rgba(255,255,255,0.08)_48%,rgba(0,0,0,0.04)_78%,rgba(0,0,0,0.42))]" />
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.35),transparent_22%,transparent_78%,rgba(0,0,0,0.35))]" />
-    </div>
-  );
-});
+    );
+  }),
+);

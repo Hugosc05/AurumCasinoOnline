@@ -1,12 +1,16 @@
 /**
  * Sistema de audio centralizado y opcional.
  *
- * Todos los sonidos se SINTETIZAN en tiempo real con Web Audio (osciladores y
- * ruido filtrado): no hay archivos de audio de terceros, así que no hay
- * problemas de licencia y no se descarga nada.
+ * Todos los sonidos se SINTETIZAN en tiempo real con Web Audio (osciladores,
+ * ruido filtrado, síntesis aditiva para campanas y metales). No hay archivos de
+ * audio de terceros: no hay problemas de licencia y no se descarga nada.
  *
- * El contexto de audio solo se crea tras la primera interacción del usuario
- * (los navegadores bloquean el audio automático y Aurum no lo intenta).
+ * Cadena: fuente → (panorama) → bus seco + envío a una reverberación de sala
+ * generada por código → compresor → salida. La reverberación es corta y suave:
+ * da cuerpo a campanas y fichas sin ensuciar los sonidos rápidos.
+ *
+ * Desactivado por defecto: no suena nada hasta que el usuario lo activa. El
+ * contexto de audio solo se crea tras un gesto del usuario.
  */
 
 type SoundName =
@@ -30,7 +34,15 @@ type SoundName =
   | 'wheelStop'
   | 'lineWin'
   | 'firework'
-  | 'coins';
+  | 'coins'
+  | 'anticipation';
+
+export interface PlayOptions {
+  /** Panorama estéreo (−1 izquierda … 1 derecha). */
+  pan?: number;
+  /** Variación de tono (1 = normal). */
+  rate?: number;
+}
 
 export interface LoopHandle {
   setIntensity(v: number): void;
@@ -39,42 +51,98 @@ export interface LoopHandle {
 
 const NOOP_LOOP: LoopHandle = { setIntensity: () => {}, stop: () => {} };
 
+/** Separación mínima (s) entre dos instancias del mismo sonido: evita saturación y efectos "metralleta". */
+const MIN_GAP: Partial<Record<SoundName, number>> = {
+  chip: 0.04, chips: 0.08, cardSlide: 0.05, cardLand: 0.05, cardFlip: 0.06, ballTick: 0.03, reelStop: 0.05,
+  lineWin: 0.12, winSmall: 0.4, winMedium: 0.6, winBig: 1.5, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03, anticipation: 0.8,
+};
+
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private dry: GainNode | null = null;
+  private wet: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private enabled = true;
   private volume = 0.6;
   private unlocked = false;
-  /** Último instante (s de AudioContext) en que sonó cada efecto: evita solapamientos molestos. */
   private last = new Map<SoundName, number>();
   private voices: number[] = [];
+
+  /** Ha habido un gesto del usuario (los navegadores permiten crear el audio a partir de entonces). */
+  private gestured = false;
 
   configure(enabled: boolean, volume: number): void {
     this.enabled = enabled;
     this.volume = Math.max(0, Math.min(1, volume));
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.enabled ? this.volume * 0.7 : 0, this.ctx.currentTime, 0.05);
+    if (this.enabled && !this.ctx && this.gestured) this.create();
+    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.enabled ? this.volume * 0.8 : 0, this.ctx.currentTime, 0.05);
   }
 
-  /** Llamar desde un gesto del usuario (clic/tecla). */
+  /**
+   * Llamar desde un gesto del usuario (clic/tecla). Si el sonido está
+   * desactivado no se crea nada: el motor de audio no consume recursos ni
+   * retrasa la primera interacción.
+   */
   unlock(): void {
-    if (this.unlocked) {
-      void this.ctx?.resume();
+    this.gestured = true;
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended' && this.enabled) void this.ctx.resume();
       return;
     }
+    if (this.enabled) this.create();
+  }
+
+  private create(): void {
+    if (this.unlocked) return;
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
-    this.ctx = new Ctor();
-    this.master = this.ctx.createGain();
-    this.master.gain.value = this.enabled ? this.volume * 0.7 : 0;
-    const comp = this.ctx.createDynamicsCompressor();
-    comp.threshold.value = -14;
-    this.master.connect(comp).connect(this.ctx.destination);
-    const len = this.ctx.sampleRate * 1.5;
-    this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const ctx = new Ctor({ latencyHint: 'interactive' });
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.enabled ? this.volume * 0.8 : 0;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -16;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.004;
+    comp.release.value = 0.18;
+    this.master.connect(comp).connect(ctx.destination);
+
+    this.dry = ctx.createGain();
+    this.dry.connect(this.master);
+    const conv = ctx.createConvolver();
+    this.wet = ctx.createGain();
+    this.wet.gain.value = 0.32;
+    const pre = ctx.createBiquadFilter();
+    pre.type = 'lowpass';
+    pre.frequency.value = 6500;
+    this.wet.connect(pre).connect(conv).connect(this.master);
+
+    // Ruido base (1 s) para los sonidos de fricción y golpes.
+    const len = ctx.sampleRate;
+    this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < len; i += 1) data[i] = Math.random() * 2 - 1;
     this.unlocked = true;
+    // La reverberación se genera fuera del gesto para no retrasar la interacción.
+    window.setTimeout(() => {
+      conv.buffer = this.impulse(1.2, 3.2);
+    }, 0);
+  }
+
+  private impulse(seconds: number, decay: number): AudioBuffer {
+    const ctx = this.ctx!;
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch += 1) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i += 1) {
+        const t = i / len;
+        // Primeras reflexiones algo más densas y cola que decae exponencialmente.
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay) * (i < ctx.sampleRate * 0.012 ? 0.3 : 1);
+      }
+    }
+    return buf;
   }
 
   private ready(): AudioContext | null {
@@ -83,134 +151,264 @@ class AudioEngine {
     return this.ctx;
   }
 
-  private tone(freq: number, start: number, dur: number, type: OscillatorType, gain: number, glideTo?: number): void {
+  /** Conecta un nodo a la salida con panorama y envío de reverberación. */
+  private out(node: AudioNode, pan = 0, send = 0.15): void {
+    const ctx = this.ctx!;
+    let tail: AudioNode = node;
+    if (pan !== 0 && 'createStereoPanner' in ctx) {
+      const p = ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      tail = node.connect(p);
+    }
+    tail.connect(this.dry!);
+    if (send > 0) {
+      const s = ctx.createGain();
+      s.gain.value = send;
+      tail.connect(s).connect(this.wet!);
+    }
+  }
+
+  /** Oscilador con envolvente percusiva. */
+  private tone(freq: number, start: number, dur: number, type: OscillatorType, gain: number, o: { glideTo?: number; attack?: number; pan?: number; send?: number } = {}): void {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, start);
-    if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, start + dur);
+    if (o.glideTo) osc.frequency.exponentialRampToValueAtTime(o.glideTo, start + dur);
+    const a = o.attack ?? 0.006;
     g.gain.setValueAtTime(0.0001, start);
-    g.gain.exponentialRampToValueAtTime(gain, start + 0.008);
+    g.gain.exponentialRampToValueAtTime(gain, start + a);
     g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    osc.connect(g).connect(this.master!);
+    osc.connect(g);
+    this.out(g, o.pan ?? 0, o.send ?? 0.1);
     osc.start(start);
-    osc.stop(start + dur + 0.02);
+    osc.stop(start + dur + 0.03);
   }
 
-  private burst(start: number, dur: number, freq: number, q: number, gain: number, type: BiquadFilterType = 'bandpass', sweepTo?: number): void {
+  /** Ruido filtrado con envolvente. */
+  private burst(start: number, dur: number, freq: number, q: number, gain: number, type: BiquadFilterType = 'bandpass', o: { sweepTo?: number; pan?: number; send?: number; attack?: number } = {}): void {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     const f = ctx.createBiquadFilter();
     f.type = type;
     f.frequency.setValueAtTime(freq, start);
-    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, start + dur);
+    if (o.sweepTo) f.frequency.exponentialRampToValueAtTime(o.sweepTo, start + dur);
     f.Q.value = q;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, start);
-    g.gain.exponentialRampToValueAtTime(gain, start + Math.min(0.01, dur / 3));
+    g.gain.exponentialRampToValueAtTime(gain, start + (o.attack ?? Math.min(0.006, dur / 3)));
     g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    src.connect(f).connect(g).connect(this.master!);
-    src.start(start, Math.random() * 0.8);
-    src.stop(start + dur + 0.02);
+    src.connect(f).connect(g);
+    this.out(g, o.pan ?? 0, o.send ?? 0.05);
+    src.start(start, Math.random() * 0.3);
+    src.stop(start + dur + 0.03);
   }
 
-  play(name: SoundName, delayMs = 0): void {
+  /**
+   * Campana / carillón por síntesis aditiva: parciales inarmónicos con caídas
+   * distintas (los agudos se apagan antes), como una campana de metal real.
+   */
+  private bell(freq: number, start: number, dur: number, gain: number, pan = 0): void {
+    const partials: [number, number, number][] = [
+      [1, 1, 1],
+      [2.0, 0.55, 0.75],
+      [2.76, 0.35, 0.5],
+      [5.4, 0.18, 0.28],
+      [8.93, 0.08, 0.16],
+    ];
+    for (const [ratio, amp, life] of partials) this.tone(freq * ratio, start, dur * life, 'sine', gain * amp, { attack: 0.003, pan, send: 0.35 });
+    // Golpe del martillo.
+    this.burst(start, 0.02, freq * 4, 1.5, gain * 0.5, 'bandpass', { pan, send: 0.1 });
+  }
+
+  /** Tintineo metálico de ficha o moneda (parciales inarmónicos muy cortos). */
+  private clink(start: number, base: number, gain: number, pan = 0): void {
+    [1, 1.47, 2.09, 2.56].forEach((r, i) => this.tone(base * r, start, 0.05 + 0.06 / (i + 1), 'sine', gain / (i + 1.2), { attack: 0.001, pan, send: 0.18 }));
+    this.burst(start, 0.012, 6500, 2, gain * 0.8, 'highpass', { pan });
+  }
+
+  play(name: SoundName, delayMs = 0, opts: PlayOptions = {}): void {
     const ctx = this.ready();
     if (!ctx) return;
     const t = ctx.currentTime + delayMs / 1000;
-    // Antisolapamiento: separación mínima por tipo de sonido y límite de voces simultáneas.
-    const minGap: Partial<Record<SoundName, number>> = { chip: 0.04, chips: 0.08, cardSlide: 0.05, cardLand: 0.05, cardFlip: 0.06, ballTick: 0.03, reelStop: 0.06, lineWin: 0.25, winSmall: 0.4, winMedium: 0.6, winBig: 1.2, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03 };
     const prev = this.last.get(name);
-    if (prev !== undefined && Math.abs(t - prev) < (minGap[name] ?? 0.05)) return;
+    if (prev !== undefined && Math.abs(t - prev) < (MIN_GAP[name] ?? 0.05)) return;
     this.voices = this.voices.filter((end) => end > ctx.currentTime);
-    if (this.voices.length >= 16 && name !== 'winBig' && name !== 'achievement') return;
+    if (this.voices.length >= 20 && name !== 'winBig' && name !== 'achievement') return;
     this.voices.push(t + 0.6);
     this.last.set(name, t);
-    const jitter = (): number => 0.94 + Math.random() * 0.12;
+    const j = (): number => (0.95 + Math.random() * 0.1) * (opts.rate ?? 1);
+    const pan = opts.pan ?? 0;
     switch (name) {
       case 'click':
-        this.tone(1400 * jitter(), t, 0.04, 'sine', 0.08);
+        this.burst(t, 0.012, 3200, 3, 0.12, 'bandpass', { pan });
+        this.tone(1800 * j(), t, 0.03, 'sine', 0.04, { pan });
         break;
       case 'cardSlide':
-        this.burst(t, 0.16, 2600 * jitter(), 0.9, 0.18, 'bandpass', 900);
+        // Fricción de papel sobre tapete: ruido que barre de agudo a medio.
+        this.burst(t, 0.17, 4200 * j(), 0.8, 0.14, 'bandpass', { sweepTo: 1300, pan, attack: 0.03 });
+        this.burst(t, 0.12, 900, 0.7, 0.05, 'lowpass', { pan });
         break;
       case 'cardLand':
-        this.burst(t, 0.05, 1800, 1.2, 0.22);
-        this.tone(140, t, 0.06, 'sine', 0.12);
+        this.burst(t, 0.035, 2200, 1, 0.18, 'bandpass', { pan });
+        this.burst(t, 0.06, 500, 0.8, 0.1, 'lowpass', { pan });
         break;
       case 'cardFlip':
-        this.burst(t, 0.07, 3800 * jitter(), 2, 0.16, 'highpass');
+        // Chasquido doble del canto de la carta.
+        this.burst(t, 0.018, 5200 * j(), 2.5, 0.16, 'highpass', { pan });
+        this.burst(t + 0.028, 0.03, 3000 * j(), 1.6, 0.12, 'bandpass', { pan });
         break;
       case 'chip':
-        this.tone(3200 * jitter(), t, 0.09, 'sine', 0.07);
-        this.tone(4700 * jitter(), t + 0.004, 0.07, 'sine', 0.05);
-        this.burst(t, 0.03, 5000, 3, 0.08, 'highpass');
+        this.clink(t, 2900 * j(), 0.07, pan);
         break;
       case 'chips':
-        for (let i = 0; i < 4; i += 1) {
-          const s = t + i * (0.035 + Math.random() * 0.03);
-          this.tone(3000 * jitter(), s, 0.08, 'sine', 0.05);
-          this.tone(4500 * jitter(), s, 0.06, 'sine', 0.035);
-        }
+        for (let i = 0; i < 5; i += 1) this.clink(t + i * (0.028 + Math.random() * 0.03), 2600 + Math.random() * 900, 0.05, pan + (Math.random() - 0.5) * 0.3);
+        this.burst(t, 0.16, 1800, 0.6, 0.03, 'bandpass', { pan });
         break;
       case 'reelStop':
-        this.tone(95, t, 0.12, 'triangle', 0.2, 60);
-        this.burst(t, 0.06, 900, 1.5, 0.14, 'lowpass');
+        // Golpe mecánico: cuerpo grave + chasquido del freno + pequeño traqueteo.
+        this.tone(78 * j(), t, 0.16, 'sine', 0.28, { glideTo: 48, pan, send: 0.08 });
+        this.tone(160 * j(), t, 0.07, 'triangle', 0.1, { glideTo: 110, pan });
+        this.burst(t, 0.025, 2600 * j(), 1.4, 0.2, 'bandpass', { pan });
+        this.burst(t + 0.035, 0.02, 1700, 2, 0.07, 'bandpass', { pan });
+        this.burst(t + 0.06, 0.015, 1500, 2, 0.04, 'bandpass', { pan });
         break;
       case 'ballTick':
-        this.tone(2400 * jitter(), t, 0.025, 'square', 0.025);
+        this.burst(t, 0.012, 3600 * j(), 3, 0.06, 'bandpass', { pan });
+        this.tone(2300 * j(), t, 0.02, 'sine', 0.02, { pan });
         break;
       case 'ballDrop':
-        this.tone(1800, t, 0.05, 'triangle', 0.08);
-        this.tone(1300, t + 0.09, 0.05, 'triangle', 0.06);
-        this.tone(1100, t + 0.16, 0.08, 'triangle', 0.05);
-        break;
-      case 'winSmall':
-        [784, 988].forEach((f, i) => this.tone(f, t + i * 0.09, 0.3, 'triangle', 0.09));
-        break;
-      case 'winMedium':
-        [659, 784, 988, 1319].forEach((f, i) => this.tone(f, t + i * 0.085, 0.42, 'triangle', 0.09));
-        break;
-      case 'winBig':
-        [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => {
-          this.tone(f, t + i * 0.09, 0.6, 'triangle', 0.09);
-          this.tone(f * 2, t + i * 0.09, 0.3, 'sine', 0.03);
+        [0, 0.11, 0.19, 0.25, 0.29].forEach((dt, i) => {
+          this.burst(t + dt, 0.02, 3000 - i * 250, 2.5, 0.12 / (i + 1), 'bandpass', { pan });
+          this.tone(1500 - i * 120, t + dt, 0.04, 'triangle', 0.05 / (i + 1), { pan });
         });
         break;
+      case 'winSmall':
+        this.bell(1046.5, t, 0.9, 0.06);
+        this.bell(1318.5, t + 0.11, 1.1, 0.055);
+        break;
+      case 'winMedium':
+        [784, 987.8, 1174.7, 1568].forEach((f, i) => this.bell(f, t + i * 0.09, 1.2, 0.055, (i - 1.5) * 0.25));
+        break;
+      case 'winBig': {
+        // Fanfarria breve de campanas + acorde de fondo; dura ~2,5 s (sin bucles).
+        const notes = [523.3, 659.3, 784, 1046.5, 784, 1046.5, 1318.5, 1568];
+        notes.forEach((f, i) => this.bell(f, t + i * 0.1, 1.4, 0.055, Math.sin(i) * 0.4));
+        this.pad([261.6, 329.6, 392, 523.3], t + 0.05, 2.3, 0.035);
+        break;
+      }
       case 'lose':
-        this.tone(330, t, 0.22, 'sine', 0.06, 290);
-        this.tone(247, t + 0.16, 0.32, 'sine', 0.05, 220);
+        // Discreto: sin "sonido triste" insistente.
+        this.tone(392, t, 0.25, 'sine', 0.035, { glideTo: 370 });
         break;
       case 'push':
-        this.tone(523, t, 0.2, 'sine', 0.06);
+        this.bell(784, t, 0.6, 0.04);
         break;
       case 'achievement':
-        [880, 1109, 1319, 1760].forEach((f, i) => this.tone(f, t + i * 0.06, 0.8, 'sine', 0.06));
+        [1046.5, 1318.5, 1568, 2093].forEach((f, i) => this.bell(f, t + i * 0.07, 1.3, 0.045, (i - 1.5) * 0.3));
         break;
       case 'error':
-        this.tone(220, t, 0.14, 'square', 0.04);
+        this.tone(196, t, 0.12, 'triangle', 0.06);
+        this.tone(185, t + 0.13, 0.16, 'triangle', 0.05);
         break;
       case 'spinStart':
-        this.burst(t, 0.35, 600, 0.7, 0.12, 'bandpass', 1800);
-        this.tone(330, t, 0.12, 'triangle', 0.05, 440);
+        // Trinquete de la palanca + soltar el muelle.
+        for (let i = 0; i < 6; i += 1) this.burst(t + i * 0.032 * (1 - i * 0.07), 0.012, 2400 + i * 160, 3, 0.09, 'bandpass');
+        this.tone(120, t + 0.2, 0.18, 'sine', 0.14, { glideTo: 70 });
+        this.burst(t + 0.18, 0.3, 700, 0.7, 0.06, 'bandpass', { sweepTo: 2200 });
         break;
       case 'wheelStop':
-        this.tone(1250, t, 0.06, 'triangle', 0.07);
-        this.burst(t, 0.05, 2500, 2, 0.08);
+        this.burst(t, 0.03, 2400, 2, 0.1, 'bandpass', { send: 0.2 });
+        this.tone(220, t, 0.25, 'sine', 0.08, { glideTo: 180 });
         break;
       case 'lineWin':
-        this.tone(1047 * jitter(), t, 0.22, 'triangle', 0.06);
-        this.tone(1568, t + 0.06, 0.25, 'sine', 0.04);
+        this.bell(1568 * (opts.rate ?? 1), t, 0.7, 0.045, pan);
         break;
       case 'firework':
-        this.burst(t, 0.5, 900, 0.5, 0.14, 'lowpass', 200);
-        this.burst(t + 0.02, 0.25, 4000 * jitter(), 1, 0.06, 'highpass');
+        // Silbido ascendente, estallido y crepitar.
+        this.tone(1300 * j(), t, 0.35, 'sine', 0.025, { glideTo: 2600, pan, send: 0.2 });
+        this.tone(70, t + 0.36, 0.5, 'sine', 0.18, { glideTo: 38, pan, send: 0.4 });
+        this.burst(t + 0.36, 0.6, 1400, 0.5, 0.12, 'lowpass', { sweepTo: 300, pan, send: 0.4 });
+        for (let i = 0; i < 10; i += 1) this.burst(t + 0.45 + Math.random() * 0.5, 0.01, 5000 + Math.random() * 3000, 3, 0.04, 'highpass', { pan: pan + (Math.random() - 0.5) * 0.6, send: 0.3 });
         break;
       case 'coins':
-        for (let i = 0; i < 8; i += 1) this.tone(2600 + Math.random() * 1800, t + i * 0.05 + Math.random() * 0.02, 0.07, 'sine', 0.035);
+        for (let i = 0; i < 12; i += 1) this.clink(t + i * 0.045 + Math.random() * 0.02, 2400 + Math.random() * 1600, 0.045, (Math.random() - 0.5) * 0.8);
         break;
+      case 'anticipation':
+        // Tensión ascendente con trémolo (dura lo que la espera extra del rodillo).
+        this.tremolo(t, 0.9, 440, 880, 0.05, pan);
+        break;
+    }
+  }
+
+  /** Acorde sostenido suave (dientes de sierra desafinados y filtrados). */
+  private pad(freqs: number[], start: number, dur: number, gain: number): void {
+    const ctx = this.ctx!;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(900, start);
+    f.frequency.linearRampToValueAtTime(2400, start + dur * 0.4);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(gain, start + 0.25);
+    g.gain.setValueAtTime(gain, start + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    f.connect(g);
+    this.out(g, 0, 0.4);
+    for (const fr of freqs) {
+      for (const det of [-6, 6]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = fr;
+        o.detune.value = det;
+        o.connect(f);
+        o.start(start);
+        o.stop(start + dur + 0.05);
+      }
+    }
+  }
+
+  private tremolo(start: number, dur: number, from: number, to: number, gain: number, pan: number): void {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(from, start);
+    o.frequency.exponentialRampToValueAtTime(to, start + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(gain, start + 0.1);
+    g.gain.setValueAtTime(gain, start + dur - 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 11;
+    const lg = ctx.createGain();
+    lg.gain.value = gain * 0.6;
+    lfo.connect(lg).connect(g.gain);
+    o.connect(g);
+    this.out(g, pan, 0.25);
+    o.start(start);
+    lfo.start(start);
+    o.stop(start + dur + 0.05);
+    lfo.stop(start + dur + 0.05);
+  }
+
+  /**
+   * Contador de premio: tics que suben de tono durante `durationMs`, como un
+   * marcador mecánico. Se apaga solo; no se repite.
+   */
+  countUp(durationMs: number): void {
+    const ctx = this.ready();
+    if (!ctx) return;
+    const start = ctx.currentTime + 0.05;
+    const dur = Math.min(3, durationMs / 1000);
+    const n = Math.max(4, Math.round(dur * 16));
+    for (let i = 0; i < n; i += 1) {
+      const p = i / n;
+      // Más rápido al principio y más espaciado al final (como el contador visual).
+      const at = start + dur * (1 - Math.pow(1 - p, 2)) * 0.95;
+      this.tone(900 + 900 * p, at, 0.05, 'triangle', 0.03 * (1 - p * 0.4), { attack: 0.002, send: 0.05 });
     }
   }
 
@@ -219,50 +417,91 @@ class AudioEngine {
     const ctx = this.ready();
     if (!ctx) return;
     const start = ctx.currentTime + delayMs / 1000;
-    const n = Math.max(8, Math.round(durationMs / 26));
+    const n = Math.max(8, Math.round(durationMs / 22));
     for (let i = 0; i < n; i += 1) {
       const p = i / n;
-      this.burst(start + (p * durationMs) / 1000 + Math.random() * 0.006, 0.022, 3000 + Math.random() * 1500, 2.5, 0.07 + 0.05 * Math.sin(p * Math.PI));
+      const at = start + (p * durationMs) / 1000 + Math.random() * 0.005;
+      this.burst(at, 0.018, 3400 + Math.random() * 1800, 2.2, 0.05 + 0.06 * Math.sin(p * Math.PI), 'bandpass', { pan: (p - 0.5) * 0.5 });
     }
+    // Asentamiento final del mazo.
+    this.burst(start + durationMs / 1000, 0.05, 1200, 1, 0.1, 'bandpass');
   }
 
-  /** Bucle continuo (rodadura de la bola, rodillos). La intensidad modula volumen y brillo. */
+  /**
+   * Bucle continuo: rodadura de la bola o rodillos girando. La intensidad
+   * (0..1) modula volumen y brillo; siempre termina con `stop()`.
+   */
   loop(kind: 'roll' | 'reels'): LoopHandle {
     const ctx = this.ready();
     if (!ctx || !this.noise) return NOOP_LOOP;
+    const now = ctx.currentTime;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    this.out(g, 0, kind === 'roll' ? 0.15 : 0.08);
+    const nodes: AudioScheduledSourceNode[] = [];
+
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     src.loop = true;
     const f = ctx.createBiquadFilter();
-    f.type = 'bandpass';
-    f.frequency.value = kind === 'roll' ? 1200 : 500;
-    f.Q.value = kind === 'roll' ? 0.8 : 2.5;
-    const g = ctx.createGain();
-    g.gain.value = 0;
-    src.connect(f).connect(g).connect(this.master!);
-    let lfo: OscillatorNode | null = null;
+    f.type = kind === 'roll' ? 'bandpass' : 'lowpass';
+    f.frequency.value = kind === 'roll' ? 1200 : 520;
+    f.Q.value = kind === 'roll' ? 0.8 : 0.9;
+    src.connect(f).connect(g);
+    nodes.push(src);
+
+    let tickGain: GainNode | null = null;
+    let tickF: BiquadFilterNode | null = null;
     if (kind === 'reels') {
-      lfo = ctx.createOscillator();
-      lfo.frequency.value = 18;
-      const lg = ctx.createGain();
-      lg.gain.value = 0.05;
-      lfo.connect(lg).connect(g.gain);
-      lfo.start();
+      // Motor: zumbido grave.
+      const hum = ctx.createOscillator();
+      hum.type = 'sawtooth';
+      hum.frequency.value = 58;
+      const hf = ctx.createBiquadFilter();
+      hf.type = 'lowpass';
+      hf.frequency.value = 180;
+      const hg = ctx.createGain();
+      hg.gain.value = 0.35;
+      hum.connect(hf).connect(hg).connect(g);
+      nodes.push(hum);
+      // Traqueteo de los símbolos al pasar: ruido agudo modulado por un pulso.
+      const tick = ctx.createBufferSource();
+      tick.buffer = this.noise;
+      tick.loop = true;
+      tickF = ctx.createBiquadFilter();
+      tickF.type = 'bandpass';
+      tickF.frequency.value = 2600;
+      tickF.Q.value = 1.6;
+      tickGain = ctx.createGain();
+      tickGain.gain.value = 0;
+      const pulse = ctx.createOscillator();
+      pulse.type = 'square';
+      pulse.frequency.value = 26;
+      const pg = ctx.createGain();
+      pg.gain.value = 0.5;
+      pulse.connect(pg).connect(tickGain.gain);
+      tick.connect(tickF).connect(tickGain).connect(g);
+      nodes.push(tick, pulse);
     }
-    src.start();
-    const base = kind === 'roll' ? 0.16 : 0.07;
-    g.gain.setTargetAtTime(base, ctx.currentTime, 0.08);
+    nodes.forEach((n) => n.start(now));
+    const base = kind === 'roll' ? 0.16 : 0.11;
+    g.gain.setTargetAtTime(base, now, 0.06);
+    let stopped = false;
     return {
       setIntensity: (v) => {
-        const now = ctx.currentTime;
-        g.gain.setTargetAtTime(base * Math.max(0, Math.min(1, v)), now, 0.1);
-        f.frequency.setTargetAtTime((kind === 'roll' ? 500 : 300) + 1200 * v, now, 0.1);
+        if (stopped) return;
+        const t = ctx.currentTime;
+        const k = Math.max(0, Math.min(1, v));
+        g.gain.setTargetAtTime(base * (0.25 + 0.75 * k), t, 0.08);
+        f.frequency.setTargetAtTime((kind === 'roll' ? 500 : 260) + (kind === 'roll' ? 1200 : 360) * k, t, 0.1);
+        if (tickF) tickF.frequency.setTargetAtTime(1800 + 900 * k, t, 0.1);
       },
       stop: (fadeMs = 200) => {
-        const now = ctx.currentTime;
-        g.gain.setTargetAtTime(0, now, fadeMs / 4000);
-        src.stop(now + fadeMs / 1000 + 0.1);
-        lfo?.stop(now + fadeMs / 1000 + 0.1);
+        if (stopped) return;
+        stopped = true;
+        const t = ctx.currentTime;
+        g.gain.setTargetAtTime(0, t, Math.max(0.01, fadeMs / 4000));
+        nodes.forEach((n) => n.stop(t + fadeMs / 1000 + 0.15));
       },
     };
   }

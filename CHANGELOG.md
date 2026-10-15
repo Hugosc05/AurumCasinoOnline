@@ -2,6 +2,25 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.2.0] — 2026-10-15
+
+### Corregido
+- **Cartas boca abajo en `npm run dev`**: con el modo estricto de React (solo en desarrollo) el vuelo de la carta se cancelaba y nunca llegaba a girarse. `TableCard` es ahora idempotente y una prueba E2E contra el servidor de desarrollo lo vigila.
+- Tirones al primer clic: el motor de audio ya no se crea mientras el sonido está desactivado y la reverberación se genera fuera del gesto.
+- Renders innecesarios que restaban fluidez (props que rompían la memoización de cartas y rodillos, filtros SVG en las líneas de premio) y desenfoques de fondo (`backdrop-blur`) encima de zonas animadas.
+- Póker: el indicador podía quedarse en «Reconectando…» estando conectado; las cartas de los rivales ya no quedan bajo su placa ni sobre las comunitarias; bote en una fila visible entre el tablero y tus cartas.
+
+### Cambiado
+- **Slots como una máquina real**: los rodillos arrancan al instante al pulsar (sin esperar al servidor), frenan con física y rebote hasta la parada exacta, se pueden frenar pulsando otra vez y se puede volver a girar durante la presentación de un premio. Palanca lateral, bombillas que recorren el marco, golpe visual al parar, símbolos premiados que saltan y brillan, anticipación más marcada.
+- **Sonidos rehechos**: reverberación, estéreo, campanas, fichas, golpes mecánicos, motor de rodillos, contador de premio (sigue siendo todo sintetizado, sin archivos de terceros).
+
+### Añadido
+- `npm run jugar` (versión optimizada) y `npm run test:e2e:dev` (pruebas de animación en modo desarrollo).
+- Física de rodillos pura (`reelMotion.ts`) con 7 pruebas; 2 pruebas E2E de animación.
+
+### Eliminado
+- `reelPlan.ts` (recorrido precalculado), sustituido por la física de rodillos.
+
 ## [1.1.0] — 2026-10-14
 
 Mejora visual y de animación sobre la versión 1.0 (sin cambios de reglas, saldos ni persistencia).

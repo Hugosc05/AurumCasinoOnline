@@ -1,7 +1,8 @@
 import { DEFAULT_SLOT_LIMITS, PAYLINES, REEL_STRIPS, SLOT_SYMBOL_LABELS, gridFromStops, type SlotSpinResult, type SlotSymbol, type WinTier } from '@aurum/engine';
 import { AnimatePresence, animate, motion } from 'motion/react';
 import { Minus, Play, Plus, Repeat, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { AnimationPlaybackControls } from 'motion/react';
 import { Celebration, type CelebrationHandle } from '../../components/Celebration';
 import { GameHeader, OddsNote, SkipButton } from '../../components/GameKit';
 import { Button, Segmented } from '../../components/ui';
@@ -14,7 +15,7 @@ import { useSession } from '../../state/session';
 import type { Achievement, Balance } from '../../state/types';
 import { planSlotPresentation, lineColor, type SlotPresentation } from './presentation';
 import { Reel, type ReelHandle } from './Reel';
-import { reelPath } from './reelPlan';
+import { REEL_FULL, REEL_REDUCED, blurLevel, createReel, mod, requestStop, slamStop, snapTo, startSpin, step, type ReelState } from './reelMotion';
 
 interface SpinResponse {
   roundId: string;
@@ -27,6 +28,13 @@ const BET_STEPS = [1, 2, 5, 10, 20, 50, 100];
 const TIER_TEXT: Record<WinTier, string> = { none: '', small: 'Premio', medium: 'Buen premio', big: 'Gran premio', mega: 'Premio extraordinario' };
 const TIER_MS: Record<WinTier, number> = { none: 0, small: DURATION.winSmall, medium: DURATION.winMedium, big: DURATION.winBig, mega: DURATION.winBig + 1200 };
 const GAP = 8;
+const LEVER_W = 56;
+const NO_LINES: ReadonlySet<number> = new Set();
+const NO_HIGHLIGHTS: ReadonlySet<number>[] = Array.from({ length: 5 }, () => NO_LINES);
+/** Tiempos de la máquina (ms): giro mínimo antes de la primera parada y separación entre paradas. */
+const SPIN_MIN = { full: 620, reduced: 300 } as const;
+const STOP_GAP = { full: 230, reduced: 120 } as const;
+const ANTICIPATION_MS = 900;
 
 type Phase = 'idle' | 'spinning' | 'presenting';
 /** Fase de la presentación de líneas: todas a la vez y después una a una. */
@@ -38,7 +46,7 @@ function useCellSize(ref: React.RefObject<HTMLDivElement | null>): number {
     const el = ref.current;
     if (!el) return;
     const update = (): void => {
-      const w = el.clientWidth - 44; // espacio para los marcadores de línea
+      const w = el.clientWidth - 44 - (window.innerWidth >= 1024 ? LEVER_W : 0); // marcadores de línea y palanca
       setCell(Math.max(52, Math.min(124, Math.floor((w - 4 * GAP) / 5), Math.floor((window.innerHeight * 0.4) / 3))));
     };
     update();
@@ -50,7 +58,7 @@ function useCellSize(ref: React.RefObject<HTMLDivElement | null>): number {
 }
 
 /** Marcadores numerados de las líneas a ambos lados de los rodillos (como en una máquina real). */
-function LineMarkers({ side, cell, lines, winning, active }: { side: 'left' | 'right'; cell: number; lines: number; winning: Set<number>; active: number | null }) {
+const LineMarkers = memo(function LineMarkers({ side, cell, lines, winning, active }: { side: 'left' | 'right'; cell: number; lines: number; winning: ReadonlySet<number>; active: number | null }) {
   const byRow: number[][] = [[], [], []];
   PAYLINES.forEach((rows, i) => byRow[rows[side === 'left' ? 0 : 4]!]!.push(i));
   return (
@@ -79,7 +87,39 @@ function LineMarkers({ side, cell, lines, winning, active }: { side: 'left' | 'r
       )}
     </div>
   );
+});
+
+/** Palanca lateral: se baja al girar (y también sirve para girar). */
+function Lever({ pulls, onPull, disabled }: { pulls: number; onPull: () => void; disabled: boolean }) {
+  return (
+    <button type="button" onClick={onPull} disabled={disabled} className="group relative hidden h-[220px] shrink-0 cursor-pointer disabled:cursor-not-allowed lg:block" style={{ width: LEVER_W }} aria-label="Tirar de la palanca para girar">
+      {/* Soporte */}
+      <span className="absolute bottom-6 left-1/2 h-16 w-7 -translate-x-1/2 rounded-lg border border-oro/40 bg-gradient-to-b from-[#3a2c12] to-[#1a1408] shadow-[inset_0_2px_6px_rgba(0,0,0,0.6)]" />
+      <motion.span
+        key={pulls}
+        className="absolute bottom-[64px] left-1/2 block w-3 origin-bottom -translate-x-1/2"
+        style={{ height: 130 }}
+        initial={{ scaleY: 1 }}
+        animate={pulls > 0 ? { scaleY: [1, -0.55, -0.62, 1.04, 1] } : { scaleY: 1 }}
+        transition={{ duration: 0.75, times: [0, 0.28, 0.4, 0.82, 1], ease: 'easeInOut' }}
+      >
+        <span className="absolute inset-x-0 bottom-0 top-3 rounded-full bg-gradient-to-r from-[#8c8c94] via-[#f2f2f5] to-[#7a7a82]" />
+        <span className="absolute -left-[10px] -top-[14px] h-8 w-8 rounded-full bg-[radial-gradient(circle_at_35%_30%,#ff9aa5,#c3142d_55%,#5e0614)] shadow-[0_6px_14px_rgba(0,0,0,0.55)] transition-transform group-hover:scale-110" />
+      </motion.span>
+    </button>
+  );
 }
+
+/** Fila de bombillas del marco (se encienden en secuencia al girar y al ganar). */
+const Bulbs = memo(function Bulbs({ count, mode, reverse }: { count: number; mode: 'off' | 'chase' | 'win'; reverse?: boolean }) {
+  return (
+    <div className={cx('flex justify-between px-3', mode === 'chase' && 'bulbs-chase', mode === 'win' && 'bulbs-win')} aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className="bulb h-2.5 w-2.5 rounded-full" style={{ animationDelay: `${((reverse ? count - i : i) * (mode === 'win' ? 0.42 : 0.9)) / count}s` }} />
+      ))}
+    </div>
+  );
+});
 
 export default function SlotsPage() {
   const { user, setBalance, speed, motion: level, effects, prefs, updatePrefs } = useSession();
@@ -88,11 +128,12 @@ export default function SlotsPage() {
   const windowRef = useRef<HTMLDivElement>(null);
   const cell = useCellSize(windowRef);
   const counterRef = useRef<HTMLSpanElement>(null);
+  const counterAnim = useRef<AnimationPlaybackControls | null>(null);
   const fx = useRef<CelebrationHandle>(null);
   const machineFx = useRef<CelebrationHandle>(null);
 
-  const [stops, setStops] = useState<number[]>([0, 7, 14, 21, 28]);
-  const [grid, setGrid] = useState<SlotSymbol[][]>(() => gridFromStops([0, 7, 14, 21, 28]));
+  const INITIAL_STOPS = [0, 7, 14, 21, 28];
+  const [stops, setStops] = useState<number[]>(INITIAL_STOPS);
   const [lines, setLines] = useState(20);
   const [betPerLine, setBetPerLine] = useState(1);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -103,8 +144,8 @@ export default function SlotsPage() {
   const [anticip, setAnticip] = useState<Set<number>>(new Set());
   const [bigWin, setBigWin] = useState<{ tier: WinTier; amount: number; multiplier: number } | null>(null);
   const [auto, setAuto] = useState(0);
+  const [pulls, setPulls] = useState(0);
   const [history, setHistory] = useState<{ bet: number; win: number }[]>([]);
-  const busy = useRef(false);
   const autoRef = useRef(0);
   autoRef.current = auto;
   const loop = useRef<LoopHandle | null>(null);
@@ -112,10 +153,43 @@ export default function SlotsPage() {
   const totalBet = betPerLine * lines;
   const canAfford = user?.unlimited || (user?.balance ?? 0) >= totalBet;
 
+  // ── Motor de los rodillos: un único bucle rAF para los cinco ──
+  // Callbacks de referencia estables: no rompen la memoización de los rodillos.
+  const reelRefs = useMemo(() => Array.from({ length: 5 }, (_, i) => (el: ReelHandle | null) => void (reels.current[i] = el)), []);
+  const motions = useRef<ReelState[]>(REEL_STRIPS.map((strip, i) => createReel(strip.length, INITIAL_STOPS[i]!)));
+  const raf = useRef<number | null>(null);
+  const spinning = useRef(false);
+  const slamRequested = useRef(false);
+  const stopWaiters = useRef<(() => void)[]>([]);
+  const onLand = useRef<(i: number) => void>(() => undefined);
+  const levelRef = useRef(level);
+  levelRef.current = level;
+
+  const frame = useCallback((now: number) => {
+    let active = false;
+    motions.current.forEach((m, i) => {
+      const r = step(m, now);
+      reels.current[i]?.place(mod(m.pos, m.L), levelRef.current === 'full' ? blurLevel(m) : 0);
+      if (r.landed || (r.stopped && m.cfg.settleMs === 0)) onLand.current(i);
+      if (r.stopped) {
+        stopWaiters.current[i]?.();
+      }
+      if (m.phase !== 'idle') active = true;
+    });
+    raf.current = active ? requestAnimationFrame(frame) : null;
+  }, []);
+  const kick = useCallback(() => {
+    if (raf.current === null) raf.current = requestAnimationFrame(frame);
+  }, [frame]);
+
   useEffect(
     () => () => {
+      if (raf.current !== null) cancelAnimationFrame(raf.current);
+      raf.current = null;
       loop.current?.stop(50);
+      counterAnim.current?.stop();
       presentToken.current += 1;
+      autoRef.current = 0;
     },
     [],
   );
@@ -137,34 +211,48 @@ export default function SlotsPage() {
 
   const current = plan && activeLine !== null ? plan.lines[activeLine] ?? null : null;
 
-  const highlightFor = (reel: number): Set<number> => {
-    if (!plan || phase !== 'presenting' || plan.total === 0) return new Set();
-    const set = new Set<number>();
+  // Resaltados por rodillo, memorizados: los rodillos solo se vuelven a dibujar si cambian.
+  const highlights = useMemo((): ReadonlySet<number>[] => {
+    if (!plan || phase !== 'presenting' || plan.total === 0) return NO_HIGHLIGHTS;
+    const sets = Array.from({ length: 5 }, () => new Set<number>());
     const wins = current ? [current] : plan.lines;
-    for (const w of wins) for (const [r, row] of w.cells) if (r === reel) set.add(row);
-    if (plan.scatter && !current) for (const [r, row] of plan.scatter.cells) if (r === reel) set.add(row);
-    return set;
-  };
+    for (const w of wins) for (const [r, row] of w.cells) sets[r]!.add(row);
+    if (plan.scatter && !current) for (const [r, row] of plan.scatter.cells) sets[r]!.add(row);
+    return sets;
+  }, [plan, phase, current]);
 
   const cellCenter = (reel: number, row: number): { x: number; y: number } => ({ x: reel * (cell + GAP) + cell / 2, y: row * cell + cell / 2 });
 
-  /** Presentación de un resultado ya liquidado. Devuelve cuando el contador ha terminado. */
-  const present = async (r: SlotSpinResult, p: SlotPresentation): Promise<void> => {
+  /** Corta cualquier presentación en curso (al volver a girar no se espera a nada). */
+  const stopPresentation = (): void => {
+    presentToken.current += 1;
+    counterAnim.current?.stop();
+    counterAnim.current = null;
+    fx.current?.clear();
+    machineFx.current?.clear();
+    setPlan(null);
+    setResult(null);
+    setBigWin(null);
+    setActiveLine(null);
+    setLineStage('overview');
+    if (counterRef.current) counterRef.current.textContent = '0';
+  };
+
+  /** Presentación de un resultado ya liquidado. No bloquea: se puede volver a girar en cualquier momento. */
+  const present = (r: SlotSpinResult, p: SlotPresentation): void => {
     const token = ++presentToken.current;
     const alive = (): boolean => token === presentToken.current;
     setPlan(p);
     setPhase('presenting');
     if (p.total === 0) return;
     setLineStage('overview');
-    // Activación de cada línea ganadora, escalonada (sin amontonar sonidos).
-    p.lines.slice(0, 4).forEach((_, i) => audio.play('lineWin', i * 160));
+    p.lines.slice(0, 5).forEach((_, i) => audio.play('lineWin', i * 140, { rate: 1 + i * 0.125, pan: (i - 2) * 0.3 }));
     const winW = cell * 5 + GAP * 4;
     const winH = cell * 3;
     const points = [...p.lines.flatMap((l) => l.cells), ...(p.scatter?.cells ?? [])].map(([reel, row]) => {
       const c = cellCenter(reel, row);
       return { x: c.x / winW, y: c.y / winH };
     });
-    // Celebración proporcional a la categoría real del premio.
     if (p.celebration === 'sparkle') fx.current?.play('sparkle', points.slice(0, 8));
     if (p.celebration === 'burst') {
       fx.current?.play('sparkle', points.slice(0, 8));
@@ -177,45 +265,95 @@ export default function SlotsPage() {
       audio.play('coins', 500);
     }
     if (r.tier === 'big' || r.tier === 'mega') setBigWin({ tier: r.tier, amount: r.totalWin, multiplier: r.totalWin / r.totalBet });
-    audio.play(r.tier === 'big' || r.tier === 'mega' ? 'winBig' : r.tier === 'medium' ? 'winMedium' : 'winSmall', 120);
+    audio.play(r.tier === 'big' || r.tier === 'mega' ? 'winBig' : r.tier === 'medium' ? 'winMedium' : 'winSmall', 80);
     const dur = (TIER_MS[r.tier] / 1000) * Math.max(speed, 0.2);
-    if (counterRef.current) {
-      const el = counterRef.current;
-      await animate(0, r.totalWin, { duration: speed === 0 ? 0 : dur, ease: 'easeOut', onUpdate: (v) => (el.textContent = credits(Math.round(v))) });
-      el.textContent = credits(r.totalWin);
+    const el = counterRef.current;
+    if (el) {
+      if (speed === 0) el.textContent = credits(r.totalWin);
+      else {
+        audio.countUp(dur * 1000);
+        const ctl = animate(0, r.totalWin, { duration: dur, ease: 'easeOut', onUpdate: (v) => (el.textContent = credits(Math.round(v))) });
+        counterAnim.current = ctl;
+        void ctl.then(() => {
+          if (!alive()) return;
+          el.textContent = credits(r.totalWin);
+        });
+      }
     }
-    if (!alive()) return;
-    window.setTimeout(() => alive() && setLineStage('cycle'), speed === 0 ? 0 : 500);
-    if (r.tier === 'big' || r.tier === 'mega') window.setTimeout(() => alive() && setBigWin(null), Math.max(1200, 2600 * Math.max(speed, 0.4)));
+    window.setTimeout(() => alive() && setLineStage('cycle'), speed === 0 ? 0 : Math.max(900, dur * 1000 * 0.6));
+    if (r.tier === 'big' || r.tier === 'mega') window.setTimeout(() => alive() && setBigWin(null), Math.max(1500, 2800 * Math.max(speed, 0.4)));
+  };
+
+  const slam = (): void => {
+    if (!spinning.current) return;
+    slamRequested.current = true;
+    const now = performance.now();
+    motions.current.forEach((m, i) => slamStop(m, now, i * 70));
+    setAnticip(new Set());
   };
 
   const spin = useCallback(async (): Promise<void> => {
-    if (busy.current) return;
+    if (spinning.current) {
+      slam();
+      return;
+    }
     if (!canAfford) {
       notify('error', 'Saldo insuficiente para esta apuesta.');
       setAuto(0);
       return;
     }
-    busy.current = true;
-    presentToken.current += 1;
-    fx.current?.clear();
-    machineFx.current?.clear();
+    spinning.current = true;
+    slamRequested.current = false;
+    stopPresentation();
     setPhase('spinning');
-    setResult(null);
-    setPlan(null);
-    setBigWin(null);
-    setActiveLine(null);
     setAnticip(new Set());
-    if (counterRef.current) counterRef.current.textContent = '0';
+    setPulls((n) => n + 1);
     if (user && !user.unlimited && user.balance !== null) setBalance({ balance: user.balance - totalBet, unlimited: false });
-    audio.play('spinStart');
-    loop.current = audio.loop('reels');
+
+    const lvl = levelRef.current;
+    const animated = lvl !== 'off';
+    const cfg = lvl === 'full' ? REEL_FULL : REEL_REDUCED;
+    const t0 = performance.now();
+    const prevStops = motions.current.map((m) => mod(m.pos, m.L));
+    const done = motions.current.map((_, i) => new Promise<void>((res) => (stopWaiters.current[i] = res)));
+    let landedCount = 0;
+    let grid: SlotSymbol[][] | null = null;
+
+    onLand.current = (i: number) => {
+      landedCount += 1;
+      audio.play('reelStop', 0, { pan: (i - 2) * 0.35 });
+      loop.current?.setIntensity(Math.max(0, 1 - landedCount / 5));
+      reels.current[i]?.thud();
+      // Anticipación honesta: con 2 estrellas ya visibles, los rodillos restantes se iluminan.
+      if (grid && lvl === 'full' && !slamRequested.current) {
+        const scatters = grid.slice(0, i + 1).flat().filter((x) => x === 'scatter').length;
+        if (scatters >= 2 && i < 4) {
+          setAnticip(new Set(Array.from({ length: 4 - i }, (_, k) => i + 1 + k)));
+          audio.play('anticipation');
+        } else setAnticip((a) => (a.has(i) ? new Set([...a].filter((x) => x !== i)) : a));
+      }
+    };
+
+    if (animated) {
+      audio.play('spinStart');
+      loop.current?.stop(30);
+      loop.current = audio.loop('reels');
+      motions.current.forEach((m, i) => startSpin(m, t0, i * 45, cfg));
+      kick();
+    }
+
     let res: SpinResponse;
     try {
       res = await api.post<SpinResponse>('/api/games/slots/spin', { betPerLine, lines, idempotencyKey: newKey() });
     } catch (err) {
+      // Sin resultado: los rodillos vuelven a la ventana anterior y no se cobra nada.
+      if (animated) {
+        const now = performance.now();
+        motions.current.forEach((m, i) => requestStop(m, prevStops[i]!, now + i * 90, true));
+        await Promise.all(done);
+      }
       loop.current?.stop();
-      busy.current = false;
+      spinning.current = false;
       setPhase('idle');
       setAuto(0);
       if (user) setBalance({ balance: user.balance, unlimited: user.unlimited });
@@ -223,60 +361,62 @@ export default function SlotsPage() {
       return;
     }
     const r = res.result;
-    // Anticipación honesta: si ya hay 2 estrellas visibles, los rodillos restantes tardan un poco más.
-    const scattersBefore = (reel: number): number => r.grid.slice(0, reel).flat().filter((s) => s === 'scatter').length;
-    const base = level === 'off' ? 0 : DURATION.reelSpin * (level === 'reduced' ? 0.45 : 1);
-    const stagger = level === 'off' ? 0 : DURATION.reelStagger * (level === 'reduced' ? 0.5 : 1);
-    let extra = 0;
-    const plans = r.stops.map((stop, i) => {
-      if (level === 'full' && i >= 2 && scattersBefore(i) >= 2) extra += 650;
-      return { path: reelPath(REEL_STRIPS[i]!, stops[i]!, stop, level === 'full' ? 1 + Math.floor(i / 2) : 0), duration: base + i * stagger + extra };
-    });
-    let stopped = 0;
-    await Promise.all(
-      plans.map((p, i) =>
-        reels.current[i]?.spin(p.path, p.duration, 0, () => {
-          audio.play('reelStop');
-          stopped += 1;
-          loop.current?.setIntensity(1 - stopped / 5);
-          setGrid((g) => g.map((col, ci) => (ci === i ? r.grid[i]! : col)));
-          if (level === 'full' && i >= 1 && i < 4 && scattersBefore(i + 1) >= 2) setAnticip(new Set(Array.from({ length: 4 - i }, (_, k) => i + 1 + k)));
-        }),
-      ),
-    );
-    // REELS_STOPPED: la cuadrícula visible es exactamente la del servidor.
-    loop.current?.stop();
+    grid = r.grid;
+
+    if (animated) {
+      const now = performance.now();
+      const slamNow = slamRequested.current;
+      const base = slamNow ? now : Math.max(now, t0 + SPIN_MIN[lvl]);
+      const gap = slamNow ? 70 : STOP_GAP[lvl];
+      let extra = 0;
+      r.stops.forEach((stop, i) => {
+        const scattersBefore = r.grid.slice(0, i).flat().filter((x) => x === 'scatter').length;
+        if (lvl === 'full' && !slamNow && i >= 2 && scattersBefore >= 2) extra += ANTICIPATION_MS;
+        requestStop(motions.current[i]!, stop, base + i * gap + extra, slamNow);
+      });
+      kick();
+      await Promise.all(done);
+    } else {
+      motions.current.forEach((m, i) => {
+        snapTo(m, r.stops[i]!);
+        reels.current[i]?.place(r.stops[i]!, 0);
+      });
+      audio.play('reelStop');
+    }
+
+    // REELS_STOPPED: la ventana visible es exactamente la del servidor.
+    loop.current?.stop(120);
+    loop.current = null;
+    spinning.current = false;
     setAnticip(new Set());
     setStops(r.stops);
-    setGrid(r.grid);
     setResult(r);
     setBalance(res.balance);
     setHistory((h) => [{ bet: r.totalBet, win: r.totalWin }, ...h].slice(0, 12));
     celebrate(res.achievements);
-    await present(r, planSlotPresentation(r));
-    busy.current = false;
+    present(r, planSlotPresentation(r));
+
     if (autoRef.current > 0) {
-      const pause = r.totalWin > 0 ? Math.max(700, TIER_MS[r.tier] * speed * 0.6) : 400;
+      const pause = r.totalWin === 0 ? 350 : r.tier === 'big' || r.tier === 'mega' ? 2600 : 1100;
       window.setTimeout(() => {
-        if (autoRef.current > 0) {
+        if (autoRef.current > 0 && !spinning.current) {
           setAuto((a) => a - 1);
           void spinRef.current();
         }
-      }, pause);
+      }, pause * Math.max(speed, 0.4));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canAfford, notify, user, setBalance, totalBet, betPerLine, lines, level, stops, speed, celebrate, cell]);
+  }, [canAfford, notify, user, setBalance, totalBet, betPerLine, lines, speed, celebrate, cell, kick]);
 
   const spinRef = useRef(spin);
   spinRef.current = spin;
 
-  // Atajo: barra espaciadora para girar (o detener si está girando).
+  // Atajo: barra espaciadora para girar (o frenar si está girando).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.code !== 'Space' || e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement) return;
       e.preventDefault();
-      if (busy.current) reels.current.forEach((r) => r?.skip());
-      else void spinRef.current();
+      void spinRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -299,6 +439,7 @@ export default function SlotsPage() {
   const tier = phase === 'presenting' && result && result.totalWin > 0 ? result.tier : null;
   const presenting = phase === 'presenting' && plan && plan.total > 0;
   const shownLines = presenting ? (lineStage === 'overview' ? plan.lines : current ? [current] : []) : [];
+  const bulbMode: 'off' | 'chase' | 'win' = level === 'off' ? 'off' : phase === 'spinning' ? 'chase' : tier ? 'win' : 'off';
   const balanceAfter = user && !user.unlimited && user.balance !== null ? user.balance - totalBet : null;
 
   return (
@@ -308,6 +449,7 @@ export default function SlotsPage() {
         {/* Máquina */}
         <div
           className={cx(
+            level === 'off' && 'motion-off',
             'relative overflow-hidden rounded-[36px] border border-oro/40 bg-gradient-to-b from-[#1c2747] via-abismo to-[#070b16] p-4 shadow-hondo transition-shadow duration-700 sm:p-6',
             tier === 'mega' ? 'shadow-[0_0_0_2px_rgba(235,217,166,0.8),0_0_120px_-10px_rgba(235,217,166,0.75)]' : tier === 'big' ? 'shadow-[0_0_0_1px_rgba(235,217,166,0.6),0_0_80px_-10px_rgba(235,217,166,0.55)]' : tier === 'medium' ? 'shadow-[0_0_50px_-15px_rgba(235,217,166,0.45)]' : '',
           )}
@@ -351,25 +493,27 @@ export default function SlotsPage() {
           {/* Ventana de rodillos */}
           <div ref={windowRef} className="relative mx-auto w-full">
             <div className="mx-auto flex items-center justify-center gap-0.5">
-              {cell >= 80 && <LineMarkers side="left" cell={cell} lines={lines} winning={presenting ? winningSet : new Set()} active={current?.line ?? null} />}
+              {cell >= 80 && <LineMarkers side="left" cell={cell} lines={lines} winning={presenting ? winningSet : NO_LINES} active={current?.line ?? null} />}
+              <div className="flex flex-col gap-1.5">
+              <Bulbs count={Math.round(winW / 34)} mode={bulbMode} />
               <div className="relative rounded-2xl border-4 border-[#3a2c12] bg-[#120d05] shadow-[inset_0_6px_20px_rgba(0,0,0,0.8),0_0_0_1px_rgba(235,217,166,0.25)]" style={{ width: winW + 8 }}>
                 <div className="flex" style={{ gap: GAP }}>
-                  {grid.map((col, i) => (
+                  {REEL_STRIPS.map((strip, i) => (
                     <Reel
                       key={i}
-                      ref={(el) => {
-                        reels.current[i] = el;
-                      }}
-                      visible={col}
+                      ref={reelRefs[i]}
+                      strip={strip}
+                      stop={stops[i]!}
                       cell={cell}
-                      highlight={highlightFor(i)}
+                      highlight={highlights[i]!}
                       dimOthers={!!presenting}
                       anticipation={anticip.has(i)}
+                      winKey={highlights[i]!.size > 0 ? activeLine ?? -1 : -1}
                     />
                   ))}
                 </div>
-                {/* Brillo cilíndrico de los rodillos (profundidad) */}
-                <div className="pointer-events-none absolute inset-1 rounded-xl bg-[linear-gradient(180deg,rgba(0,0,0,0.25),rgba(255,255,255,0.07)_42%,rgba(255,255,255,0.1)_50%,rgba(255,255,255,0.05)_58%,rgba(0,0,0,0.3))]" />
+                {/* Cristal de la ventana: reflejo diagonal */}
+                <div className="pointer-events-none absolute inset-1 rounded-xl bg-[linear-gradient(115deg,rgba(255,255,255,0.10),rgba(255,255,255,0)_32%,rgba(255,255,255,0)_70%,rgba(255,255,255,0.06))]" />
                 {/* Líneas de pago: siguen exactamente las celdas de cada línea del motor */}
                 <svg className="pointer-events-none absolute left-1 top-1" width={winW} height={winH} aria-hidden>
                   <AnimatePresence>
@@ -379,18 +523,22 @@ export default function SlotsPage() {
                         {l.cells.map(([reel, row]) => (
                           <rect key={`${reel}-${row}`} x={reel * (cell + GAP) + 3} y={row * cell + 3} width={cell - 6} height={cell - 6} rx={10} fill="none" stroke={l.color} strokeWidth={lineStage === 'cycle' ? 3 : 2} opacity={0.9} />
                         ))}
-                        <motion.polyline
-                          points={linePoints(l.rows)}
-                          fill="none"
-                          stroke={l.color}
-                          strokeWidth={lineStage === 'cycle' ? 5 : 3.5}
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                          initial={{ pathLength: 0 }}
-                          animate={{ pathLength: 1 }}
-                          transition={{ duration: 0.5 * Math.max(speed, 0.3), ease: 'easeOut' }}
-                          style={{ filter: `drop-shadow(0 0 6px ${l.color}) drop-shadow(0 0 2px rgba(0,0,0,0.9))` }}
-                        />
+                        {/* Halo y contorno con trazos anchos semitransparentes (sin filtros: más fluido) */}
+                        {[{ w: 14, c: l.color, o: 0.22 }, { w: 7, c: '#05070d', o: 0.55 }, { w: lineStage === 'cycle' ? 5 : 3.5, c: l.color, o: 1 }].map((t, k) => (
+                          <motion.polyline
+                            key={k}
+                            points={linePoints(l.rows)}
+                            fill="none"
+                            stroke={t.c}
+                            strokeOpacity={t.o}
+                            strokeWidth={t.w}
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                            initial={{ pathLength: 0 }}
+                            animate={{ pathLength: 1 }}
+                            transition={{ duration: 0.5 * Math.max(speed, 0.3), ease: 'easeOut' }}
+                          />
+                        ))}
                       </motion.g>
                     ))}
                   </AnimatePresence>
@@ -425,10 +573,13 @@ export default function SlotsPage() {
                   )}
                 </AnimatePresence>
               </div>
-              {cell >= 80 && <LineMarkers side="right" cell={cell} lines={lines} winning={presenting ? winningSet : new Set()} active={current?.line ?? null} />}
+              <Bulbs count={Math.round(winW / 34)} mode={bulbMode} reverse />
+              </div>
+              {cell >= 80 && <LineMarkers side="right" cell={cell} lines={lines} winning={presenting ? winningSet : NO_LINES} active={current?.line ?? null} />}
+              <Lever pulls={pulls} onPull={() => void spin()} disabled={!canAfford && phase !== 'spinning'} />
             </div>
             <div className="mt-3 flex min-h-[28px] flex-wrap items-center justify-center gap-3 text-sm" aria-live="polite">
-              <SkipButton visible={phase === 'spinning'} onSkip={() => reels.current.forEach((r) => r?.skip())} />
+              <SkipButton visible={phase === 'spinning'} onSkip={slam} />
               {presenting && lineStage === 'overview' && (
                 <span className="text-marfil">
                   {plan.lines.length > 0 && `${plan.lines.length} línea${plan.lines.length > 1 ? 's' : ''} premiada${plan.lines.length > 1 ? 's' : ''}`}
@@ -477,35 +628,29 @@ export default function SlotsPage() {
             {/* Botón de giro con anillo de progreso */}
             <div className="flex flex-col items-center gap-1.5">
               <motion.button
-                onClick={() => {
-                  if (phase === 'spinning') reels.current.forEach((r) => r?.skip());
-                  else void spin();
-                }}
+                onClick={() => void spin()}
                 disabled={!canAfford && phase !== 'spinning'}
                 title={!canAfford ? 'Saldo insuficiente para esta apuesta' : undefined}
                 whileHover={{ scale: 1.05, filter: 'brightness(1.08)' }}
                 whileTap={{ scale: 0.92 }}
-                aria-label={phase === 'spinning' ? 'Detener rodillos' : `Girar por ${totalBet} créditos`}
+                aria-label={phase === 'spinning' ? 'Frenar los rodillos' : `Girar por ${totalBet} créditos`}
                 className="group relative grid h-28 w-28 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="absolute inset-1 rounded-full bg-oro/30 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
                 <svg className="absolute inset-0" viewBox="0 0 100 100" aria-hidden>
                   <circle cx="50" cy="50" r="47" fill="none" stroke="#24324F" strokeWidth="4" />
-                  {phase === 'spinning' && (
-                    <motion.circle
-                      cx="50" cy="50" r="47" fill="none" stroke="#ebd9a6" strokeWidth="4" strokeLinecap="round" transform="rotate(-90 50 50)"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ duration: ((DURATION.reelSpin + DURATION.reelStagger * 4) / 1000) * Math.max(speed, 0.2), ease: 'linear' }}
-                    />
-                  )}
                 </svg>
+                {phase === 'spinning' && (
+                  <svg className="absolute inset-0 animate-spin [animation-duration:0.9s]" viewBox="0 0 100 100" aria-hidden>
+                    <circle cx="50" cy="50" r="47" fill="none" stroke="#ebd9a6" strokeWidth="4" strokeLinecap="round" strokeDasharray="70 225" />
+                  </svg>
+                )}
                 <span className={cx('relative grid h-[88px] w-[88px] place-items-center rounded-full bg-gradient-to-b from-oro-claro via-oro to-oro-oscuro text-noche shadow-[0_2px_0_rgba(255,255,255,0.5)_inset,0_14px_30px_-10px_rgba(207,174,107,0.9)]', tier ? 'turn-ring' : '')}>
                   {phase === 'spinning' ? <Square className="h-7 w-7" /> : <Play className="ml-1 h-9 w-9" />}
                 </span>
               </motion.button>
               <p className="text-xs text-niebla">
-                {phase === 'spinning' ? 'Girando: pulsa para detener' : phase === 'presenting' && plan ? (plan.total > 0 ? `Ganas ${credits(plan.total)}` : 'Sin premio') : `Girar por ${credits(totalBet)}`}
+                {phase === 'spinning' ? 'Pulsa para frenar' : phase === 'presenting' && plan ? (plan.total > 0 ? `Ganas ${credits(plan.total)}` : 'Sin premio') : `Girar por ${credits(totalBet)}`}
               </p>
             </div>
 

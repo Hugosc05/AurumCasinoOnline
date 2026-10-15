@@ -1,5 +1,5 @@
 import { motion, useAnimate } from 'motion/react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { audio } from '../lib/audio';
 import { DURATION, EASE } from '../lib/anim/tokens';
 import { PlayingCard } from './PlayingCard';
@@ -35,8 +35,10 @@ interface Props {
   /** Retardo antes de girar al aterrizar (ms). */
   flipDelay?: number;
   sound?: boolean;
+  /** Identificador que se devuelve en `onFaceShown` (permite pasar un callback estable). */
+  cardId?: string;
   /** Se llama cuando la cara ya es visible (mitad del giro), para actualizar totales sin adelantarse. */
-  onFaceShown?: () => void;
+  onFaceShown?: (cardId: string) => void;
 }
 
 /**
@@ -67,58 +69,83 @@ export const TableCard = memo(function TableCard({
   shake,
   flipDelay = 60,
   sound = true,
+  cardId = '',
   onFaceShown,
 }: Props) {
   const [scope, animate] = useAnimate();
   const stageScale = useStageScale();
   const [landed, setLanded] = useState(!from || speed === 0);
   const [flying, setFlying] = useState(!!from && speed > 0);
-  const first = useRef(true);
   const h = width * 1.4;
+  /** Última posición pedida (la del vuelo puede quedar desfasada si cambia durante el trayecto). */
+  const target = useRef({ x, y, rotate });
+  target.current = { x, y, rotate };
+  /** La carta ya está en la mesa (tras el vuelo o colocada sin animación). */
+  const placed = useRef(false);
 
+  // Vuelo inicial. Se escribe para ser idempotente: en desarrollo, React (StrictMode)
+  // monta, desmonta y vuelve a montar; la limpieza detiene el vuelo y el segundo
+  // montaje lo repite desde el principio, así que la carta siempre llega a aterrizar.
+  useLayoutEffect(() => {
+    const el = scope.current as HTMLElement | null;
+    if (!el || placed.current) return;
+    const { x: tx, y: ty, rotate: tr } = target.current;
+    const left = tx - width / 2;
+    const top = ty - h / 2;
+    if (!from || speed === 0) {
+      el.style.transform = `translate(${left}px, ${top}px) rotate(${tr}deg)`;
+      placed.current = true;
+      setLanded(true);
+      setFlying(false);
+      return;
+    }
+    const sx = from.x - width / 2;
+    const sy = from.y - h / 2;
+    const ex = sx + extractVector.x;
+    const ey = sy + extractVector.y;
+    const dist = Math.hypot(left - ex, top - ey);
+    const flight = (DURATION.card / 1000) * speed * Math.min(1.25, Math.max(0.75, dist / 480));
+    const extract = 0.16 * speed;
+    const total = extract + flight;
+    const mx = (ex + left) / 2;
+    const my = Math.min(ey, top) - Math.min(70, 20 + dist * 0.08);
+    const t1 = extract / total;
+    const tMid = t1 + (1 - t1) * 0.45;
+    if (sound) audio.play('cardSlide');
+    const shadow = el.querySelector('[data-shadow]');
+    const body = el.querySelector('[data-body]');
+    const controls = [
+      animate(
+        el,
+        { x: [sx, ex, mx, left], y: [sy, ey, my, top], rotate: [-8, -14, -6, tr] },
+        { duration: total, ease: [EASE.out, EASE.out, [0.3, 0.7, 0.4, 1]], times: [0, t1, tMid, 1] },
+      ),
+    ];
+    if (shadow) controls.push(animate(shadow, { opacity: [0.25, 0.3, 0.45, 0.6], scale: [0.95, 1, 1.25, 1], x: [2, 3, 18, 3], y: [3, 4, 26, 4] }, { duration: total, times: [0, t1, tMid, 1] }));
+    if (body) controls.push(animate(body, { scale: [1, 1, 1.1, 0.98, 1] }, { duration: total * 1.1, ease: EASE.out, times: [0, t1, tMid, 0.9, 1] }));
+    const t = window.setTimeout(() => {
+      placed.current = true;
+      if (sound) audio.play('cardLand');
+      setFlying(false);
+      setLanded(true);
+      // Si el destino cambió durante el vuelo (otra carta abrió la mano), se recoloca.
+      const now = target.current;
+      if (now.x !== tx || now.y !== ty || now.rotate !== tr) {
+        void animate(el, { x: now.x - width / 2, y: now.y - h / 2, rotate: now.rotate }, { type: 'spring', stiffness: 260, damping: 28 });
+      }
+    }, total * 1000 + flipDelay * speed);
+    return () => {
+      window.clearTimeout(t);
+      if (!placed.current) controls.forEach((c) => c.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recolocación posterior (p. ej., al dividir o al abrirse la mano): deslizamiento suave.
   useEffect(() => {
     const el = scope.current as HTMLElement | null;
-    if (!el || collectTo) return;
-    const left = x - width / 2;
-    const top = y - h / 2;
-    if (first.current) {
-      first.current = false;
-      if (!from || speed === 0) {
-        el.style.transform = `translate(${left}px, ${top}px) rotate(${rotate}deg)`;
-        return;
-      }
-      const sx = from.x - width / 2;
-      const sy = from.y - h / 2;
-      const ex = sx + extractVector.x;
-      const ey = sy + extractVector.y;
-      const dist = Math.hypot(left - ex, top - ey);
-      const flight = (DURATION.card / 1000) * speed * Math.min(1.25, Math.max(0.75, dist / 480));
-      const extract = 0.16 * speed;
-      const total = extract + flight;
-      const mx = (ex + left) / 2;
-      const my = Math.min(ey, top) - Math.min(70, 20 + dist * 0.08);
-      const t1 = extract / total;
-      const tMid = t1 + (1 - t1) * 0.45;
-      if (sound) audio.play('cardSlide');
-      const shadow = el.querySelector('[data-shadow]');
-      const body = el.querySelector('[data-body]');
-      void animate(
-        el,
-        { x: [sx, ex, mx, left], y: [sy, ey, my, top], rotate: [-8, -14, -6, rotate] },
-        { duration: total, ease: [EASE.out, EASE.out, [0.3, 0.7, 0.4, 1]], times: [0, t1, tMid, 1] },
-      );
-      if (shadow) void animate(shadow, { opacity: [0.25, 0.3, 0.45, 0.6], scale: [0.95, 1, 1.25, 1], x: [2, 3, 18, 3], y: [3, 4, 26, 4] }, { duration: total, times: [0, t1, tMid, 1] });
-      if (body) void animate(body, { scale: [1, 1, 1.1, 0.98, 1] }, { duration: total * 1.1, ease: EASE.out, times: [0, t1, tMid, 0.9, 1] });
-      const t = window.setTimeout(() => {
-        if (sound) audio.play('cardLand');
-        setFlying(false);
-        setLanded(true);
-      }, total * 1000 + flipDelay * speed);
-      return () => clearTimeout(t);
-    }
-    // Recolocación (p. ej., al dividir): deslizamiento suave.
-    void animate(el, { x: left, y: top, rotate }, { type: 'spring', stiffness: 260, damping: 28 });
-    return undefined;
+    if (!el || collectTo || !placed.current) return;
+    void animate(el, { x: x - width / 2, y: y - h / 2, rotate }, { type: 'spring', stiffness: 260, damping: 28 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [x, y, rotate]);
 
@@ -145,7 +172,7 @@ export const TableCard = memo(function TableCard({
   const onFaceShownRef = useRef(onFaceShown);
   onFaceShownRef.current = onFaceShown;
   useEffect(() => {
-    if (prevFace.current) onFaceShownRef.current?.(); // ya boca arriba al montar (recuperación)
+    if (prevFace.current) onFaceShownRef.current?.(cardId); // ya boca arriba al montar (recuperación)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
@@ -155,7 +182,7 @@ export const TableCard = memo(function TableCard({
     if (!changed) return;
     if (sound) audio.play('cardFlip');
     const half = DURATION.flip * Math.max(speed, 0.3) * (dramatic ? 1.35 : 1) * 0.5;
-    const t = window.setTimeout(() => onFaceShownRef.current?.(), speed === 0 ? 0 : half);
+    const t = window.setTimeout(() => onFaceShownRef.current?.(cardId), speed === 0 ? 0 : half);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [faceUp, landed, sound]);

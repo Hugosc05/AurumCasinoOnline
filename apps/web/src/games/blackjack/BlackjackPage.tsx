@@ -415,7 +415,8 @@ export default function BlackjackPage() {
                 dim={outcome === 'lose' || outcome === 'bust'}
                 shake={outcome === 'bust'}
                 dramatic={dramaticReveal && c.owner === 'dealer' && c.index === 1}
-                onFaceShown={() => markShown(c.id)}
+                cardId={c.id}
+                onFaceShown={markShown}
               />
             );
           })}

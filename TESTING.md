@@ -10,10 +10,11 @@ Para E2E hace falta descargar una vez el navegador: `npx playwright install chro
 
 ## Resultado de la última ejecución
 
-Ejecutado el 14/10/2026 en Linux con Node 22.22:
+Ejecutado el 15/10/2026 en Linux con Node 22.22:
 
-- `npm test`: **16 archivos, 267 pruebas, todas correctas**.
-- `npm run test:e2e`: **7 pruebas, todas correctas** (Chromium incluido con Playwright 1.56; escritorio y móvil Pixel 7).
+- `npm test`: **16 archivos, 272 pruebas, todas correctas**.
+- `npm run test:e2e:dev`: **2 pruebas, correctas** (servidor de desarrollo con React en modo estricto).
+- `npm run test:e2e`: **9 pruebas, todas correctas** (Chromium incluido con Playwright 1.56; escritorio y móvil Pixel 7).
 - `npm run typecheck`: sin errores.
 
 No se ha ejecutado todavía en Windows: el código no depende de binarios nativos propios, pero conviene lanzar `npm test` tras la primera instalación.
@@ -54,11 +55,14 @@ Secuenciador de animaciones (orden, velocidad, anti doble clic, saltar ejecuta t
 ### Cartas (`apps/web/src/components/cards/cards.test.tsx`, 111)
 Para las 52 cartas: rango y palo correctos, color del palo en índices y pips, número de pips, as y figuras, índice inferior girado, ausencia de elementos `<text>` (no dependen de fuentes), variante compacta e identificadores SVG únicos. Una carta boca abajo no expone rango ni palo en el DOM, y la variante compacta se elige según el tamaño real en pantalla.
 
+### Física de los rodillos (`apps/web/src/games/slots/reelMotion.test.ts`, 7)
+Termina siempre exactamente en la parada del servidor (todas las paradas de las cinco tiras) con un único evento de parada; sigue girando si el resultado tarda; movimiento continuo sin saltos de velocidad ni de la fracción visible; durante la frenada los símbolos solo caen y después rebotan; la parada rápida acorta el giro sin cambiar el resultado; modo reducido sin rebote; fotogramas muy largos (pestaña en segundo plano).
+
 ### Presentación de slots (`apps/web/src/games/slots/presentation.test.ts`, 3)
 En 3000 tiradas: las líneas dibujadas son exactamente las del motor (ni inventadas ni omitidas), cada celda resaltada está en el recorrido real de la línea, la suma presentada es el premio liquidado, un único evento de total, celebración según la categoría real y orden de mayor a menor premio.
 
-### Extremo a extremo (`e2e/`, 7)
-Registro, cierre e inicio de sesión; ruleta; blackjack; slots; póker contra bots (ver las propias cartas y levantarse); acceso de administración; móvil sin desbordamiento horizontal y menú.
+### Extremo a extremo (`e2e/`, 9 + 2 en desarrollo)
+Animaciones reales (`animations.spec.ts`, también contra el servidor de desarrollo): las cartas de blackjack se giran y muestran la cara; los rodillos se mueven en menos de 400 ms tras pulsar, se frenan al pulsar de nuevo y se puede volver a girar durante la presentación. Registro, cierre e inicio de sesión; ruleta; blackjack; slots; póker contra bots (ver las propias cartas y levantarse); acceso de administración; móvil sin desbordamiento horizontal y menú.
 
 ## Comprobaciones manuales realizadas
 

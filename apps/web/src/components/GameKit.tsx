@@ -73,7 +73,7 @@ export function SkipButton({ visible, onSkip }: { visible: boolean; onSkip: () =
   }, [visible, onSkip]);
   if (!visible) return null;
   return (
-    <button onClick={onSkip} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1.5 text-xs text-marfil backdrop-blur hover:bg-black/60">
+    <button onClick={onSkip} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-xs text-marfil hover:bg-black/80">
       <FastForward className="h-3.5 w-3.5" /> Saltar <kbd className="ml-1 rounded border border-white/20 px-1 text-[10px] text-niebla">Espacio</kbd>
     </button>
   );
@@ -117,8 +117,8 @@ export function OutcomeBanner({ outcome, title, amount }: { outcome: Outcome; ti
       exit={{ opacity: 0 }}
       transition={{ type: 'spring', stiffness: 420, damping: 24 }}
       className={cx(
-        'rounded-2xl border px-6 py-3 text-center shadow-hondo backdrop-blur',
-        good ? 'border-oro/60 bg-noche/80' : outcome === 'push' ? 'border-white/20 bg-noche/70' : 'border-rubi/50 bg-noche/75',
+        'rounded-2xl border px-6 py-3 text-center shadow-hondo',
+        good ? 'border-oro/60 bg-noche/95' : outcome === 'push' ? 'border-white/20 bg-noche/90' : 'border-rubi/50 bg-noche/90',
       )}
     >
       <p className={cx('font-display text-3xl', good ? 'gold-text' : outcome === 'push' ? 'text-marfil' : 'text-[#f1a3ad]')}>{title}</p>

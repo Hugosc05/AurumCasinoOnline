@@ -20,18 +20,67 @@ import { useSession } from '../../state/session';
 import { EMPTY_VIS, POKER_LANDSCAPE, POKER_PORTRAIT, applyPokerEvent, boardSlot, seatPosition, towardCenter, visFromSnapshot, type PokerGeometry, type PokerVis } from './model';
 import type { SeatView, Snapshot, UpdateMsg } from './types';
 
+/** Vector de extracción de las cartas desde la bandeja del crupier (constante: no rompe la memoización). */
+const DEAL_DOWN = { x: 0, y: 18 };
 /** Tamaños coherentes: comunitarias y propias parecidas; las rivales algo menores (están más lejos). */
-/** Distancia relativa (asiento → centro) a la que se dejan las apuestas; la del jugador, por encima de sus cartas. */
-const BET_RIVAL = 0.57;
-/** Las apuestas del jugador se dejan a la izquierda de sus cartas (no encima, ni sobre el bote). */
-function betSpot(p: { x: number; y: number }, hero: boolean, g: PokerGeometry): { x: number; y: number } {
-  if (!hero) return towardCenter(p, BET_RIVAL, g);
-  const c = towardCenter(p, 0.36, g);
-  return { x: c.x - 104, y: c.y };
-}
 const BOARD_W = 64;
 const HERO_W = 66;
 const RIVAL_W = 54;
+/** Medio tamaño del bloque de un asiento (avatar + placa) y de la pareja de cartas de un rival. */
+const SEAT_HALF = { w: 75, h: 62 };
+const PAIR_HALF = { w: RIVAL_W / 2 + 17, h: (RIVAL_W * 1.4) / 2 };
+
+/** Distancia desde el centro de un rectángulo hasta su borde en la dirección (ux, uy). */
+function exitDistance(ux: number, uy: number, halfW: number, halfH: number): number {
+  return Math.min(Math.abs(ux) > 1e-6 ? halfW / Math.abs(ux) : Infinity, Math.abs(uy) > 1e-6 ? halfH / Math.abs(uy) : Infinity);
+}
+
+/** Punto a `dist` del asiento en dirección al centro de la mesa (sin pasar del 80 % del recorrido). */
+function alongToCenter(p: { x: number; y: number }, dist: number, g: PokerGeometry): { x: number; y: number } {
+  const dx = g.cx - p.x;
+  const dy = g.cy - p.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const d = Math.min(dist, len * 0.8);
+  return { x: p.x + (dx / len) * d, y: p.y + (dy / len) * d };
+}
+
+/** Cartas de un rival: justo fuera de su placa, hacia el centro (nunca tapadas por ella). */
+function rivalCardsSpot(p: { x: number; y: number }, g: PokerGeometry): { x: number; y: number } {
+  const len = Math.hypot(g.cx - p.x, g.cy - p.y) || 1;
+  const ux = (g.cx - p.x) / len;
+  const uy = (g.cy - p.y) / len;
+  const c = alongToCenter(p, exitDistance(ux, uy, SEAT_HALF.w + PAIR_HALF.w, SEAT_HALF.h + PAIR_HALF.h) + 4, g);
+  return awayFromBoard(c, p, PAIR_HALF.w, PAIR_HALF.h, g);
+}
+
+/** Si un elemento (de medio tamaño hw × hh) pisa las comunitarias, se aparta en vertical hacia su asiento. */
+function awayFromBoard(c: { x: number; y: number }, seat: { x: number; y: number }, hw: number, hh: number, g: PokerGeometry): { x: number; y: number } {
+  const bw = 2 * g.boardGap + BOARD_W / 2 + 6;
+  const bh = (BOARD_W * 1.4) / 2 + 6;
+  const overlapX = Math.abs(c.x - g.cx) < bw + hw;
+  const overlapY = Math.abs(c.y - g.boardY) < bh + hh;
+  if (!overlapX || !overlapY) return c;
+  return { x: c.x, y: seat.y < g.boardY ? g.boardY - bh - hh : g.boardY + bh + hh };
+}
+
+/** Apuestas: las del rival, más allá de sus cartas; las del jugador, a la izquierda de sus cartas. */
+function betSpot(p: { x: number; y: number }, hero: boolean, g: PokerGeometry): { x: number; y: number } {
+  if (!hero) {
+    const len = Math.hypot(g.cx - p.x, g.cy - p.y) || 1;
+    const ux = (g.cx - p.x) / len;
+    const uy = (g.cy - p.y) / len;
+    const cards = exitDistance(ux, uy, SEAT_HALF.w + PAIR_HALF.w, SEAT_HALF.h + PAIR_HALF.h) + 4;
+    const b = alongToCenter(p, cards + exitDistance(ux, uy, PAIR_HALF.w, PAIR_HALF.h) + 16, g);
+    // Nunca encima de las cartas comunitarias: si cae en su franja, se aparta en vertical.
+    const halfBoard = 2 * g.boardGap + BOARD_W / 2 + 16;
+    const top = g.boardY - (BOARD_W * 1.4) / 2 - 30;
+    const bottom = g.boardY + (BOARD_W * 1.4) / 2 + 16;
+    if (Math.abs(b.x - g.cx) < halfBoard && b.y > top && b.y < bottom) b.y = p.y < g.cy ? top : bottom;
+    return b;
+  }
+  const c = towardCenter(p, 0.36, g);
+  return { x: c.x - 104, y: c.y };
+}
 
 const STEP_MS: Partial<Record<PokerEvent['type'], number>> = {
   hand_start: 1250, blind: 260, deal_hole: 140, action: 420, collect: 460, return: 350, showdown: 1500, award: 1300,
@@ -93,7 +142,7 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
           )}
           {!seat.connected && !seat.isBot && <WifiOff className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-noche p-0.5 text-aviso" aria-label="Desconectado" />}
         </div>
-        <div className="mt-1 w-full rounded-xl border border-white/10 bg-black/65 px-2 py-1 text-center backdrop-blur">
+        <div className="mt-1 w-full rounded-xl border border-white/10 bg-[#070b14]/90 px-2 py-1 text-center">
           <p className="flex items-center justify-center gap-1 truncate text-[13px] text-marfil">
             {seat.name}
             {seat.isBot && <span className="rounded bg-white/10 px-1 text-[9px] text-niebla" title={`Bot ${seat.profile ?? ''} (${seat.difficulty ?? ''})`}>BOT</span>}
@@ -268,6 +317,8 @@ export default function PokerTablePage() {
   }, [applySnapshot, n, speed]);
 
   useEffect(() => {
+    // Sincroniza por si la conexión se abrió entre el render y la suscripción.
+    setConnected(socket.status === 'open');
     const offs = [
       socket.onStatus((s) => setConnected(s === 'open')),
       socket.onOpen(() => socket.send({ t: 'poker.watch', tableId })),
@@ -330,7 +381,7 @@ export default function PokerTablePage() {
   };
 
   const holeCardPos = (seat: number, i: number) => {
-    const p = towardCenter(posOf(seat), seat === heroSeat ? 0.34 : 0.37, g);
+    const p = seat === heroSeat ? towardCenter(posOf(seat), 0.34, g) : rivalCardsSpot(posOf(seat), g);
     return { x: p.x + (i === 0 ? -17 : 17), y: p.y - 6, rotate: i === 0 ? -6 : 6 };
   };
 
@@ -383,12 +434,12 @@ export default function PokerTablePage() {
           </div>
 
           {/* Bote */}
-          <div className="absolute flex -translate-x-1/2 flex-col items-center" style={{ left: POT_POS.x, top: POT_POS.y - 10 }}>
+          <div className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center" style={{ left: POT_POS.x, top: POT_POS.y, zIndex: 35 }}>
             <AnimatePresence>
               {potShown > 0 && (
-                <motion.div key="pot" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center">
-                  <ChipStack amount={potShown} size={32} max={4} />
-                  <span className="mt-1 rounded-full bg-black/60 px-3 py-0.5 font-display text-base text-oro-claro">Bote {credits(potShown)}</span>
+                <motion.div key="pot" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                  <ChipStack amount={potShown} size={30} max={3} />
+                  <span className="whitespace-nowrap rounded-full bg-black/65 px-3 py-0.5 font-display text-base text-oro-claro">Bote {credits(potShown)}</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -402,7 +453,7 @@ export default function PokerTablePage() {
           {/* Cartas comunitarias */}
           {vis.board.map((c, i) => {
             const p = boardSlot(i, g);
-            return <TableCard key={`${vis.handId}-b${i}`} card={c} faceUp x={p.x} y={p.y} z={40 + i} from={DEALER_POS} extractVector={{ x: 0, y: 18 }} collectTo={collectingCards ? DEALER_POS : null} width={BOARD_W} speed={speed} highlight={bestCards.includes(c)} dim={bestCards.length > 0 && !bestCards.includes(c)} />;
+            return <TableCard key={`${vis.handId}-b${i}`} card={c} faceUp x={p.x} y={p.y} z={40 + i} from={DEALER_POS} extractVector={DEAL_DOWN} collectTo={collectingCards ? DEALER_POS : null} width={BOARD_W} speed={speed} highlight={bestCards.includes(c)} dim={bestCards.length > 0 && !bestCards.includes(c)} />;
           })}
 
           {/* Cartas privadas */}
@@ -424,7 +475,7 @@ export default function PokerTablePage() {
                   z={50 + i}
                   from={DEALER_POS}
                   width={seat === heroSeat ? HERO_W : RIVAL_W}
-                  extractVector={{ x: 0, y: 18 }}
+                  extractVector={DEAL_DOWN}
                   collectTo={collectingCards || mucked ? DEALER_POS : null}
                   speed={speed}
                   highlight={!!card && bestCards.includes(card)}

@@ -44,14 +44,15 @@ Abre **http://localhost:5173**. El servidor de la API escucha en el puerto 3001 
 
 `admin:create` pide la contraseña por teclado (mínimo 10 caracteres, letras y números). También puedes definir `ADMIN_PASSWORD` en el entorno. Para dar el rol a una cuenta ya registrada: `npm run admin:create -- --promote nombre_de_usuario`. Para restablecer una contraseña: `npm run admin:create -- --reset-password nombre_de_usuario`.
 
-### Modo producción local (un solo proceso y un solo puerto)
+### Para jugar con la máxima fluidez (recomendado)
 
 ```powershell
-npm run build
-npm start
+npm run jugar
 ```
 
-Abre **http://localhost:3001**: el servidor entrega también el frontend compilado.
+Compila el frontend y arranca el servidor en un solo proceso. Abre **http://localhost:3001**. Es la versión optimizada: las animaciones van más fluidas que en `npm run dev`, que incluye herramientas de depuración de React (montaje doble en modo estricto, comprobaciones extra) pensadas para desarrollar, no para jugar.
+
+Equivale a `npm run build` seguido de `npm start`.
 
 ### Parar
 
@@ -64,8 +65,10 @@ Abre **http://localhost:3001**: el servidor entrega también el frontend compila
 | `npm run dev` | Servidor (recarga automática) + frontend Vite |
 | `npm run build` | Compila el frontend en `apps/web/dist` |
 | `npm start` | Arranca el servidor (sirve `dist` si existe) |
-| `npm test` | 153 pruebas unitarias y de integración (Vitest) |
-| `npm run test:e2e` | 7 pruebas de extremo a extremo con Playwright |
+| `npm run jugar` | Compila y arranca la versión optimizada (http://localhost:3001) |
+| `npm test` | 272 pruebas unitarias y de integración (Vitest) |
+| `npm run test:e2e` | 9 pruebas de extremo a extremo con Playwright (versión compilada) |
+| `npm run test:e2e:dev` | Pruebas de animación contra el servidor de desarrollo (modo estricto de React) |
 | `npm run typecheck` / `npm run lint` | Comprobación de tipos estricta de los tres paquetes |
 | `npm run db:migrate` | Aplica migraciones pendientes |
 | `npm run db:seed` | Inserta bots y mesas de demostración (idempotente) |

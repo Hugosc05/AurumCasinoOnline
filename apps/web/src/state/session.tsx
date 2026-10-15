@@ -88,11 +88,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     audio.configure(prefs.sound, prefs.volume);
   }, [prefs.sound, prefs.volume]);
 
-  // Desbloquea el audio en la primera interacción (nunca antes).
+  // Desbloquea el audio con las interacciones del usuario (nunca antes). Si el sonido
+  // está desactivado no se crea nada; al activarlo, se crea en ese momento.
   useEffect(() => {
     const unlock = (): void => audio.unlock();
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
     return () => {
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);

@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado: 14/10/2026 — versión 1.1.0.
+Actualizado: 15/10/2026 — versión 1.2.0.
 
 ## Hecho y verificado
 
@@ -16,7 +16,8 @@ Actualizado: 14/10/2026 — versión 1.1.0.
 | Logros, rachas, promociones, clasificación, actividad anonimizada | Completo | Pruebas de integración |
 | Panel de administración | Completo | E2E + capturas |
 | Cartas SVG propias (52 + reverso) y volteo en dos fases | Completo | 111 pruebas + galería capturada en 3 tamaños |
-| Animaciones de blackjack, póker y slots (v1.1) y efectos de celebración | Completo | Pruebas de presentación + capturas fotograma a fotograma |
+| Animaciones de blackjack, póker y slots y efectos de celebración | Completo | Pruebas de presentación + capturas fotograma a fotograma |
+| Slots tipo máquina real (giro inmediato, física, frenada rápida) — v1.2 | Completo | 7 pruebas de física + E2E en producción y desarrollo + medición de fotogramas |
 | Responsive (escritorio y móvil) | Completo | Capturas 1440 px y 390 px + E2E móvil |
 | Documentación | Completa | — |
 
@@ -33,7 +34,8 @@ Actualizado: 14/10/2026 — versión 1.1.0.
 - **Windows**: el código está pensado para Windows (sin binarios nativos propios, scripts multiplataforma), pero las pruebas se ejecutaron en Linux. Ejecuta `npm test` tras la primera instalación.
 - **Audio**: los sonidos se sintetizan y se han probado por código, pero no se han escuchado en este entorno; conviene revisar el volumen relativo en un equipo real.
 - **Premio grande/extraordinario**: las partículas (destello, ráfaga y fuegos artificiales) se han comprobado en un banco aislado, pero el cartel de premio grande no se ha visto en una tirada real porque no salió ninguno durante las capturas.
-- **Rendimiento**: animaciones con `transform`/`opacity` y rAF; no se ha medido en equipos modestos reales.
+- **Rendimiento**: medido en un navegador sin aceleración gráfica (contenedor Linux): blackjack y póker a ~58-60 fps en desarrollo y producción; slots con mediana de 17 ms por fotograma y picos por el compositor por software. En un equipo con GPU el compositor no debería ser el cuello de botella, pero no se ha medido en un PC real.
+- **`npm run dev` frente a `npm run jugar`**: el modo desarrollo de React es más pesado; para jugar, mejor `npm run jugar`.
 
 ## Siguientes pasos sugeridos
 
