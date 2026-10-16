@@ -1,6 +1,8 @@
 import type { AppConfig } from './config';
 import type { Database } from './db/database';
 import type { PokerManager } from './poker/manager';
+import type { BlackjackManager } from './blackjack/manager';
+import type { BotPool } from './bots/pool';
 import type { RealtimeHub } from './realtime/hub';
 
 export interface AppContext {
@@ -8,5 +10,7 @@ export interface AppContext {
   db: Database;
   realtime: RealtimeHub;
   poker: PokerManager;
+  blackjack: BlackjackManager;
+  bots: BotPool;
   startedAt: number;
 }

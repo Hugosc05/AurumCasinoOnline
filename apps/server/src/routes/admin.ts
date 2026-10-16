@@ -172,8 +172,9 @@ export function adminRoutes(ctx: AppContext): Router {
   /* --------------------------------- Bots --------------------------------- */
   r.get('/bots', (_req, res) => {
     const items = db.all<Record<string, unknown> & { id: string }>(
-      `SELECT id, name, profile, difficulty, enabled, bankroll, hands_played AS handsPlayed, net_result AS netResult FROM bots ORDER BY name`,
-    ).map((b) => ({ ...b, seatedAt: ctx.poker.botPool.seatedAt(b.id) }));
+      `SELECT id, name, profile, difficulty, enabled, bankroll, hands_played AS handsPlayed, net_result AS netResult,
+              bj_strategy AS bjStrategy, bet_style AS betStyle, experience, bj_rounds AS bjRounds, bj_net AS bjNet FROM bots ORDER BY name`,
+    ).map((b) => ({ ...b, seatedAt: ctx.bots.seatedAt(b.id) }));
     res.json({ items });
   });
 
@@ -192,6 +193,50 @@ export function adminRoutes(ctx: AppContext): Router {
     if (body.difficulty) db.run('UPDATE bots SET difficulty = ? WHERE id = ?', body.difficulty, id);
     audit(req, 'bot.update', id, body);
     res.json({ ok: true, note: 'Los cambios se aplican cuando el bot vuelva a sentarse en una mesa.' });
+  });
+
+  /* -------------------------- Mesas de blackjack --------------------------- */
+  r.get('/blackjack-tables', (_req, res) => {
+    res.json({ items: db.all('SELECT * FROM blackjack_tables ORDER BY sort_order, name'), live: ctx.blackjack.diagnostics() });
+  });
+
+  const bjTableSchema = z.object({
+    name: z.string().trim().min(3).max(40).optional(),
+    minBet: z.number().int().min(1).max(100_000).optional(),
+    maxBet: z.number().int().min(1).max(1_000_000).optional(),
+    maxSeats: z.number().int().min(1).max(7).optional(),
+    maxBots: z.number().int().min(0).max(6).optional(),
+    targetPlayers: z.number().int().min(0).max(7).optional(),
+    enabled: z.boolean().optional(),
+  }).strict();
+  r.patch('/blackjack-tables/:id', (req, res) => {
+    const id = z.string().min(1).max(64).parse(req.params.id);
+    const body = parse(bjTableSchema, req.body);
+    const cur = db.get<Record<string, number | string>>('SELECT * FROM blackjack_tables WHERE id = ?', id);
+    if (!cur) throw notFound('Mesa no encontrada');
+    const next = {
+      name: body.name ?? (cur.name as string),
+      min: body.minBet ?? (cur.min_bet as number),
+      max: body.maxBet ?? (cur.max_bet as number),
+      seats: body.maxSeats ?? (cur.max_seats as number),
+      bots: body.maxBots ?? (cur.max_bots as number),
+      target: body.targetPlayers ?? (cur.target_players as number),
+      enabled: body.enabled ?? cur.enabled === 1,
+    };
+    if (next.max < next.min) throw new AppError(400, 'INVALID_LIMITS', 'La apuesta máxima debe ser mayor o igual que la mínima');
+    if (next.bots >= next.seats) throw new AppError(400, 'INVALID_BOTS', 'Debe quedar al menos un asiento libre para personas');
+    const live = ctx.blackjack.get(id);
+    // Las reglas no cambian a mitad de ronda: los límites nuevos se aplican en la siguiente apuesta.
+    if (body.maxSeats !== undefined && body.maxSeats !== cur.max_seats && !live.isIdle()) {
+      throw new AppError(409, 'ROUND_IN_PROGRESS', 'Cambia el número de asientos cuando la mesa esté en reposo');
+    }
+    db.run(
+      'UPDATE blackjack_tables SET name = ?, min_bet = ?, max_bet = ?, max_seats = ?, max_bots = ?, target_players = ?, enabled = ? WHERE id = ?',
+      next.name, next.min, next.max, next.seats, next.bots, next.target, next.enabled ? 1 : 0, id,
+    );
+    ctx.blackjack.reloadTables();
+    audit(req, 'blackjack_table.update', id, body);
+    res.json({ ok: true, note: 'Los límites se aplican desde la siguiente ronda de apuestas.' });
   });
 
   /* -------------------------------- Mesas --------------------------------- */
@@ -306,6 +351,7 @@ export function adminRoutes(ctx: AppContext): Router {
       },
       realtime: { online: ctx.realtime.onlineCount(), connections: ctx.realtime.connectionCount() },
       poker: ctx.poker.diagnostics(),
+      blackjack: ctx.blackjack.diagnostics(),
     });
   });
 

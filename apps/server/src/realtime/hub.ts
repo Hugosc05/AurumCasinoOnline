@@ -15,6 +15,8 @@ export interface RtClient {
   role: 'player' | 'admin' | null;
   alive: boolean;
   watching: string | null;
+  /** Mesa de blackjack multijugador que está mirando. */
+  bjWatching: string | null;
   connectedAt: number;
 }
 
@@ -113,6 +115,7 @@ export class RealtimeHub {
       role: user?.role ?? null,
       alive: true,
       watching: null,
+      bjWatching: null,
       connectedAt: Date.now(),
     };
     this.clients.add(client);

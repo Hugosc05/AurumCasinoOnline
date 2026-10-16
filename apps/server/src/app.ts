@@ -13,6 +13,8 @@ import { csrfGuard, cors, errorHandler } from './lib/http';
 import { logger } from './lib/logger';
 import { notFound } from './lib/errors';
 import { PokerManager } from './poker/manager';
+import { BlackjackManager } from './blackjack/manager';
+import { BotPool } from './bots/pool';
 import { RealtimeHub } from './realtime/hub';
 import { adminRoutes } from './routes/admin';
 import { authRoutes } from './routes/auth';
@@ -35,14 +37,25 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   purgeExpiredSessions(database);
 
   const realtime = new RealtimeHub(database, config);
+  const bots = new BotPool(database);
+  const fast = config.POKER_FAST_MODE;
   const poker = new PokerManager(database, realtime, {
-    fast: config.POKER_FAST_MODE,
-    humanTimeoutMs: config.POKER_FAST_MODE ? 2000 : 25_000,
-    disconnectedTimeoutMs: config.POKER_FAST_MODE ? 500 : 6_000,
-    betweenHandsMs: config.POKER_FAST_MODE ? 0 : 3_200,
-  });
-  const ctx: AppContext = { config, db: database, realtime, poker, startedAt: Date.now() };
+    fast,
+    humanTimeoutMs: fast ? 2000 : 25_000,
+    disconnectedTimeoutMs: fast ? 500 : 6_000,
+    betweenHandsMs: fast ? 0 : 3_200,
+  }, bots);
+  const blackjack = new BlackjackManager(database, realtime, {
+    fast,
+    betWindowMs: fast ? 1500 : 15_000,
+    demoBetWindowMs: fast ? 0 : 4_000,
+    humanTurnMs: fast ? 2000 : 20_000,
+    disconnectedTurnMs: fast ? 300 : 5_000,
+    betweenRoundsMs: fast ? 0 : 2_500,
+  }, bots);
+  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, startedAt: Date.now() };
   poker.init();
+  blackjack.init();
 
   const app = express();
   app.disable('x-powered-by');
@@ -112,6 +125,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     async close() {
       clearInterval(sessionSweep);
       poker.shutdown();
+      blackjack.shutdown();
       realtime.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       database.close();

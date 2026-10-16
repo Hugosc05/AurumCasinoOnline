@@ -59,7 +59,7 @@ test('ruleta: apostar, girar y liquidar', async ({ page }) => {
 test('blackjack: repartir y jugar una mano completa', async ({ page }) => {
   await register(page);
   await fastMode(page);
-  await page.goto('/blackjack');
+  await page.goto('/blackjack/individual');
   await page.locator('[data-chip="25"]').click();
   await page.getByRole('button', { name: /Repartir/ }).click();
   for (let i = 0; i < 6; i += 1) {
@@ -70,6 +70,30 @@ test('blackjack: repartir y jugar una mano completa', async ({ page }) => {
   }
   await expect(page.getByRole('button', { name: /Repetir 25/ })).toBeVisible({ timeout: 10000 });
   await expect(page.getByRole('status').filter({ hasText: /Gana|Pierde|Empate|Blackjack|Se pasa/ }).first()).toBeVisible();
+});
+
+test('blackjack multijugador: elegir mesa, sentarse, apostar y jugar contra el crupier', async ({ page }) => {
+  await register(page);
+  await fastMode(page);
+  await page.goto('/blackjack');
+  await expect(page.getByText('Demo con bots').first()).toBeVisible();
+  await page.getByTestId('bj-table-nacar').getByRole('button', { name: /Unirse/ }).click();
+  await expect(page).toHaveURL(/\/blackjack\/mesa\/nacar/);
+  await page.getByTestId('sit-0').click();
+  await expect(page.getByTestId('seat-0')).toContainText('TÚ');
+  await page.locator('[data-chip="25"]').click();
+  await expect(page.getByTestId('pending-bet')).toHaveText('25');
+  await page.getByTestId('confirm-bet').click();
+  await expect(page.getByLabel(/Saldo: 9\.?975 /)).toBeVisible();
+  for (let i = 0; i < 30; i += 1) {
+    if ((await page.getByTestId('bj-status').innerText()).includes('terminada')) break;
+    const stand = page.getByRole('button', { name: /Plantarse/ });
+    if (await stand.isEnabled()) await stand.click();
+    await page.waitForTimeout(500);
+  }
+  await expect(page.getByTestId('bj-status')).toContainText(/terminada|Apuestas/, { timeout: 15000 });
+  await page.getByRole('button', { name: /Levantarse/ }).click();
+  await expect(page.getByTestId('sit-0')).toBeVisible();
 });
 
 test('slots: una tirada cobra la apuesta y muestra el resultado', async ({ page }) => {

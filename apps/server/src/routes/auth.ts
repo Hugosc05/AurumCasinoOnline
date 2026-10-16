@@ -10,6 +10,7 @@ import { RateLimiter, rateLimit } from '../lib/rateLimit';
 import { credit } from '../wallet/wallet';
 import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
 import { SESSION_COOKIE, createSession, destroySession, type UserRow } from '../auth/sessions';
+import { RESERVED_BOT_NAMES } from '../bots/catalog';
 import { emailSchema, passwordSchema, toPublicUser, usernameSchema } from '../auth/users';
 
 const registerSchema = z.object({
@@ -51,6 +52,11 @@ export function authRoutes(ctx: AppContext): Router {
         'SELECT username, email FROM users WHERE username = ? OR email = ?',
         body.username, body.email,
       );
+      const isBotName = RESERVED_BOT_NAMES.has(body.username.toLowerCase())
+        || !!db.get('SELECT 1 AS x FROM bots WHERE lower(name) = lower(?)', body.username);
+      if (isBotName) {
+        throw new AppError(409, 'ALREADY_EXISTS', 'Nombre reservado', { fields: { username: 'Este nombre pertenece a un bot de demostración' } });
+      }
       if (taken) {
         const fields: Record<string, string> = {};
         if (taken.username.toLowerCase() === body.username.toLowerCase()) fields.username = 'Este nombre de usuario ya existe';

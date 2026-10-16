@@ -30,6 +30,7 @@ import { cryptoRng } from '../lib/rng';
 import { recordOutcome } from '../stats/stats';
 import { credit, debit, getBalance } from '../wallet/wallet';
 import type { RealtimeHub, RtClient } from '../realtime/hub';
+import type { BotIdentity, BotPool } from '../bots/pool';
 
 export interface TableConfig {
   id: string;
@@ -51,6 +52,7 @@ interface SeatState {
   stack: number;
   profile?: BotProfile;
   difficulty?: BotDifficulty;
+  bot?: BotIdentity;
   connected: boolean;
   disconnectedAt: number | null;
   timeouts: number;
@@ -93,12 +95,6 @@ function animationMs(events: readonly PokerEvent[]): number {
   return ms;
 }
 
-export interface BotPool {
-  acquire(tableId: string): { id: string; name: string; profile: BotProfile; difficulty: BotDifficulty } | null;
-  release(botId: string, stackReturned: number, buyIn: number): void;
-  takeBuyIn(botId: string, amount: number): number;
-  recordHand(botId: string, net: number): void;
-}
 
 /**
  * Mesa de Texas Hold'em autoritativa en el servidor.
@@ -173,6 +169,8 @@ export class PokerTable {
       handInProgress: !!this.hand && !this.hand.result,
       enabled: this.cfg.enabled,
       handsPlayed: this.handsPlayed,
+      free: this.seats.filter((x) => x === null).length,
+      mode: this.cfg.maxBots > 0 ? ('bots' as const) : ('public' as const),
     };
   }
 
@@ -191,6 +189,7 @@ export class PokerTable {
         maxBuyIn: this.cfg.maxBuyIn,
         maxSeats: this.cfg.maxSeats,
         enabled: this.cfg.enabled,
+        mode: this.cfg.maxBots > 0 ? ('bots' as const) : ('public' as const),
       },
       seats: this.seats.map((s, i) => {
         if (!s) return null;
@@ -201,6 +200,9 @@ export class PokerTable {
           isBot: s.kind === 'bot',
           profile: s.profile ? BOT_PROFILE_LABELS[s.profile] : null,
           difficulty: s.difficulty ?? null,
+          avatar: s.bot?.avatar ?? null,
+          experience: s.bot?.experience ?? null,
+          tagline: s.bot?.tagline ?? null,
           stack: inHand ? inHand.stack : s.stack,
           connected: s.connected,
           leaving: s.leaving,
@@ -315,7 +317,7 @@ export class PokerTable {
       this.hub.sendToUser(s.id, { t: 'balance', ...getBalance(this.db, s.id) });
       this.hub.sendToUser(s.id, { t: 'poker.left', tableId: this.cfg.id, cashOut: s.stack });
     } else {
-      this.bots.release(s.id, s.stack, 0);
+      this.bots.release(s.id, s.stack);
     }
   }
 
@@ -377,12 +379,12 @@ export class PokerTable {
     while (need > 0) {
       const free = this.seats.findIndex((s) => s === null);
       if (free === -1) break;
-      const bot = this.bots.acquire(this.cfg.id);
+      const bot = this.bots.acquire(`poker:${this.cfg.id}`);
       if (!bot) break;
       const buyIn = Math.min(this.cfg.maxBuyIn, Math.max(this.cfg.minBuyIn, this.cfg.bigBlind * 100));
       const stack = this.bots.takeBuyIn(bot.id, buyIn);
       this.seats[free] = {
-        kind: 'bot', id: bot.id, name: bot.name, stack, profile: bot.profile, difficulty: bot.difficulty,
+        kind: 'bot', id: bot.id, name: bot.name, stack, profile: bot.profile, difficulty: bot.difficulty, bot,
         connected: true, disconnectedAt: null, timeouts: 0, leaving: false, joinedAt: Date.now(),
       };
       need -= 1;

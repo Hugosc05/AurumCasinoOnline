@@ -124,6 +124,15 @@ export class BlackjackError extends Error {
   }
 }
 
+export function drawFromShoe(shoe: { shoe: Card[]; shoeSize: number; rules: BlackjackRules; events: { type: string }[] }, rng: Rng): Card {
+  if (shoe.shoe.length === 0) {
+    shoe.shoe = createShoe(shoe.rules.decks, rng);
+    shoe.shoeSize = shoe.shoe.length;
+    shoe.events.push({ type: 'shuffle' });
+  }
+  return shoe.shoe.pop() as Card;
+}
+
 function draw(state: BjState, rng: Rng): Card {
   if (state.shoe.length === 0) {
     state.shoe = createShoe(state.rules.decks, rng);
@@ -207,22 +216,49 @@ export function startBlackjack(
   return state;
 }
 
-export function blackjackLegalActions(state: BjState): BjAction[] {
-  if (state.phase !== 'player') return [];
-  const hand = state.hands[state.active];
-  if (!hand || hand.done) return [];
+/** Acciones legales para una mano concreta (compartido por la mesa individual y la multijugador). */
+export function legalHandActions(hand: BjHand, handsInSeat: number, rules: BlackjackRules): BjAction[] {
+  if (hand.done) return [];
   const actions: BjAction[] = ['hit', 'stand'];
   if (hand.cards.length === 2) {
     const splitAces = hand.fromSplit && rankOf(hand.cards[0]!) === 14;
-    if (!splitAces && (!hand.fromSplit || state.rules.doubleAfterSplit)) actions.push('double');
-    if (
-      state.hands.length < state.rules.maxHands &&
-      cardValue(hand.cards[0]!) === cardValue(hand.cards[1]!)
-    ) {
-      actions.push('split');
-    }
+    if (!splitAces && (!hand.fromSplit || rules.doubleAfterSplit)) actions.push('double');
+    if (handsInSeat < rules.maxHands && cardValue(hand.cards[0]!) === cardValue(hand.cards[1]!)) actions.push('split');
   }
   return actions;
+}
+
+export function blackjackLegalActions(state: BjState): BjAction[] {
+  if (state.phase !== 'player') return [];
+  const hand = state.hands[state.active];
+  if (!hand) return [];
+  return legalHandActions(hand, state.hands.length, state.rules);
+}
+
+/** Regla del crupier: pide con menos de 17 (y con 17 blando si la mesa es H17). */
+export function dealerMustHit(cards: readonly Card[], rules: BlackjackRules): boolean {
+  const v = handValue(cards);
+  return v.total < 17 || (v.total === 17 && v.soft && rules.dealerHitsSoft17);
+}
+
+/** El crupier solo roba si queda alguna mano que no se haya pasado ni sea blackjack natural. */
+export function dealerNeedsToPlay(hands: readonly BjHand[]): boolean {
+  return hands.some((h) => handValue(h.cards).total <= 21 && !(!h.fromSplit && isNatural(h.cards)));
+}
+
+/** Resultado y pago (apuesta + ganancia) de una mano contra la mano final del crupier. */
+export function settleHand(hand: BjHand, dealer: readonly Card[], rules: BlackjackRules): { outcome: BjOutcome; payout: number } {
+  const dealerTotal = handValue(dealer).total;
+  const dealerBj = isNatural(dealer);
+  const v = handValue(hand.cards).total;
+  const natural = !hand.fromSplit && isNatural(hand.cards);
+  if (natural && !dealerBj) return { outcome: 'blackjack', payout: hand.bet + Math.floor(hand.bet * rules.blackjackPayout) };
+  if (natural && dealerBj) return { outcome: 'push', payout: hand.bet };
+  if (v > 21) return { outcome: 'bust', payout: 0 };
+  if (dealerBj) return { outcome: 'lose', payout: 0 };
+  if (dealerTotal > 21 || v > dealerTotal) return { outcome: 'win', payout: hand.bet * 2 };
+  if (v === dealerTotal) return { outcome: 'push', payout: hand.bet };
+  return { outcome: 'lose', payout: 0 };
 }
 
 /** Apuesta adicional que requiere una acción (para descontarla del monedero antes). */
@@ -303,10 +339,7 @@ function advance(state: BjState, rng: Rng): void {
   state.events.push({ type: 'reveal', card: hole });
   const anyLive = state.hands.some((h) => handValue(h.cards).total <= 21);
   if (anyLive) {
-    for (;;) {
-      const v = handValue(state.dealer);
-      const mustHit = v.total < 17 || (v.total === 17 && v.soft && state.rules.dealerHitsSoft17);
-      if (!mustHit) break;
+    while (dealerMustHit(state.dealer, state.rules)) {
       const c = draw(state, rng);
       state.dealer.push(c);
       state.events.push({ type: 'deal', target: 'dealer', card: c, faceDown: false });
@@ -316,36 +349,9 @@ function advance(state: BjState, rng: Rng): void {
 }
 
 function settle(state: BjState): void {
-  const dealerTotal = handValue(state.dealer).total;
-  const dealerBj = isNatural(state.dealer);
   let total = 0;
   for (const hand of state.hands) {
-    const v = handValue(hand.cards).total;
-    const natural = !hand.fromSplit && isNatural(hand.cards);
-    let outcome: BjOutcome;
-    let payout: number;
-    if (natural && !dealerBj) {
-      outcome = 'blackjack';
-      payout = hand.bet + Math.floor(hand.bet * state.rules.blackjackPayout);
-    } else if (natural && dealerBj) {
-      outcome = 'push';
-      payout = hand.bet;
-    } else if (v > 21) {
-      outcome = 'bust';
-      payout = 0;
-    } else if (dealerBj) {
-      outcome = 'lose';
-      payout = 0;
-    } else if (dealerTotal > 21 || v > dealerTotal) {
-      outcome = 'win';
-      payout = hand.bet * 2;
-    } else if (v === dealerTotal) {
-      outcome = 'push';
-      payout = hand.bet;
-    } else {
-      outcome = 'lose';
-      payout = 0;
-    }
+    const { outcome, payout } = settleHand(hand, state.dealer, state.rules);
     hand.outcome = outcome;
     hand.payout = payout;
     hand.done = true;

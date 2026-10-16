@@ -256,7 +256,7 @@ function Footer() {
           </p>
         </div>
         <FooterCol title="Juegos" links={[['/blackjack', 'Blackjack'], ['/poker', "Texas Hold'em"], ['/ruleta', 'Ruleta europea'], ['/slots', 'Slots Aurum Royale']]} />
-        <FooterCol title="Información" links={[['/reglas', 'Reglas y pagos'], ['/juego-responsable', 'Juego responsable'], ['/ayuda', 'Ayuda']]} />
+        <FooterCol title="Información" links={[['/reglas', 'Reglas y pagos'], ['/juego-responsable', 'Juego responsable'], ['/ayuda', 'Ayuda'], ['/bots', 'Bots del casino']]} />
         <FooterCol title="Legal" links={[['/privacidad', 'Privacidad'], ['/terminos', 'Condiciones de uso']]} />
       </div>
       <div className="border-t border-linea/40">

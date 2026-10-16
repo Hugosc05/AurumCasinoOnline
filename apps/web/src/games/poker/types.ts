@@ -1,3 +1,4 @@
+import type { AvatarSpec } from '../../components/BotAvatar';
 import type { LegalActions, PokerEvent, PokerPublicHand } from '@aurum/engine';
 
 export interface SeatView {
@@ -6,6 +7,9 @@ export interface SeatView {
   isBot: boolean;
   profile: string | null;
   difficulty: string | null;
+  avatar: AvatarSpec | null;
+  experience: string | null;
+  tagline: string | null;
   stack: number;
   connected: boolean;
   leaving: boolean;

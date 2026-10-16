@@ -1,7 +1,8 @@
 import { DEFAULT_BLACKJACK_RULES, type BjAction, type BjEvent, type BjOutcome, type BjPublicState } from '@aurum/engine';
 import { AnimatePresence, motion } from 'motion/react';
-import { Eraser, Hand, Layers, PlusCircle, Repeat2, Split, Square } from 'lucide-react';
+import { ArrowLeft, Eraser, Hand, Layers, PlusCircle, Repeat2, Split, Square } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChipStack } from '../../components/Chip';
 import { ChipRack, GameHeader, OddsNote, SkipButton } from '../../components/GameKit';
 import { useFlyingChips } from '../../components/FlyingChips';
@@ -335,7 +336,8 @@ export default function BlackjackPage() {
   return (
     <div className="mx-auto max-w-6xl px-3 py-8 sm:px-6">
       {layer}
-      <GameHeader title="Blackjack" subtitle="Seis barajas, el crupier se planta en 17, blackjack 3 a 2." />
+      <Link to="/blackjack" className="mb-3 inline-flex items-center gap-1.5 text-sm text-niebla hover:text-marfil"><ArrowLeft className="h-4 w-4" /> Mesas de blackjack</Link>
+      <GameHeader title="Blackjack · mesa individual" subtitle="Seis barajas, el crupier se planta en 17, blackjack 3 a 2." />
       <div className="rail relative rounded-[44px] p-2.5 sm:rounded-[64px] sm:p-3.5">
        <div className="felt relative overflow-hidden rounded-[36px] shadow-[inset_0_0_80px_rgba(0,0,0,0.55)] sm:rounded-[54px]">
         <Stage width={STAGE.w} height={STAGE.h} maxHeightVh={72}>

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, Bot, LogOut, Wifi, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { BotAvatar } from '../../components/BotAvatar';
 import { ChipStack } from '../../components/Chip';
 import { OddsNote, SkipButton } from '../../components/GameKit';
 import { CardBack } from '../../components/PlayingCard';
@@ -136,7 +137,9 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
     <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: pos.x, top: pos.y, zIndex: 60 }}>
       <div className={cx('relative flex w-[150px] flex-col items-center transition-opacity duration-300', folded && 'opacity-55')}>
         <div className={cx('relative grid h-16 w-16 place-items-center rounded-full border-2 bg-gradient-to-b shadow-hondo', seat.isYou ? 'border-oro-claro from-marino to-abismo' : 'border-white/20 from-[#1f2a44] to-[#0c1222]', isTurn && 'turn-ring', won !== undefined && 'shadow-[0_0_0_3px_#ebd9a6,0_0_30px_rgba(235,217,166,0.6)]')}>
-          {seat.isBot ? <Bot className="h-7 w-7 text-niebla" /> : <span className="font-display text-2xl text-marfil">{seat.name[0]!.toUpperCase()}</span>}
+          {seat.isBot && seat.avatar ? (
+            <BotAvatar spec={seat.avatar} size={60} title={`Avatar de ${seat.name} (bot)`} />
+          ) : seat.isBot ? <Bot className="h-7 w-7 text-niebla" /> : <span className="font-display text-2xl text-marfil">{seat.name[0]!.toUpperCase()}</span>}
           {remaining !== null && (
             <svg className="absolute -inset-1.5" viewBox="0 0 100 100" aria-hidden>
               <circle cx="50" cy="50" r="47" fill="none" stroke={pct < 0.25 ? '#e0a84b' : '#ebd9a6'} strokeWidth="4" strokeDasharray={`${pct * 295} 295`} transform="rotate(-90 50 50)" strokeLinecap="round" />
@@ -147,7 +150,7 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
         <div className="mt-1 w-full rounded-xl border border-white/10 bg-[#070b14]/90 px-2 py-1 text-center">
           <p className="flex items-center justify-center gap-1 truncate text-[13px] text-marfil">
             {seat.name}
-            {seat.isBot && <span className="rounded bg-white/10 px-1 text-[9px] text-niebla" title={`Bot ${seat.profile ?? ''} (${seat.difficulty ?? ''})`}>BOT</span>}
+            {seat.isBot && <span className="rounded bg-white/10 px-1 text-[9px] text-niebla" title={`Bot automatizado · ${seat.profile ?? ''}${seat.tagline ? ` · ${seat.tagline}` : ''}`}>BOT</span>}
             {seat.isYou && <span className="rounded bg-oro/20 px-1 text-[9px] text-oro-claro">TÚ</span>}
           </p>
           <p className="font-display text-base text-oro-claro tabular-nums">{credits(stack)}</p>

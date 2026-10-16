@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+  BJ_STRATEGY_LABELS,
   BOT_PROFILE_LABELS,
   DEFAULT_BLACKJACK_RULES,
   DEFAULT_ROULETTE_LIMITS,
@@ -16,6 +17,7 @@ import type { AppContext } from '../context';
 import { getSetting } from '../db/seed';
 import { parse } from '../lib/http';
 import { anonymize } from '../auth/users';
+import { parseAvatar } from '../bots/pool';
 
 const rtp = computeRtp();
 
@@ -33,6 +35,7 @@ export function publicRoutes(ctx: AppContext): Router {
     res.json({
       games: getSetting(db, 'gamesEnabled'),
       tables: ctx.poker.lobby(),
+      blackjackTables: ctx.blackjack.lobby(),
       online: ctx.realtime.onlineCount(),
       registeredPlayers: registered,
       maintenanceMessage: getSetting(db, 'maintenanceMessage'),
@@ -86,6 +89,38 @@ export function publicRoutes(ctx: AppContext): Router {
         rtp,
       },
       poker: { profiles: BOT_PROFILE_LABELS },
+    });
+  });
+
+  /**
+   * Perfiles públicos de los bots de demostración. Son participantes
+   * automatizados: las estadísticas proceden solo de las partidas que han
+   * jugado de verdad en este servidor.
+   */
+  r.get('/bots', (_req, res) => {
+    const rows = db.all<{
+      id: string; name: string; profile: keyof typeof BOT_PROFILE_LABELS; difficulty: string; experience: string; bet_style: string;
+      bj_strategy: keyof typeof BJ_STRATEGY_LABELS; tagline: string; avatar_json: string;
+      hands_played: number; poker_wins: number; bj_rounds: number; bj_wins: number;
+    }>('SELECT * FROM bots WHERE enabled = 1 ORDER BY name');
+    res.json({
+      automated: true,
+      notice: 'Los bots son jugadores automatizados del casino. No son personas.',
+      bots: rows.map((b) => {
+        const where = ctx.bots.seatedAt(b.id);
+        return {
+          name: b.name,
+          avatar: parseAvatar(b.avatar_json),
+          profile: BOT_PROFILE_LABELS[b.profile],
+          difficulty: b.difficulty,
+          experience: b.experience,
+          betStyle: b.bet_style,
+          blackjackStrategy: BJ_STRATEGY_LABELS[b.bj_strategy],
+          tagline: b.tagline,
+          playingNow: where ? (where.startsWith('poker:') ? 'poker' : 'blackjack') : null,
+          stats: { pokerHands: b.hands_played, pokerWins: b.poker_wins, blackjackRounds: b.bj_rounds, blackjackWins: b.bj_wins },
+        };
+      }),
     });
   });
 

@@ -23,7 +23,7 @@ async function register(page: Page): Promise<void> {
 
 test('blackjack: las cartas repartidas se giran y muestran su valor', async ({ page }) => {
   await register(page);
-  await page.goto('/blackjack');
+  await page.goto('/blackjack/individual');
   await page.locator('[data-chip="25"]').click();
   await page.getByRole('button', { name: /Repartir/ }).click();
   // Dos cartas del jugador y la vista del crupier boca arriba (la oculta sigue boca abajo).

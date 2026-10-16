@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Database } from './database';
 import { nowIso } from './database';
+import { BOT_CATALOG } from '../bots/catalog';
 
 export interface GameSettings {
   blackjack: boolean;
@@ -18,33 +19,18 @@ export const DEFAULT_SETTINGS = {
 };
 export type SettingsShape = typeof DEFAULT_SETTINGS;
 
-/**
- * Bots de demostración. Sus nombres llevan el prefijo "Bot" y se marcan como
- * bots en todas las vistas: nunca se presentan como personas reales.
- */
-const DEMO_BOTS: { name: string; profile: 'conservative' | 'aggressive' | 'balanced' | 'analytical'; difficulty: 'easy' | 'normal' | 'hard' }[] = [
-  { name: 'Bot Atlas', profile: 'analytical', difficulty: 'hard' },
-  { name: 'Bot Brisa', profile: 'conservative', difficulty: 'normal' },
-  { name: 'Bot Ciro', profile: 'aggressive', difficulty: 'normal' },
-  { name: 'Bot Dalia', profile: 'balanced', difficulty: 'normal' },
-  { name: 'Bot Eco', profile: 'analytical', difficulty: 'normal' },
-  { name: 'Bot Fénix', profile: 'aggressive', difficulty: 'hard' },
-  { name: 'Bot Gaia', profile: 'conservative', difficulty: 'easy' },
-  { name: 'Bot Hugo', profile: 'balanced', difficulty: 'easy' },
-  { name: 'Bot Iris', profile: 'balanced', difficulty: 'hard' },
-  { name: 'Bot Jano', profile: 'conservative', difficulty: 'hard' },
-  { name: 'Bot Kira', profile: 'aggressive', difficulty: 'easy' },
-  { name: 'Bot Lince', profile: 'analytical', difficulty: 'easy' },
-  { name: 'Bot Mora', profile: 'balanced', difficulty: 'normal' },
-  { name: 'Bot Nilo', profile: 'conservative', difficulty: 'normal' },
-  { name: 'Bot Onix', profile: 'analytical', difficulty: 'hard' },
-  { name: 'Bot Pira', profile: 'aggressive', difficulty: 'normal' },
-];
-
 const DEMO_TABLES = [
   { id: 'esmeralda', name: 'Salón Esmeralda', sb: 5, bb: 10, min: 200, max: 2000, seats: 6, bots: 4, target: 4, order: 1 },
   { id: 'zafiro', name: 'Mesa Zafiro', sb: 25, bb: 50, min: 1000, max: 10000, seats: 6, bots: 4, target: 5, order: 2 },
   { id: 'obsidiana', name: 'Sala Obsidiana', sb: 100, bb: 200, min: 4000, max: 40000, seats: 6, bots: 3, target: 4, order: 3 },
+  // Mesa pública sin bots: solo juega cuando se sientan al menos dos personas.
+  { id: 'marfil', name: 'Mesa Marfil', sb: 10, bb: 20, min: 400, max: 4000, seats: 6, bots: 0, target: 0, order: 4 },
+];
+
+const BJ_TABLES = [
+  { id: 'rubi', name: 'Mesa Rubí', min: 10, max: 500, seats: 5, bots: 3, target: 3, order: 1 },
+  { id: 'onix', name: 'Mesa Ónix', min: 50, max: 2500, seats: 5, bots: 2, target: 3, order: 2 },
+  { id: 'nacar', name: 'Mesa Nácar', min: 10, max: 1000, seats: 5, bots: 0, target: 0, order: 3 },
 ];
 
 /** Datos de demostración reproducibles e idempotentes (no sobrescribe cambios del administrador). */
@@ -56,10 +42,12 @@ export function seed(db: Database): { bots: number; tables: number } {
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
       db.run('INSERT OR IGNORE INTO settings (key, value_json, updated_at) VALUES (?, ?, ?)', key, JSON.stringify(value), now);
     }
-    for (const b of DEMO_BOTS) {
-      bots += db.run(
-        'INSERT OR IGNORE INTO bots (id, name, profile, difficulty, created_at) VALUES (?, ?, ?, ?, ?)',
-        randomUUID(), b.name, b.profile, b.difficulty, now,
+    bots += seedBots(db, now);
+    for (const t of BJ_TABLES) {
+      tables += db.run(
+        `INSERT OR IGNORE INTO blackjack_tables (id, name, min_bet, max_bet, min_buy_in, max_buy_in, max_seats, max_bots, target_players, sort_order, created_at)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)`,
+        t.id, t.name, t.min, t.max, t.seats, t.bots, t.target, t.order, now,
       ).changes;
     }
     for (const t of DEMO_TABLES) {
@@ -71,6 +59,44 @@ export function seed(db: Database): { bots: number; tables: number } {
     }
   });
   return { bots, tables };
+}
+
+/**
+ * Bots del catálogo. Los bots de versiones anteriores ("Bot Atlas"…) se
+ * renombran conservando su id e historial. Si un usuario humano ya usa un
+ * nombre del catálogo, ese bot no se crea, para no confundirse con él.
+ */
+function seedBots(db: Database, now: string): number {
+  let n = 0;
+  for (const b of BOT_CATALOG) {
+    const clash = db.get('SELECT 1 AS x FROM users WHERE lower(username) = lower(?)', b.name);
+    if (clash) continue;
+    const identity = [JSON.stringify(b.avatar), b.experience, b.betStyle, b.bjStrategy, b.tagline] as const;
+    const existing = db.get<{ id: string }>('SELECT id FROM bots WHERE name = ?', b.name);
+    if (existing) {
+      // Solo se completa la identidad si aún está vacía (no pisa cambios del administrador).
+      db.run(
+        `UPDATE bots SET avatar_json = ?, experience = ?, bet_style = ?, bj_strategy = ?, tagline = ? WHERE id = ? AND avatar_json = '{}'`,
+        ...identity, existing.id,
+      );
+      continue;
+    }
+    const legacy = b.legacy ? db.get<{ id: string }>('SELECT id FROM bots WHERE name = ?', b.legacy) : undefined;
+    if (legacy) {
+      db.run(
+        'UPDATE bots SET name = ?, avatar_json = ?, experience = ?, bet_style = ?, bj_strategy = ?, tagline = ? WHERE id = ?',
+        b.name, ...identity, legacy.id,
+      );
+      n += 1;
+      continue;
+    }
+    n += db.run(
+      `INSERT INTO bots (id, name, profile, difficulty, avatar_json, experience, bet_style, bj_strategy, tagline, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      randomUUID(), b.name, b.profile, b.difficulty, ...identity, now,
+    ).changes;
+  }
+  return n;
 }
 
 export function getSetting<K extends keyof SettingsShape>(db: Database, key: K): SettingsShape[K] {

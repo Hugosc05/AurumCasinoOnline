@@ -9,15 +9,19 @@ import { InfoPage } from './pages/Info';
 import { NotFound } from './pages/NotFound';
 
 const BlackjackPage = lazy(() => import('./games/blackjack/BlackjackPage'));
+const BlackjackLobby = lazy(() => import('./games/blackjack/multi/BlackjackLobby'));
+const BlackjackTablePage = lazy(() => import('./games/blackjack/multi/BlackjackTablePage'));
 const RoulettePage = lazy(() => import('./games/roulette/RoulettePage'));
 const SlotsPage = lazy(() => import('./games/slots/SlotsPage'));
 const PokerLobby = lazy(() => import('./games/poker/PokerLobby'));
 const PokerTablePage = lazy(() => import('./games/poker/PokerTablePage'));
 const ProfilePage = lazy(() => import('./pages/Profile'));
 const LeaderboardPage = lazy(() => import('./pages/Leaderboard'));
+const BotsPage = lazy(() => import('./pages/Bots'));
 const PromotionsPage = lazy(() => import('./pages/Promotions'));
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 const CardGallery = lazy(() => import('./dev/CardGallery'));
+const DealerGallery = lazy(() => import('./dev/DealerGallery'));
 
 /** Protección de rutas privadas en el cliente (la autorización real está en el servidor). */
 function RequireAuth({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
@@ -34,18 +38,22 @@ export function App() {
     <Suspense fallback={<Spinner />}>
       <Routes>
         {import.meta.env.DEV && <Route path="/dev/cartas" element={<CardGallery />} />}
+        {import.meta.env.DEV && <Route path="/dev/crupier" element={<DealerGallery />} />}
         <Route path="/admin/*" element={<RequireAuth admin><AdminApp /></RequireAuth>} />
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="entrar" element={<LoginPage />} />
           <Route path="registro" element={<RegisterPage />} />
-          <Route path="blackjack" element={<RequireAuth><BlackjackPage /></RequireAuth>} />
+          <Route path="blackjack" element={<BlackjackLobby />} />
+          <Route path="blackjack/individual" element={<RequireAuth><BlackjackPage /></RequireAuth>} />
+          <Route path="blackjack/mesa/:tableId" element={<BlackjackTablePage />} />
           <Route path="ruleta" element={<RequireAuth><RoulettePage /></RequireAuth>} />
           <Route path="slots" element={<RequireAuth><SlotsPage /></RequireAuth>} />
           <Route path="poker" element={<PokerLobby />} />
           <Route path="poker/:tableId" element={<PokerTablePage />} />
           <Route path="perfil" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="clasificacion" element={<LeaderboardPage />} />
+          <Route path="bots" element={<BotsPage />} />
           <Route path="promociones" element={<PromotionsPage />} />
           <Route path="reglas" element={<InfoPage kind="rules" />} />
           <Route path="ayuda" element={<InfoPage kind="help" />} />

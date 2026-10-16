@@ -316,7 +316,7 @@ function RoundsPage() {
 /* ----------------------------------- Bots ---------------------------------- */
 function BotsPage() {
   const { notify } = useNotify();
-  const st = useLoad<{ items: { id: string; name: string; profile: string; difficulty: string; enabled: number; bankroll: number; handsPlayed: number; netResult: number; seatedAt: string | null }[] }>('/api/admin/bots');
+  const st = useLoad<{ items: { id: string; name: string; profile: string; difficulty: string; enabled: number; bankroll: number; handsPlayed: number; netResult: number; bjRounds: number; bjNet: number; bjStrategy: string; seatedAt: string | null }[] }>('/api/admin/bots');
   const patch = async (id: string, body: Record<string, unknown>): Promise<void> => {
     try {
       await api.patch(`/api/admin/bots/${id}`, body);
@@ -331,8 +331,8 @@ function BotsPage() {
       <Loadable state={st}>
         {(d) => (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead><tr><th className={th}>Nombre</th><th className={th}>Perfil</th><th className={th}>Dificultad</th><th className={th}>Manos</th><th className={th}>Resultado</th><th className={th}>Mesa</th><th className={th}>Activo</th></tr></thead>
+            <table className="w-full min-w-[900px] text-sm">
+              <thead><tr><th className={th}>Nombre</th><th className={th}>Perfil</th><th className={th}>Dificultad</th><th className={th}>Manos póker</th><th className={th}>Resultado</th><th className={th}>Rondas BJ</th><th className={th}>Resultado BJ</th><th className={th}>Mesa</th><th className={th}>Activo</th></tr></thead>
               <tbody>
                 {d.items.map((b) => (
                   <tr key={b.id}>
@@ -349,6 +349,8 @@ function BotsPage() {
                     </td>
                     <td className={td}>{b.handsPlayed}</td>
                     <td className={cx(td, b.netResult >= 0 ? 'text-exito' : 'text-[#f1a3ad]')}>{signed(b.netResult)}</td>
+                    <td className={td}>{b.bjRounds}</td>
+                    <td className={cx(td, b.bjNet >= 0 ? 'text-exito' : 'text-[#f1a3ad]')}>{signed(b.bjNet)}</td>
                     <td className={cx(td, 'text-niebla')}>{b.seatedAt ?? '—'}</td>
                     <td className={td}>
                       <input type="checkbox" className="h-4 w-4 accent-[#cfae6b]" checked={b.enabled === 1} onChange={(e) => void patch(b.id, { enabled: e.target.checked })} aria-label={`Activar ${b.name}`} />
@@ -432,6 +434,83 @@ function TablesPage() {
             <label className="flex items-center gap-2 text-sm text-marfil sm:col-span-2">
               <input type="checkbox" className="h-4 w-4 accent-[#cfae6b]" checked={edit.enabled === 1} onChange={(e) => setEdit({ ...edit, enabled: e.target.checked ? 1 : 0 })} /> Mesa abierta
             </label>
+            <div className="flex justify-end gap-2 sm:col-span-2">
+              <Button variant="ghost" onClick={() => setEdit(null)}>Cancelar</Button>
+              <Button onClick={() => void save()}>Guardar</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </Card>
+  );
+}
+
+/* --------------------------- Mesas de blackjack ---------------------------- */
+interface BjTableRow {
+  id: string;
+  name: string;
+  min_bet: number;
+  max_bet: number;
+  max_seats: number;
+  max_bots: number;
+  target_players: number;
+  enabled: number;
+}
+
+function BlackjackTablesCard() {
+  const { notify } = useNotify();
+  const st = useLoad<{ items: BjTableRow[] }>('/api/admin/blackjack-tables');
+  const [edit, setEdit] = useState<BjTableRow | null>(null);
+  const save = async (): Promise<void> => {
+    if (!edit) return;
+    try {
+      const r = await api.patch<{ note: string }>(`/api/admin/blackjack-tables/${edit.id}`, {
+        name: edit.name, minBet: Number(edit.min_bet), maxBet: Number(edit.max_bet), maxSeats: Number(edit.max_seats),
+        maxBots: Number(edit.max_bots), targetPlayers: Number(edit.target_players), enabled: edit.enabled === 1,
+      });
+      notify('success', r.note);
+      setEdit(null);
+      st.reload();
+    } catch (e) {
+      notify('error', (e as ApiError).message);
+    }
+  };
+  const f = (k: keyof BjTableRow) => (e: React.ChangeEvent<HTMLInputElement>) => setEdit((x) => (x ? { ...x, [k]: e.target.value } : x));
+  return (
+    <Card title="Mesas de blackjack">
+      <Loadable state={st}>
+        {(d) => (
+          <table className="w-full text-sm">
+            <thead><tr><th className={th}>Mesa</th><th className={th}>Apuesta</th><th className={th}>Asientos</th><th className={th}>Bots máx.</th><th className={th}>Modo</th><th className={th}>Estado</th><th className={th} /></tr></thead>
+            <tbody>
+              {d.items.map((t) => (
+                <tr key={t.id}>
+                  <td className={td}>{t.name}</td>
+                  <td className={td}>{credits(t.min_bet)}–{credits(t.max_bet)}</td>
+                  <td className={td}>{t.max_seats}</td>
+                  <td className={td}>{t.max_bots}</td>
+                  <td className={td}>{t.max_bots > 0 ? 'Demo con bots' : 'Solo personas'}</td>
+                  <td className={td}>{t.enabled ? <Badge tone="green">abierta</Badge> : <Badge tone="muted">cerrada</Badge>}</td>
+                  <td className={td}><Button size="sm" variant="outline" onClick={() => setEdit(t)}>Editar</Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Loadable>
+      <Modal open={!!edit} onClose={() => setEdit(null)} title={`Editar ${edit?.name ?? ''}`}>
+        {edit && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field className="sm:col-span-2" label="Nombre" value={edit.name} onChange={f('name')} />
+            <Field label="Apuesta mínima" type="number" value={edit.min_bet} onChange={f('min_bet')} />
+            <Field label="Apuesta máxima" type="number" value={edit.max_bet} onChange={f('max_bet')} />
+            <Field label="Asientos (1–7)" type="number" value={edit.max_seats} onChange={f('max_seats')} hint="Se aplica con la mesa en reposo." />
+            <Field label="Bots máximos" type="number" value={edit.max_bots} onChange={f('max_bots')} hint="0 = mesa solo para personas." />
+            <Field label="Jugadores objetivo" type="number" value={edit.target_players} onChange={f('target_players')} hint="Los bots rellenan hasta este número." />
+            <label className="flex items-center gap-2 text-sm text-marfil sm:col-span-2">
+              <input type="checkbox" className="h-4 w-4 accent-[#cfae6b]" checked={edit.enabled === 1} onChange={(e) => setEdit({ ...edit, enabled: e.target.checked ? 1 : 0 })} /> Mesa abierta
+            </label>
+            <p className="text-xs text-niebla sm:col-span-2">Las reglas no cambian a mitad de ronda: los nuevos límites se aplican al abrir la siguiente ronda de apuestas.</p>
             <div className="flex justify-end gap-2 sm:col-span-2">
               <Button variant="ghost" onClick={() => setEdit(null)}>Cancelar</Button>
               <Button onClick={() => void save()}>Guardar</Button>
@@ -605,7 +684,7 @@ export default function AdminApp() {
           <Route path="usuarios/:id" element={<UserDetail />} />
           <Route path="partidas" element={<RoundsPage />} />
           <Route path="bots" element={<BotsPage />} />
-          <Route path="mesas" element={<TablesPage />} />
+          <Route path="mesas" element={<div className="space-y-6"><TablesPage /><BlackjackTablesCard /></div>} />
           <Route path="ajustes" element={<SettingsPage />} />
           <Route path="diagnostico" element={<DiagnosticsPage />} />
         </Routes>

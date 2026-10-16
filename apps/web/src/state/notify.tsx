@@ -45,6 +45,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => socket.on('achievements', (m) => celebrate(m.achievements as Achievement[])), [celebrate]);
   useEffect(() => socket.on('poker.notice', (m) => notify('info', String(m.message))), [notify]);
+  useEffect(() => socket.on('bj.notice', (m) => notify('info', String(m.message))), [notify]);
 
   const current = queue[0];
   useEffect(() => {

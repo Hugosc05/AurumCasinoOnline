@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import type { BotDifficulty, BotProfile, PokerAction } from '@aurum/engine';
+import type { PokerAction } from '@aurum/engine';
+import type { BotPool } from '../bots/pool';
 import type { Database } from '../db/database';
 import { getSetting } from '../db/seed';
 import { AppError } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { credit } from '../wallet/wallet';
 import type { RealtimeHub, RtClient } from '../realtime/hub';
-import { type BotPool, PokerTable, type TableConfig, type TableTimings } from './table';
+import { PokerTable, type TableConfig, type TableTimings } from './table';
 
 interface TableRow {
   id: string;
@@ -51,57 +52,16 @@ function parseMsg<T extends z.ZodType>(schema: T, msg: unknown): z.infer<T> {
   return r.data;
 }
 
-/** Banca interna de los bots (fichas de demostración sin relación con ningún usuario). */
-class DbBotPool implements BotPool {
-  private seated = new Map<string, string>(); // botId → tableId
-  constructor(private readonly db: Database) {}
-
-  acquire(tableId: string) {
-    const rows = this.db.all<{ id: string; name: string; profile: BotProfile; difficulty: BotDifficulty }>(
-      'SELECT id, name, profile, difficulty FROM bots WHERE enabled = 1 ORDER BY hands_played ASC, name ASC',
-    );
-    const free = rows.filter((b) => !this.seated.has(b.id));
-    if (free.length === 0) return null;
-    // Rotación: el bot con menos manos jugadas entra primero (reincorporación controlada).
-    const bot = free[0]!;
-    this.seated.set(bot.id, tableId);
-    return bot;
-  }
-
-  takeBuyIn(botId: string, amount: number): number {
-    const row = this.db.get<{ bankroll: number }>('SELECT bankroll FROM bots WHERE id = ?', botId);
-    // Si la banca de demostración se agota, se repone (documentado: los bots no son jugadores reales).
-    if (!row || row.bankroll < amount) this.db.run('UPDATE bots SET bankroll = 100000 WHERE id = ?', botId);
-    this.db.run('UPDATE bots SET bankroll = bankroll - ? WHERE id = ?', amount, botId);
-    return amount;
-  }
-
-  release(botId: string, stackReturned: number): void {
-    this.seated.delete(botId);
-    this.db.run('UPDATE bots SET bankroll = bankroll + ? WHERE id = ?', stackReturned, botId);
-  }
-
-  recordHand(botId: string, net: number): void {
-    this.db.run('UPDATE bots SET hands_played = hands_played + 1, net_result = net_result + ? WHERE id = ?', net, botId);
-  }
-
-  seatedAt(botId: string): string | null {
-    return this.seated.get(botId) ?? null;
-  }
-}
-
 export class PokerManager {
   readonly tables = new Map<string, PokerTable>();
-  readonly botPool: DbBotPool;
   private lobbyTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly db: Database,
     private readonly hub: RealtimeHub,
     private readonly timings: TableTimings,
-  ) {
-    this.botPool = new DbBotPool(db);
-  }
+    readonly botPool: BotPool,
+  ) {}
 
   /** Arranque: reembolsa fichas de sesiones anteriores (reinicio/caída) y carga las mesas. */
   init(): void {

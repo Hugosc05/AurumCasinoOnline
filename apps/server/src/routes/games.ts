@@ -164,7 +164,7 @@ export function gameRoutes(ctx: AppContext): Router {
 
   r.get('/blackjack/current', (req, res) => {
     const round = db.get<RoundRow>(
-      `SELECT * FROM game_rounds WHERE user_id = ? AND game = 'blackjack' AND status = 'open' ORDER BY created_at DESC LIMIT 1`,
+      `SELECT * FROM game_rounds WHERE user_id = ? AND game = 'blackjack' AND status = 'open' AND state_json IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
       req.user!.id,
     );
     if (!round || !round.state_json) {
@@ -188,7 +188,7 @@ export function gameRoutes(ctx: AppContext): Router {
     const replay = findRoundByKey(db, user.id, body.idempotencyKey);
     if (replay) throw conflict('DUPLICATE_REQUEST', 'Esta mano ya se ha iniciado');
     const out = db.tx(() => {
-      const open = db.get<{ id: string }>(`SELECT id FROM game_rounds WHERE user_id = ? AND game = 'blackjack' AND status = 'open'`, user.id);
+      const open = db.get<{ id: string }>(`SELECT id FROM game_rounds WHERE user_id = ? AND game = 'blackjack' AND status = 'open' AND idempotency_key NOT LIKE 'bjt:%'`, user.id);
       if (open) throw new AppError(409, 'ROUND_IN_PROGRESS', 'Ya tienes una mano en curso', { roundId: open.id });
       const state = engineGuard(() => startBlackjack(body.bet, loadShoe(user.id), cryptoRng));
       const round = openRound(db, user.id, 'blackjack', body.bet, body.idempotencyKey);
