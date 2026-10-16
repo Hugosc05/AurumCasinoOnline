@@ -11,6 +11,7 @@ import { credit } from '../wallet/wallet';
 import { getDummyHash, hashPassword, verifyPassword } from '../auth/password';
 import { SESSION_COOKIE, createSession, destroySession, type UserRow } from '../auth/sessions';
 import { RESERVED_BOT_NAMES } from '../bots/catalog';
+import { getSetting } from '../db/seed';
 import { emailSchema, passwordSchema, toPublicUser, usernameSchema } from '../auth/users';
 
 const registerSchema = z.object({
@@ -65,7 +66,8 @@ export function authRoutes(ctx: AppContext): Router {
       }
       const hash = await hashPassword(body.password);
       const id = randomUUID();
-      const startBalance = config.STARTING_BALANCE;
+      // Saldo inicial configurable por el administrador; se concede una única vez, al crear la cuenta.
+      const startBalance = getSetting(db, 'startingBalance') ?? config.STARTING_BALANCE;
       try {
         db.tx(() => {
           db.run(

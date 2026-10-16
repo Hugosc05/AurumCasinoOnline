@@ -11,7 +11,8 @@ export type WalletReason =
   | 'poker_buyin'
   | 'poker_cashout'
   | 'admin_adjustment'
-  | 'refund';
+  | 'refund'
+  | 'ad_reward';
 
 export interface WalletMove {
   userId: string;

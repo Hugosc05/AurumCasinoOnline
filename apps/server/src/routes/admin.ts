@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
+import { isValidTimezone } from '../economy/period';
 import type { AppContext } from '../context';
 import { nowIso } from '../db/database';
 import { DEFAULT_SETTINGS, getSetting, setSetting } from '../db/seed';
@@ -299,6 +300,14 @@ export function adminRoutes(ctx: AppContext): Router {
     dailyBonus: z.number().int().min(0).max(1_000_000).optional(),
     demoRefillAmount: z.number().int().min(0).max(1_000_000).optional(),
     demoRefillThreshold: z.number().int().min(0).max(1_000_000).optional(),
+    startingBalance: z.number().int().min(0).max(10_000_000).nullable().optional(),
+    dailyTimezone: z.string().max(64).refine(isValidTimezone, 'Zona horaria no válida').optional(),
+    dailyStreakEnabled: z.boolean().optional(),
+    dailyStreakStep: z.number().int().min(0).max(100_000).optional(),
+    dailyStreakMaxSteps: z.number().int().min(0).max(30).optional(),
+    adsRewardAmount: z.number().int().min(0).max(100_000).optional(),
+    adsDailyLimit: z.number().int().min(0).max(100).optional(),
+    adsMinWatchSeconds: z.number().int().min(5).max(120).optional(),
     maintenanceMessage: z.string().max(300).optional(),
   }).strict();
   r.patch('/settings', (req, res) => {

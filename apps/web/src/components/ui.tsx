@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Loader2, X } from 'lucide-react';
 import { forwardRef, useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
@@ -82,7 +83,8 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
       prev?.focus();
     };
   }, [open, onClose]);
-  return (
+  // Portal: un ancestro con transform o backdrop-filter (p. ej., .panel) atraparía el modal fijo.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
@@ -109,7 +111,8 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

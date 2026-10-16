@@ -12,9 +12,21 @@ export interface GameSettings {
 
 export const DEFAULT_SETTINGS = {
   gamesEnabled: { blackjack: true, roulette: true, slots: true, poker: true } as GameSettings,
+  /** Saldo inicial de las cuentas nuevas (se concede una sola vez, al registrarse). null = valor de STARTING_BALANCE. */
+  startingBalance: null as number | null,
   dailyBonus: 1000,
+  /** Zona horaria que define el día de la recompensa diaria. */
+  dailyTimezone: 'Europe/Madrid',
+  /** Racha amable: cada día reclamado en la última semana suma un extra; saltarse un día no la reinicia. */
+  dailyStreakEnabled: true,
+  dailyStreakStep: 100,
+  dailyStreakMaxSteps: 6,
   demoRefillAmount: 5000,
   demoRefillThreshold: 500,
+  /** Anuncios recompensados (solo si hay un proveedor configurado en el servidor). */
+  adsRewardAmount: 250,
+  adsDailyLimit: 5,
+  adsMinWatchSeconds: 15,
   maintenanceMessage: '' as string,
 };
 export type SettingsShape = typeof DEFAULT_SETTINGS;

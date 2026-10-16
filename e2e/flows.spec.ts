@@ -96,6 +96,18 @@ test('blackjack multijugador: elegir mesa, sentarse, apostar y jugar contra el c
   await expect(page.getByTestId('sit-0')).toBeVisible();
 });
 
+test('recompensa diaria: se reclama una vez, muestra la cuenta atrás; sin proveedor no hay anuncios', async ({ page }) => {
+  await register(page);
+  await page.goto('/promociones');
+  await expect(page.getByTestId('ads-card')).toContainText('Los anuncios recompensados no están disponibles en este entorno.');
+  await page.getByTestId('claim-daily').click();
+  await expect(page.getByText('Reclamada hoy')).toBeVisible();
+  await expect(page.getByTestId('daily-countdown')).toHaveText(/^\d\d:\d\d:\d\d$/);
+  await expect(page.getByLabel(/Saldo: 11\.000/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByTestId('claim-daily')).toHaveCount(0);
+});
+
 test('slots: una tirada cobra la apuesta y muestra el resultado', async ({ page }) => {
   await register(page);
   await fastMode(page);

@@ -18,6 +18,7 @@ const PokerTablePage = lazy(() => import('./games/poker/PokerTablePage'));
 const ProfilePage = lazy(() => import('./pages/Profile'));
 const LeaderboardPage = lazy(() => import('./pages/Leaderboard'));
 const BotsPage = lazy(() => import('./pages/Bots'));
+const RecoveryPage = lazy(() => import('./pages/Recovery'));
 const PromotionsPage = lazy(() => import('./pages/Promotions'));
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 const CardGallery = lazy(() => import('./dev/CardGallery'));
@@ -54,6 +55,7 @@ export function App() {
           <Route path="perfil" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="clasificacion" element={<LeaderboardPage />} />
           <Route path="bots" element={<BotsPage />} />
+          <Route path="sin-saldo" element={<RequireAuth><RecoveryPage /></RequireAuth>} />
           <Route path="promociones" element={<PromotionsPage />} />
           <Route path="reglas" element={<InfoPage kind="rules" />} />
           <Route path="ayuda" element={<InfoPage kind="help" />} />

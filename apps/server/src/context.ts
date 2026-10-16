@@ -3,6 +3,7 @@ import type { Database } from './db/database';
 import type { PokerManager } from './poker/manager';
 import type { BlackjackManager } from './blackjack/manager';
 import type { BotPool } from './bots/pool';
+import type { AdsService } from './ads/ads';
 import type { RealtimeHub } from './realtime/hub';
 
 export interface AppContext {
@@ -12,5 +13,6 @@ export interface AppContext {
   poker: PokerManager;
   blackjack: BlackjackManager;
   bots: BotPool;
+  ads: AdsService;
   startedAt: number;
 }

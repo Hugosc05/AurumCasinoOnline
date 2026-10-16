@@ -7,7 +7,8 @@ import { getSetting } from '../db/seed';
 import { AppError, conflict } from '../lib/errors';
 import { parse, requireAuth } from '../lib/http';
 import { credit, getBalance } from '../wallet/wallet';
-import { type UserRow } from '../auth/sessions';
+import { claimDaily, dailyStatus, economyTimezone } from '../economy/daily';
+import { periodInfo } from '../economy/period';
 import { preferencesSchema, readPrefs, toPublicUser } from '../auth/users';
 
 const pageSchema = z.object({
@@ -16,7 +17,6 @@ const pageSchema = z.object({
   game: z.enum(['blackjack', 'roulette', 'slots', 'poker']).optional(),
 });
 
-const today = (): string => new Date().toISOString().slice(0, 10);
 
 export function meRoutes(ctx: AppContext): Router {
   const r = Router();
@@ -89,48 +89,53 @@ export function meRoutes(ctx: AppContext): Router {
   });
 
   /* ------------------------- Promociones virtuales ------------------------- */
+  const currentDay = (): string => periodInfo(new Date(), economyTimezone(db)).day;
+
   r.get('/promotions', (req, res) => {
-    const id = req.user!.id;
-    const day = today();
-    const claims = db.all<{ kind: string }>('SELECT kind FROM daily_claims WHERE user_id = ? AND day = ?', id, day).map((c) => c.kind);
-    const balance = getBalance(db, id);
+    const user = req.user!;
+    const day = currentDay();
+    const refillClaimed = !!db.get(`SELECT 1 AS x FROM daily_claims WHERE user_id = ? AND kind = 'demo_refill' AND day = ?`, user.id, day);
+    const balance = getBalance(db, user.id);
+    const threshold = getSetting(db, 'demoRefillThreshold');
     res.json({
       day,
-      dailyBonus: { amount: getSetting(db, 'dailyBonus'), claimed: claims.includes('daily_bonus') },
+      daily: dailyStatus(db, user.id),
       demoRefill: {
         amount: getSetting(db, 'demoRefillAmount'),
-        threshold: getSetting(db, 'demoRefillThreshold'),
-        claimed: claims.includes('demo_refill'),
-        eligible: !balance.unlimited && (balance.balance ?? 0) < getSetting(db, 'demoRefillThreshold'),
+        threshold,
+        claimed: refillClaimed,
+        eligible: !balance.unlimited && (balance.balance ?? 0) < threshold,
       },
+      ads: ctx.ads.status(user.id, user.role),
+      serverTime: new Date().toISOString(),
     });
   });
-
-  const claim = (user: UserRow, kind: 'daily_bonus' | 'demo_refill', amount: number) =>
-    db.tx(() => {
-      try {
-        db.run('INSERT INTO daily_claims (user_id, kind, day, amount, created_at) VALUES (?, ?, ?, ?, ?)', user.id, kind, today(), amount, nowIso());
-      } catch (err) {
-        if (String(err).includes('UNIQUE') || String(err).includes('PRIMARY')) throw conflict('ALREADY_CLAIMED', 'Ya lo has reclamado hoy');
-        throw err;
-      }
-      credit(db, user.id, amount, kind);
-      return getBalance(db, user.id);
-    });
 
   r.post('/promotions/daily-bonus', (req, res) => {
     const user = req.user!;
-    if (user.role === 'admin') throw new AppError(400, 'NOT_APPLICABLE', 'Las cuentas administradoras tienen saldo ilimitado');
-    res.json({ balance: claim(user, 'daily_bonus', getSetting(db, 'dailyBonus')) });
+    const out = claimDaily(db, user.id, user.role);
+    res.json({ balance: out.balance, amount: out.amount, daily: out.status });
   });
 
-  /** Recarga de demostración: solo con saldo bajo, una vez al día, registrada en el libro mayor (no altera el historial). */
+  /** Recarga de demostración: solo con saldo bajo, una vez por periodo, registrada en el libro mayor. */
   r.post('/promotions/demo-refill', (req, res) => {
     const user = req.user!;
     if (user.role === 'admin') throw new AppError(400, 'NOT_APPLICABLE', 'Las cuentas administradoras tienen saldo ilimitado');
     const threshold = getSetting(db, 'demoRefillThreshold');
-    if (user.balance >= threshold) throw new AppError(400, 'NOT_ELIGIBLE', `Disponible cuando tu saldo sea inferior a ${threshold}`);
-    res.json({ balance: claim(user, 'demo_refill', getSetting(db, 'demoRefillAmount')) });
+    const amount = getSetting(db, 'demoRefillAmount');
+    const balance = db.tx(() => {
+      const fresh = db.get<{ balance: number }>('SELECT balance FROM users WHERE id = ?', user.id)!;
+      if (fresh.balance >= threshold) throw new AppError(400, 'NOT_ELIGIBLE', `Disponible cuando tu saldo sea inferior a ${threshold}`);
+      try {
+        db.run('INSERT INTO daily_claims (user_id, kind, day, amount, created_at) VALUES (?, ?, ?, ?, ?)', user.id, 'demo_refill', currentDay(), amount, nowIso());
+      } catch (err) {
+        if (String(err).includes('UNIQUE') || String(err).includes('PRIMARY')) throw conflict('ALREADY_CLAIMED', 'Ya has usado la recarga de hoy');
+        throw err;
+      }
+      credit(db, user.id, amount, 'demo_refill');
+      return getBalance(db, user.id);
+    });
+    res.json({ balance });
   });
 
   r.get('/', (req, res) => {

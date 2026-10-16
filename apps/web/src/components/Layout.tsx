@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { credits, cx } from '../lib/format';
 import { socket, type WsStatus } from '../lib/ws';
+import { LOW_BALANCE } from '../lib/economy';
 import { useSession } from '../state/session';
 import { Button } from './ui';
 
@@ -304,7 +305,27 @@ export function Layout() {
           <Outlet />
         </motion.div>
       </main>
+      <LowBalanceBanner />
       <Footer />
+    </div>
+  );
+}
+
+/** Aviso discreto con saldo agotado: lleva a la pantalla de recuperación sin interrumpir la partida. */
+function LowBalanceBanner() {
+  const { user } = useSession();
+  const loc = useLocation();
+  const [dismissed, setDismissed] = useState(false);
+  const low = !!user && !user.unlimited && (user.balance ?? 0) < LOW_BALANCE;
+  useEffect(() => {
+    if (!low) setDismissed(false);
+  }, [low]);
+  if (!low || dismissed || loc.pathname === '/sin-saldo' || loc.pathname === '/promociones') return null;
+  return (
+    <div className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-oro/40 bg-noche/95 p-3 pl-4 shadow-hondo backdrop-blur" role="status" data-testid="low-balance">
+      <p className="flex-1 text-sm text-marfil">Te has quedado sin créditos para apostar.</p>
+      <Link to="/sin-saldo" className="rounded-full bg-oro px-3 py-1.5 text-sm font-semibold text-noche">Recuperar créditos</Link>
+      <button onClick={() => setDismissed(true)} className="px-1 text-niebla hover:text-marfil" aria-label="Cerrar aviso">×</button>
     </div>
   );
 }

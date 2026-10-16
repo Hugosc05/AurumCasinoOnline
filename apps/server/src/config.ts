@@ -48,6 +48,15 @@ const schema = z.object({
   REGISTER_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(10),
   LOGIN_LIMIT_PER_15MIN: z.coerce.number().int().min(1).default(30),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /**
+   * Anuncios recompensados:
+   *  - none (por defecto): no hay anuncios; la interfaz lo indica.
+   *  - dev-simulation: simulación de desarrollo claramente etiquetada. Prohibida en producción.
+   *  - signed-callback: el proveedor confirma cada anuncio con una llamada servidor a servidor firmada (HMAC-SHA256).
+   */
+  ADS_PROVIDER: z.enum(['none', 'dev-simulation', 'signed-callback']).default('none'),
+  ADS_CALLBACK_SECRET: z.string().min(32, 'ADS_CALLBACK_SECRET debe tener al menos 32 caracteres').optional(),
+  ADS_CALLBACK_MAX_AGE_SEC: z.coerce.number().int().min(30).max(3600).default(300),
 });
 
 export type AppConfig = z.infer<typeof schema> & {
@@ -63,6 +72,12 @@ export function loadConfig(overrides: Partial<Record<keyof z.infer<typeof schema
     throw new Error(`Configuración no válida:\n${msg}`);
   }
   const c = parsed.data;
+  if (c.ADS_PROVIDER === 'dev-simulation' && c.NODE_ENV === 'production') {
+    throw new Error('Configuración no válida:\nADS_PROVIDER=dev-simulation no se puede usar en producción.');
+  }
+  if (c.ADS_PROVIDER === 'signed-callback' && !c.ADS_CALLBACK_SECRET) {
+    throw new Error('Configuración no válida:\nADS_PROVIDER=signed-callback necesita ADS_CALLBACK_SECRET.');
+  }
   const dbFile = c.DATABASE_PATH === ':memory:' ? ':memory:' : path.resolve(SERVER_ROOT, c.DATABASE_PATH);
   return {
     ...c,

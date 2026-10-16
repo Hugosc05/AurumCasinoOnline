@@ -528,6 +528,14 @@ interface SettingsShape {
   dailyBonus: number;
   demoRefillAmount: number;
   demoRefillThreshold: number;
+  startingBalance: number | null;
+  dailyTimezone: string;
+  dailyStreakEnabled: boolean;
+  dailyStreakStep: number;
+  dailyStreakMaxSteps: number;
+  adsRewardAmount: number;
+  adsDailyLimit: number;
+  adsMinWatchSeconds: number;
   maintenanceMessage: string;
 }
 
@@ -541,7 +549,7 @@ function SettingsPage() {
   const save = async (): Promise<void> => {
     if (!form) return;
     try {
-      await api.patch('/api/admin/settings', { ...form, dailyBonus: Number(form.dailyBonus), demoRefillAmount: Number(form.demoRefillAmount), demoRefillThreshold: Number(form.demoRefillThreshold) });
+      await api.patch('/api/admin/settings', form);
       notify('success', 'Ajustes guardados.');
       st.reload();
     } catch (e) {
@@ -568,8 +576,22 @@ function SettingsPage() {
           <Field label="Recarga de demostración" type="number" value={form.demoRefillAmount} onChange={(e) => setForm({ ...form, demoRefillAmount: Number(e.target.value) })} />
           <Field label="Umbral de recarga" type="number" value={form.demoRefillThreshold} onChange={(e) => setForm({ ...form, demoRefillThreshold: Number(e.target.value) })} />
         </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Saldo inicial (cuentas nuevas)" type="number" value={form.startingBalance ?? ''} onChange={(e) => setForm({ ...form, startingBalance: e.target.value === '' ? null : Number(e.target.value) })} hint="Vacío: valor de STARTING_BALANCE. Se concede una sola vez." />
+          <Field label="Zona horaria del día" value={form.dailyTimezone} onChange={(e) => setForm({ ...form, dailyTimezone: e.target.value })} hint="Por ejemplo, Europe/Madrid." />
+          <label className="flex items-center gap-2 self-center text-sm text-marfil">
+            <input type="checkbox" className="h-4 w-4 accent-[#cfae6b]" checked={form.dailyStreakEnabled} onChange={(e) => setForm({ ...form, dailyStreakEnabled: e.target.checked })} /> Racha de días (sin castigo)
+          </label>
+          <Field label="Extra por día de racha" type="number" value={form.dailyStreakStep} onChange={(e) => setForm({ ...form, dailyStreakStep: Number(e.target.value) })} />
+          <Field label="Días de racha máximos" type="number" value={form.dailyStreakMaxSteps} onChange={(e) => setForm({ ...form, dailyStreakMaxSteps: Number(e.target.value) })} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label="Créditos por anuncio" type="number" value={form.adsRewardAmount} onChange={(e) => setForm({ ...form, adsRewardAmount: Number(e.target.value) })} />
+          <Field label="Anuncios al día por usuario" type="number" value={form.adsDailyLimit} onChange={(e) => setForm({ ...form, adsDailyLimit: Number(e.target.value) })} />
+          <Field label="Duración mínima (s)" type="number" value={form.adsMinWatchSeconds} onChange={(e) => setForm({ ...form, adsMinWatchSeconds: Number(e.target.value) })} />
+        </div>
+        <p className="text-xs text-niebla">El proveedor de anuncios se configura en el servidor (ADS_PROVIDER). Sin proveedor, la interfaz indica que no están disponibles.</p>
         <Field label="Aviso en portada (vacío para ocultar)" value={form.maintenanceMessage} onChange={(e) => setForm({ ...form, maintenanceMessage: e.target.value })} />
-        <p className="text-xs text-niebla">El saldo inicial de las cuentas nuevas se configura con STARTING_BALANCE en el archivo .env.</p>
         <Button onClick={() => void save()}>Guardar ajustes</Button>
       </div>
     </Card>

@@ -21,6 +21,8 @@ import { authRoutes } from './routes/auth';
 import { gameRoutes } from './routes/games';
 import { meRoutes } from './routes/me';
 import { publicRoutes } from './routes/public';
+import { adsCallbackRoute, adsRoutes } from './routes/ads';
+import { AdsService, createAdProvider } from './ads/ads';
 
 export interface RunningApp {
   ctx: AppContext;
@@ -53,7 +55,8 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     disconnectedTurnMs: fast ? 300 : 5_000,
     betweenRoundsMs: fast ? 0 : 2_500,
   }, bots);
-  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, startedAt: Date.now() };
+  const ads = new AdsService(database, config, createAdProvider(config));
+  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, startedAt: Date.now() };
   poker.init();
   blackjack.init();
 
@@ -87,6 +90,8 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     req.user = getSessionUser(database, req.sessionToken, config.SESSION_TTL_HOURS);
     next();
   });
+  // Confirmaciones firmadas del proveedor de anuncios (servidor a servidor, sin cookie).
+  app.use('/api/ads/callback', adsCallbackRoute(ctx));
   app.use('/api', csrfGuard(config.allowedOrigins));
   app.use('/api', (_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -98,6 +103,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   app.use('/api/me', meRoutes(ctx));
   app.use('/api/games', gameRoutes(ctx));
   app.use('/api/admin', adminRoutes(ctx));
+  app.use('/api/ads', adsRoutes(ctx));
   app.use('/api', (_req, _res, next) => next(notFound('Ruta de API no encontrada')));
 
   // Producción: el servidor entrega también el frontend compilado (un único proceso, un único puerto).
