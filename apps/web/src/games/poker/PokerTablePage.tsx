@@ -19,6 +19,8 @@ import { useNotify } from '../../state/notify';
 import { useSession } from '../../state/session';
 import { EMPTY_VIS, POKER_LANDSCAPE, POKER_PORTRAIT, applyPokerEvent, boardSlot, seatPosition, towardCenter, visFromSnapshot, type PokerGeometry, type PokerVis } from './model';
 import type { SeatView, Snapshot, UpdateMsg } from './types';
+import { cardEmphasis, heroInsight, type AssistMode } from './assist';
+import { HandAssistant } from './HandAssistant';
 
 /** Vector de extracción de las cartas desde la bandeja del crupier (constante: no rompe la memoización). */
 const DEAL_DOWN = { x: 0, y: 18 };
@@ -184,7 +186,8 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
 export default function PokerTablePage() {
   const { tableId = '' } = useParams();
   const nav = useNavigate();
-  const { user, speed, effects } = useSession();
+  const { user, speed, effects, prefs, updatePrefs } = useSession();
+  const assistMode: AssistMode = prefs.pokerAssist ?? 'beginner';
   const { notify } = useNotify();
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [vis, setVis] = useState<PokerVis>(EMPTY_VIS);
@@ -221,6 +224,16 @@ export default function PokerTablePage() {
   const DEALER_POS = g.dealer;
   const POT_POS = g.pot;
   const heroSeat = snap?.you.seat ?? null;
+  const heroFolded = heroSeat !== null && !!vis.folded[heroSeat];
+  const heroHole = heroSeat !== null && !heroFolded ? vis.revealed[heroSeat] : undefined;
+  // Asistente: solo con las cartas propias y las comunitarias (lo que el jugador puede ver).
+  const insight = useMemo(() => heroInsight(heroHole, vis.board, assistMode), [heroHole, vis.board, assistMode]);
+  /** Énfasis de una carta: en el showdown manda la jugada ganadora; antes, la combinación del jugador. */
+  const emphasis = (card: string, mine: boolean) => {
+    if (bestCards.length > 0) return bestCards.includes(card) ? 'highlight' : 'dim';
+    const e = cardEmphasis(insight, card, mine);
+    return e === 'highlight' ? 'highlight' : e === 'soft' ? 'soft' : 'none';
+  };
   const n = snap?.table.maxSeats ?? 6;
   const displayIndex = useCallback((seat: number) => (heroSeat === null ? seat : (seat - heroSeat + n) % n), [heroSeat, n]);
   const posOf = useCallback((seat: number) => seatPosition(displayIndex(seat), n, g), [displayIndex, n, g]);
@@ -453,7 +466,8 @@ export default function PokerTablePage() {
           {/* Cartas comunitarias */}
           {vis.board.map((c, i) => {
             const p = boardSlot(i, g);
-            return <TableCard key={`${vis.handId}-b${i}`} card={c} faceUp x={p.x} y={p.y} z={40 + i} from={DEALER_POS} extractVector={DEAL_DOWN} collectTo={collectingCards ? DEALER_POS : null} width={BOARD_W} speed={speed} highlight={bestCards.includes(c)} dim={bestCards.length > 0 && !bestCards.includes(c)} />;
+            const em = emphasis(c, true);
+            return <TableCard key={`${vis.handId}-b${i}`} card={c} faceUp x={p.x} y={p.y} z={40 + i} from={DEALER_POS} extractVector={DEAL_DOWN} collectTo={collectingCards ? DEALER_POS : null} width={BOARD_W} speed={speed} highlight={em === 'highlight'} dim={em === 'dim' ? true : em === 'soft' ? 'soft' : false} />;
           })}
 
           {/* Cartas privadas */}
@@ -464,6 +478,7 @@ export default function PokerTablePage() {
             return Array.from({ length: count }, (_, i) => {
               const p = holeCardPos(seat, i);
               const card = vis.revealed[seat]?.[i] ?? null;
+              const em = card ? emphasis(card, seat === heroSeat) : 'none';
               return (
                 <TableCard
                   key={`${vis.handId}-${seat}-${i}`}
@@ -478,8 +493,8 @@ export default function PokerTablePage() {
                   extractVector={DEAL_DOWN}
                   collectTo={collectingCards || mucked ? DEALER_POS : null}
                   speed={speed}
-                  highlight={!!card && bestCards.includes(card)}
-                  dim={!!vis.folded[seat]}
+                  highlight={em === 'highlight'}
+                  dim={vis.folded[seat] ? true : em === 'soft' ? 'soft' : false}
                   sound={i === 0 && seat === heroSeat}
                 />
               );
@@ -534,6 +549,11 @@ export default function PokerTablePage() {
           </div>
         </Stage>
       </div>
+
+      {/* Asistente de manos (debajo de las cartas del jugador) */}
+      {heroSeat !== null && vis.handId && (
+        <HandAssistant insight={insight} mode={assistMode} onMode={(m) => void updatePrefs({ pokerAssist: m })} folded={heroFolded} />
+      )}
 
       {/* Controles del jugador */}
       <div className="panel mt-4 p-4 sm:p-5">

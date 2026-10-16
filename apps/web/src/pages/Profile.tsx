@@ -148,6 +148,11 @@ export default function ProfilePage() {
               <p className="mt-2 text-xs text-niebla">Destellos, partículas y fuegos artificiales al ganar. Nunca superan el nivel de animación elegido arriba.</p>
             </div>
             <div>
+              <p className="mb-2 text-marfil">Asistente de póker</p>
+              <Segmented label="Asistente de manos de póker" value={prefs.pokerAssist ?? 'beginner'} onChange={(v) => void updatePrefs({ pokerAssist: v })} options={[{ value: 'beginner', label: 'Principiante' }, { value: 'standard', label: 'Estándar' }, { value: 'advanced', label: 'Avanzado' }]} />
+              <p className="mt-2 text-xs text-niebla">Principiante explica cada combinación y las reglas; estándar muestra la combinación, las cartas iluminadas y la probabilidad de mejorar; avanzado, solo la combinación. Nunca decide por ti.</p>
+            </div>
+            <div>
               <p className="mb-2 text-marfil">Sonido <span className="text-xs text-niebla">(desactivado por defecto)</span></p>
               <div className="flex flex-wrap items-center gap-4">
                 <Segmented label="Sonido" value={prefs.sound ? 'on' : 'off'} onChange={(v) => void updatePrefs({ sound: v === 'on' })} options={[{ value: 'on', label: 'Activado' }, { value: 'off', label: 'Silencio' }]} />

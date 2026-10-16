@@ -27,7 +27,7 @@ interface Props {
   width: number;
   speed: number;
   highlight?: boolean;
-  dim?: boolean;
+  dim?: boolean | 'soft';
   /** Revelado destacado. */
   dramatic?: boolean;
   /** Pequeña sacudida (p. ej., al pasarse de 21). */

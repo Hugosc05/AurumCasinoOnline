@@ -8,6 +8,10 @@ export interface Preferences {
   music: boolean;
   animations: 'full' | 'reduced' | 'off';
   effects: 'full' | 'reduced' | 'off';
+  /** Asistente de manos de póker. */
+  pokerAssist: 'beginner' | 'standard' | 'advanced';
+  /** Aparecer como desconectado ante los amigos. */
+  invisible: boolean;
   /** Mostrar recordatorio de independencia de resultados. */
   showOddsNotes: boolean;
 }
@@ -19,6 +23,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   music: false,
   animations: 'full',
   effects: 'full',
+  pokerAssist: 'beginner',
+  invisible: false,
   showOddsNotes: true,
 };
 
@@ -28,6 +34,8 @@ export const preferencesSchema = z.object({
   music: z.boolean().optional(),
   animations: z.enum(['full', 'reduced', 'off']).optional(),
   effects: z.enum(['full', 'reduced', 'off']).optional(),
+  pokerAssist: z.enum(['beginner', 'standard', 'advanced']).optional(),
+  invisible: z.boolean().optional(),
   showOddsNotes: z.boolean().optional(),
 }).strict();
 

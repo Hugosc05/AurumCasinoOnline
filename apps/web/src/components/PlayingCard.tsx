@@ -25,7 +25,8 @@ export interface PlayingCardProps {
   variant?: CardVariant | 'auto';
   className?: string;
   highlight?: boolean;
-  dim?: boolean;
+  /** Atenuación: true (fuerte) o 'soft' (ligera, p. ej. cartas que no forman la combinación). */
+  dim?: boolean | 'soft';
   /** Carta seleccionada: se eleva ligeramente. */
   selected?: boolean;
   /** Revelado destacado (carta oculta del crupier). */
@@ -118,7 +119,7 @@ export const PlayingCard = memo(function PlayingCard({
           highlight && 'shadow-[0_0_0_2px_#EBD9A6,0_0_22px_rgba(235,217,166,0.6)]',
           dramatic && shownFace && 'shadow-[0_0_0_2px_#EBD9A6,0_0_34px_rgba(235,217,166,0.75)]',
           selected && 'shadow-[0_0_0_2px_#EBD9A6,0_14px_24px_-8px_rgba(0,0,0,0.7)]',
-          dim && 'bg-black/40',
+          dim === 'soft' ? 'bg-black/25' : dim && 'bg-black/40',
         )}
       />
     </motion.div>

@@ -20,9 +20,21 @@ export interface EvaluatedHand {
   score: number;
   category: HandCategory;
   name: string;
-  /** Las cinco cartas que forman la mejor jugada. */
+  /** Las cinco cartas que forman la mejor jugada (primero las de la combinación, después las de acompañamiento). */
   best: Card[];
+  /**
+   * Cartas que forman la combinación propiamente dicha (sin las de acompañamiento):
+   * 1 en carta alta, 2 en pareja, 4 en doble pareja, 3 en trío, 4 en póker y 5 en
+   * escalera, color, full, escalera de color y escalera real.
+   */
+  core: Card[];
 }
+
+/** Número de cartas de `best` que forman la combinación, por categoría. */
+export const CORE_SIZE: Readonly<Record<HandCategory, number>> = { 0: 1, 1: 2, 2: 4, 3: 3, 4: 5, 5: 5, 6: 5, 7: 4, 8: 5, 9: 5 };
+
+type Partial5 = Omit<EvaluatedHand, 'core'>;
+const withCore = (h: Partial5): EvaluatedHand => ({ ...h, core: h.best.slice(0, CORE_SIZE[h.category]) });
 
 function encode(category: number, kickers: readonly number[]): number {
   let s = category;
@@ -61,6 +73,10 @@ function straightCards(cards: readonly Card[], high: number): Card[] {
  * Algoritmo directo por recuento de rangos y palos (sin tablas precalculadas).
  */
 export function evaluateHand(cards: readonly Card[]): EvaluatedHand {
+  return withCore(evaluate5(cards));
+}
+
+function evaluate5(cards: readonly Card[]): Partial5 {
   if (cards.length < 5 || cards.length > 7) throw new Error('Se necesitan entre 5 y 7 cartas');
   const sortedCards = cards.slice().sort((a, b) => rankOf(b) - rankOf(a));
 

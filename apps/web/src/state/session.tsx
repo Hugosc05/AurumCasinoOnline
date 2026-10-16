@@ -5,7 +5,7 @@ import { speedFor, type MotionLevel } from '../lib/anim/tokens';
 import { socket } from '../lib/ws';
 import type { Balance, Preferences, User } from './types';
 
-const DEFAULT_PREFS: Preferences = { sound: false, volume: 0.6, music: false, animations: 'full', effects: 'full', showOddsNotes: true };
+const DEFAULT_PREFS: Preferences = { sound: false, volume: 0.6, music: false, animations: 'full', effects: 'full', pokerAssist: 'beginner', invisible: false, showOddsNotes: true };
 const GUEST_KEY = 'aurum.guestPrefs';
 
 interface SessionValue {

@@ -4,6 +4,7 @@ export * from './blackjack';
 export * from './roulette';
 export * from './slots';
 export * from './poker/evaluator';
+export * from './poker/assistant';
 export * from './poker/pots';
 export * from './poker/holdem';
 export * from './poker/bot';

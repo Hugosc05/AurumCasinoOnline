@@ -5,6 +5,8 @@ export interface Preferences {
   animations: 'full' | 'reduced' | 'off';
   /** Partículas y celebraciones visuales. */
   effects: 'full' | 'reduced' | 'off';
+  pokerAssist: 'beginner' | 'standard' | 'advanced';
+  invisible: boolean;
   showOddsNotes: boolean;
 }
 
