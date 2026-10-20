@@ -1,17 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+  SLOT_MACHINES,
+  machineInfo,
   BJ_STRATEGY_LABELS,
   BOT_PROFILE_LABELS,
   DEFAULT_BLACKJACK_RULES,
   DEFAULT_ROULETTE_LIMITS,
   DEFAULT_SLOT_LIMITS,
-  LINE_PAYS,
-  PAYLINES,
-  REEL_STRIPS,
   ROULETTE_PAYOUTS,
-  SCATTER_PAYS,
-  computeRtp,
 } from '@aurum/engine';
 import type { AppContext } from '../context';
 import { getSetting } from '../db/seed';
@@ -19,7 +16,7 @@ import { parse } from '../lib/http';
 import { anonymize } from '../auth/users';
 import { parseAvatar } from '../bots/pool';
 
-const rtp = computeRtp();
+const machines = SLOT_MACHINES.map(machineInfo);
 
 export function publicRoutes(ctx: AppContext): Router {
   const r = Router();
@@ -80,14 +77,7 @@ export function publicRoutes(ctx: AppContext): Router {
     res.json({
       blackjack: DEFAULT_BLACKJACK_RULES,
       roulette: { payouts: ROULETTE_PAYOUTS, limits: DEFAULT_ROULETTE_LIMITS, houseEdge: 1 / 37 },
-      slots: {
-        linePays: LINE_PAYS,
-        scatterPays: SCATTER_PAYS,
-        paylines: PAYLINES,
-        strips: REEL_STRIPS,
-        limits: DEFAULT_SLOT_LIMITS,
-        rtp,
-      },
+      slots: { machines, limits: DEFAULT_SLOT_LIMITS },
       poker: { profiles: BOT_PROFILE_LABELS },
     });
   });

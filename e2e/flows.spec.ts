@@ -111,10 +111,29 @@ test('recompensa diaria: se reclama una vez, muestra la cuenta atrás; sin prove
 test('slots: una tirada cobra la apuesta y muestra el resultado', async ({ page }) => {
   await register(page);
   await fastMode(page);
-  await page.goto('/slots');
+  await page.goto('/slots/aurum-royale');
   await page.locator('button[aria-label^="Girar por"]').click();
   await expect(page.getByText(/Sin premio esta vez|Línea \d+|estrellas/).first()).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText('Apuesta 20')).toBeVisible();
+  await expect(page.getByTestId('session-stats')).toContainText(/Apostado\s*20/);
+});
+
+test('slots: elegir máquina, ver su tabla de premios y girar sin giros automáticos', async ({ page }) => {
+  await register(page);
+  await fastMode(page);
+  await page.goto('/slots');
+  await page.getByTestId('machine-tesoro-arrecife').getByRole('button', { name: 'Jugar' }).click();
+  await expect(page).toHaveURL(/\/slots\/tesoro-arrecife/);
+  await expect(page.getByText('Bono de cofres').first()).toBeVisible();
+  await page.getByRole('button', { name: /Tabla de premios/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('RTP teórico exacto');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: /Giro automático|Detener/ })).toHaveCount(0);
+  await page.locator('button[aria-label^="Girar por"]').click();
+  await expect(page.getByTestId('slot-history').locator('li')).toHaveCount(1, { timeout: 10000 });
+  await expect(page.getByTestId('session-stats')).toContainText('Tiradas');
+  // Tras la tirada no empieza otra sola.
+  await page.waitForTimeout(2500);
+  await expect(page.getByTestId('slot-history').locator('li')).toHaveCount(1);
 });
 
 test('póker: sentarse contra bots, ver solo las propias cartas y levantarse', async ({ page }) => {

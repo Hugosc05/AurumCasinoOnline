@@ -1,6 +1,6 @@
-import { LINE_PAYS, ROULETTE_BET_LABELS, ROULETTE_PAYOUTS, SCATTER_PAYS, computeRtp, type SlotSymbol } from '@aurum/engine';
+import { ROULETTE_BET_LABELS, ROULETTE_PAYOUTS, SLOT_MACHINES } from '@aurum/engine';
 import type { ReactNode } from 'react';
-import { SlotSymbolArt } from '../games/slots/symbols';
+import { SlotPaytable } from '../games/slots/SlotPaytable';
 
 type Kind = 'rules' | 'help' | 'privacy' | 'terms' | 'responsible';
 
@@ -13,10 +13,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const rtp = computeRtp();
-
 function Rules() {
-  const symbols = Object.keys(LINE_PAYS) as (keyof typeof LINE_PAYS)[];
   return (
     <>
       <Section title="Blackjack">
@@ -44,40 +41,12 @@ function Rules() {
         </div>
         <p>Ventaja de la casa: 1/37 ≈ 2,70 % en todas las apuestas.</p>
       </Section>
-      <Section title="Slots Aurum Royale">
-        <p>Cinco rodillos y tres filas, con 1, 5, 10, 15 o 20 líneas activas. Las combinaciones pagan de izquierda a derecha desde el primer rodillo, con tres o más símbolos iguales consecutivos. El comodín sustituye a cualquier símbolo salvo la estrella; en cada línea se paga solo el premio mayor. Los pagos de línea multiplican la apuesta por línea.</p>
-        <div className="overflow-x-auto">
-          <table className="mt-2 w-full max-w-lg text-sm">
-            <thead>
-              <tr className="text-left text-niebla">
-                <th className="py-1.5 font-normal">Símbolo</th>
-                <th className="py-1.5 text-right font-normal">×3</th>
-                <th className="py-1.5 text-right font-normal">×4</th>
-                <th className="py-1.5 text-right font-normal">×5</th>
-              </tr>
-            </thead>
-            <tbody>
-              {symbols.map((s) => (
-                <tr key={s} className="border-b border-linea/50">
-                  <td className="py-1"><SlotSymbolArt symbol={s as SlotSymbol} size={30} /></td>
-                  {LINE_PAYS[s].map((v, i) => (
-                    <td key={i} className="py-1 text-right text-marfil">{v}</td>
-                  ))}
-                </tr>
-              ))}
-              <tr>
-                <td className="py-1"><SlotSymbolArt symbol="scatter" size={30} /></td>
-                {([3, 4, 5] as const).map((k) => (
-                  <td key={k} className="py-1 text-right text-marfil">{SCATTER_PAYS[k]}× total</td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p>
-          <strong>RTP teórico: {(rtp.totalRtp * 100).toFixed(2)} %</strong> ({(rtp.lineRtp * 100).toFixed(2)} % por líneas y {(rtp.scatterRtp * 100).toFixed(2)} % por estrellas). Se calcula de forma exacta enumerando todas las combinaciones de las tiras de los rodillos, no por simulación. Es un valor a largo plazo: en sesiones cortas el resultado varía mucho.
-        </p>
-      </Section>
+      {SLOT_MACHINES.map((m) => (
+        <Section key={m.id} title={`Slots ${m.name}`}>
+          <p>Cinco rodillos y tres filas, con 1, 5, 10, 15 o 20 líneas activas. Los pagos de línea multiplican la apuesta por línea; en cada línea se paga solo la mejor combinación. Se calcula el RTP de forma exacta (no por simulación) a partir de las tiras de los rodillos, funciones especiales incluidas; es un valor a largo plazo y en sesiones cortas el resultado varía mucho.</p>
+          <SlotPaytable machine={m} />
+        </Section>
+      ))}
     </>
   );
 }

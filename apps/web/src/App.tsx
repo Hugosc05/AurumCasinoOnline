@@ -13,6 +13,7 @@ const BlackjackLobby = lazy(() => import('./games/blackjack/multi/BlackjackLobby
 const BlackjackTablePage = lazy(() => import('./games/blackjack/multi/BlackjackTablePage'));
 const RoulettePage = lazy(() => import('./games/roulette/RoulettePage'));
 const SlotsPage = lazy(() => import('./games/slots/SlotsPage'));
+const SlotsLobby = lazy(() => import('./games/slots/SlotsLobby'));
 const PokerLobby = lazy(() => import('./games/poker/PokerLobby'));
 const PokerTablePage = lazy(() => import('./games/poker/PokerTablePage'));
 const ProfilePage = lazy(() => import('./pages/Profile'));
@@ -49,7 +50,8 @@ export function App() {
           <Route path="blackjack/individual" element={<RequireAuth><BlackjackPage /></RequireAuth>} />
           <Route path="blackjack/mesa/:tableId" element={<BlackjackTablePage />} />
           <Route path="ruleta" element={<RequireAuth><RoulettePage /></RequireAuth>} />
-          <Route path="slots" element={<RequireAuth><SlotsPage /></RequireAuth>} />
+          <Route path="slots" element={<SlotsLobby />} />
+          <Route path="slots/:machineId" element={<RequireAuth><SlotsPage /></RequireAuth>} />
           <Route path="poker" element={<PokerLobby />} />
           <Route path="poker/:tableId" element={<PokerTablePage />} />
           <Route path="perfil" element={<RequireAuth><ProfilePage /></RequireAuth>} />

@@ -15,10 +15,8 @@ import {
   publicBlackjackState,
   settleRoulette,
   spinRoulette,
-  spinSlots,
   startBlackjack,
   validateRouletteBets,
-  validateSlotBet,
   type BjAction,
   type BjState,
   type RouletteBet,
@@ -31,6 +29,7 @@ import { parse, requireAuth } from '../lib/http';
 import { RateLimiter, rateLimit } from '../lib/rateLimit';
 import { cryptoRng } from '../lib/rng';
 import { getBalance } from '../wallet/wallet';
+import { slotBonusPick, slotFeatureState, slotSpin } from '../games/slots';
 import {
   type RoundRow,
   addToRoundBet,
@@ -54,7 +53,9 @@ const rouletteSchema = z.object({
   bets: z.array(z.union([insideBet, dozenBet, evenBet])).min(1).max(DEFAULT_ROULETTE_LIMITS.maxBets),
   idempotencyKey,
 });
-const slotsSchema = z.object({ betPerLine: intAmount, lines: z.number().int(), idempotencyKey });
+const machineId = z.string().min(1).max(40).default('aurum-royale');
+const slotsSchema = z.object({ machine: machineId, betPerLine: intAmount, lines: z.number().int(), idempotencyKey });
+const bonusPickSchema = z.object({ machine: machineId, index: z.number().int().min(0).max(30) });
 const bjStartSchema = z.object({ bet: intAmount, idempotencyKey });
 const bjActionSchema = z.object({
   roundId: z.string().uuid(),
@@ -116,23 +117,27 @@ export function gameRoutes(ctx: AppContext): Router {
   });
 
   /* --------------------------------- Slots -------------------------------- */
+  r.get('/slots/state', (req, res) => {
+    const machine = machineId.parse(req.query.machine ?? undefined);
+    res.json(engineGuard(() => slotFeatureState(db, req.user!.id, machine)));
+  });
+
   r.post('/slots/spin', (req, res) => {
     assertGameEnabled(db, 'slots');
     const body = parse(slotsSchema, req.body);
     const user = req.user!;
     const replay = findRoundByKey(db, user.id, body.idempotencyKey);
     if (replay) {
-      res.json({ roundId: replay.id, result: JSON.parse(replay.result_json ?? 'null'), balance: getBalance(db, user.id), achievements: [], replayed: true });
+      res.json({ roundId: replay.id, result: JSON.parse(replay.result_json ?? 'null'), balance: getBalance(db, user.id), achievements: [], replayed: true, feature: slotFeatureState(db, user.id, body.machine) });
       return;
     }
-    const total = engineGuard(() => validateSlotBet(body.betPerLine, body.lines));
-    const out = db.tx(() => {
-      const round = openRound(db, user.id, 'slots', total, body.idempotencyKey);
-      const result = spinSlots(cryptoRng, body.betPerLine, body.lines);
-      const settled = settleRound(db, round.id, result.totalWin, result, { slotsMultiplier: result.totalWin / result.totalBet });
-      return { roundId: round.id, result, ...settled };
-    });
-    res.json(out);
+    res.json(engineGuard(() => slotSpin(db, user.id, body.machine, body.betPerLine, body.lines, body.idempotencyKey)));
+  });
+
+  r.post('/slots/bonus/pick', (req, res) => {
+    assertGameEnabled(db, 'slots');
+    const body = parse(bonusPickSchema, req.body);
+    res.json(engineGuard(() => slotBonusPick(db, req.user!.id, body.machine, body.index)));
   });
 
   /* ------------------------------- Blackjack ------------------------------- */

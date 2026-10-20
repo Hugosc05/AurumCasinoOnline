@@ -1,4 +1,3 @@
-import type { SlotSymbol } from '@aurum/engine';
 import { forwardRef, memo, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { cx } from '../../lib/format';
 import { SlotSymbolArt } from './symbols';
@@ -15,7 +14,11 @@ export interface ReelHandle {
 }
 
 interface Props {
-  strip: readonly SlotSymbol[];
+  strip: readonly string[];
+  /** Símbolos especiales (comodín, scatter, bono): brillan suavemente y destacan al aparecer. */
+  special?: ReadonlySet<string>;
+  /** Degradado del fondo de los rodillos (temática de la máquina). */
+  bg?: string;
   /** Parada en reposo (para la colocación inicial y para situar los resaltados). */
   stop: number;
   cell: number;
@@ -30,11 +33,12 @@ interface Props {
 /** Desenfoque de movimiento: dos niveles (cambiar el filtro tiene coste; se cambia pocas veces). */
 const BLUR_PX = [0, 0, 2.2] as const;
 
-const Cell = memo(function Cell({ symbol, size, lit, dim, winKey }: { symbol: SlotSymbol; size: number; lit: boolean; dim: boolean; winKey: number }) {
+const Cell = memo(function Cell({ symbol, size, lit, dim, winKey, special }: { symbol: string; size: number; lit: boolean; dim: boolean; winKey: number; special: boolean }) {
   return (
     <div className="relative flex items-center justify-center" style={{ height: size }}>
       {lit && <div key={`g${winKey}`} className="slot-win-glow pointer-events-none absolute inset-1 rounded-xl" aria-hidden />}
-      <div key={lit ? `w${winKey}` : 'n'} className={cx('relative transition-[opacity,filter] duration-300', lit && 'slot-win-pop', dim && 'opacity-65 saturate-[.7]')}>
+      {special && !dim && <div className="slot-special-aura pointer-events-none absolute inset-2 rounded-full" aria-hidden />}
+      <div key={lit ? `w${winKey}` : 'n'} className={cx('relative transition-[opacity,filter] duration-300', lit && (special ? 'slot-special-pop' : 'slot-win-pop'), dim && 'opacity-65 saturate-[.7]')}>
         <SlotSymbolArt symbol={symbol} size={size * 0.78} />
       </div>
       {lit && <div className="pointer-events-none absolute inset-1 rounded-xl ring-2 ring-oro-claro/90" aria-hidden />}
@@ -51,7 +55,7 @@ const Cell = memo(function Cell({ symbol, size, lit, dim, winKey }: { symbol: Sl
  * sin cortes: índice DOM = índice de la tira + 1.
  */
 export const Reel = memo(
-  forwardRef<ReelHandle, Props>(function Reel({ strip, stop, cell, highlight, dimOthers, anticipation, winKey }, ref) {
+  forwardRef<ReelHandle, Props>(function Reel({ strip, stop, cell, highlight, dimOthers, anticipation, winKey, special, bg = 'from-[#fdfaf3] via-[#f3ecdc] to-[#e2d6bc]' }, ref) {
     const L = strip.length;
     const stripRef = useRef<HTMLDivElement>(null);
     const blurRef = useRef<HTMLDivElement>(null);
@@ -96,7 +100,8 @@ export const Reel = memo(
       <div
         ref={rootRef}
         className={cx(
-          'reel relative overflow-hidden rounded-xl bg-gradient-to-b from-[#fdfaf3] via-[#f3ecdc] to-[#e2d6bc] transition-shadow duration-300',
+          'reel relative overflow-hidden rounded-xl bg-gradient-to-b transition-shadow duration-300',
+          bg,
           anticipation && 'reel-anticipation',
         )}
         style={{ height: cell * 3, width: cell }}
@@ -107,7 +112,7 @@ export const Reel = memo(
             const row = i - 1 - stop;
             const inWindow = row >= 0 && row < 3;
             const lit = inWindow && highlight.has(row);
-            return <Cell key={i} symbol={s} size={cell} lit={lit} dim={inWindow && dimOthers && !lit} winKey={lit ? winKey : -1} />;
+            return <Cell key={i} symbol={s} size={cell} lit={lit} dim={inWindow && dimOthers && !lit} winKey={lit ? winKey : -1} special={!!special?.has(s)} />;
           })}
         </div>
         </div>

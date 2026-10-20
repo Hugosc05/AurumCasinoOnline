@@ -1,11 +1,12 @@
-import { DEFAULT_SLOT_LIMITS, PAYLINES, REEL_STRIPS, SLOT_SYMBOL_LABELS, gridFromStops, type SlotSpinResult, type SlotSymbol, type WinTier } from '@aurum/engine';
+import { PAYLINES, SLOT_MACHINES, machineStrips, type MachineSpinResult, type SlotMachineDef, type WinTier } from '@aurum/engine';
 import { AnimatePresence, animate, motion } from 'motion/react';
-import { Minus, Play, Plus, Repeat, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, BookOpen, Flame, Gift, Minus, Play, Plus, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AnimationPlaybackControls } from 'motion/react';
 import { Celebration, type CelebrationHandle } from '../../components/Celebration';
 import { GameHeader, OddsNote, SkipButton } from '../../components/GameKit';
-import { Button, Segmented } from '../../components/ui';
+import { Link, useParams } from 'react-router-dom';
+import { Badge, Button, Modal, Segmented } from '../../components/ui';
 import { ApiError, api, newKey } from '../../lib/api';
 import { DURATION } from '../../lib/anim/tokens';
 import { audio, type LoopHandle } from '../../lib/audio';
@@ -15,14 +16,64 @@ import { useSession } from '../../state/session';
 import type { Achievement, Balance } from '../../state/types';
 import { planSlotPresentation, lineColor, type SlotPresentation } from './presentation';
 import { Reel, type ReelHandle } from './Reel';
+import { ChestBonus, type BonusView } from './ChestBonus';
+import { SlotPaytable, machineFeatures } from './SlotPaytable';
+import { SlotSymbolArt } from './symbols';
+import { NotFound } from '../../pages/NotFound';
 import { REEL_FULL, REEL_REDUCED, blurLevel, createReel, mod, requestStop, slamStop, snapTo, startSpin, step, type ReelState } from './reelMotion';
+
+interface FeatureState {
+  machine: string;
+  freeSpins: { left: number; total: number; multiplier: number; betPerLine: number; lines: number; won: number } | null;
+  bonus: BonusView | null;
+}
 
 interface SpinResponse {
   roundId: string;
-  result: SlotSpinResult;
+  result: MachineSpinResult;
   balance: Balance;
   achievements: Achievement[];
+  feature: FeatureState;
 }
+
+/** Estadísticas reales de la sesión (no alteran nada: solo cuentan lo ocurrido). */
+interface SessionStats {
+  spins: number;
+  freeSpins: number;
+  bonuses: number;
+  bet: number;
+  won: number;
+  biggest: number;
+  hits: number;
+  streak: number;
+  bestStreak: number;
+}
+const EMPTY_STATS: SessionStats = { spins: 0, freeSpins: 0, bonuses: 0, bet: 0, won: 0, biggest: 0, hits: 0, streak: 0, bestStreak: 0 };
+
+interface HistoryEntry {
+  id: number;
+  kind: 'line' | 'scatter' | 'bonus' | 'free' | 'none';
+  symbols: string[];
+  text: string;
+  win: number;
+  bet: number;
+}
+
+/** Ambientación visual de cada máquina. */
+const THEMES: Record<string, { frame: string; reel: string; marquee: string; accent: string }> = {
+  'aurum-royale': {
+    frame: 'from-[#1c2747] via-abismo to-[#070b16] border-oro/40',
+    reel: 'from-[#fdfaf3] via-[#f3ecdc] to-[#e2d6bc]',
+    marquee: 'border-oro/30 bg-noche/80',
+    accent: 'text-oro-claro',
+  },
+  'tesoro-arrecife': {
+    frame: 'from-[#0b4a5e] via-[#062a3a] to-[#03141e] border-[#7ff0e4]/40',
+    reel: 'from-[#f0fbff] via-[#d9f2f7] to-[#b5dde6]',
+    marquee: 'border-[#7ff0e4]/30 bg-[#03141e]/80',
+    accent: 'text-[#9ff5ec]',
+  },
+};
 
 const BET_STEPS = [1, 2, 5, 10, 20, 50, 100];
 const TIER_TEXT: Record<WinTier, string> = { none: '', small: 'Premio', medium: 'Buen premio', big: 'Gran premio', mega: 'Premio extraordinario' };
@@ -121,8 +172,21 @@ const Bulbs = memo(function Bulbs({ count, mode, reverse }: { count: number; mod
   );
 });
 
-export default function SlotsPage() {
+export default function SlotsPageRoute() {
+  const { machineId = 'aurum-royale' } = useParams();
+  const machine = SLOT_MACHINES.find((m) => m.id === machineId);
+  if (!machine) return <NotFound />;
+  // La clave reinicia por completo el estado al cambiar de máquina.
+  return <SlotsPage key={machine.id} machine={machine} />;
+}
+
+function SlotsPage({ machine }: { machine: SlotMachineDef }) {
   const { user, setBalance, speed, motion: level, effects, prefs, updatePrefs } = useSession();
+  const strips = useMemo(() => machineStrips(machine), [machine]);
+  const labels = useMemo(() => new Map(machine.symbols.map((x) => [x.id, x.label])), [machine]);
+  const special = useMemo(() => new Set(machine.symbols.filter((x) => x.kind !== 'regular').map((x) => x.id)), [machine]);
+  const scatterId = machine.symbols.find((x) => x.kind === 'scatter')?.id ?? null;
+  const theme = THEMES[machine.id] ?? THEMES['aurum-royale']!;
   const { notify, celebrate } = useNotify();
   const reels = useRef<(ReelHandle | null)[]>([]);
   const windowRef = useRef<HTMLDivElement>(null);
@@ -137,26 +201,40 @@ export default function SlotsPage() {
   const [lines, setLines] = useState(20);
   const [betPerLine, setBetPerLine] = useState(1);
   const [phase, setPhase] = useState<Phase>('idle');
-  const [result, setResult] = useState<SlotSpinResult | null>(null);
+  const [result, setResult] = useState<MachineSpinResult | null>(null);
   const [plan, setPlan] = useState<SlotPresentation | null>(null);
   const [lineStage, setLineStage] = useState<LineStage>('overview');
   const [activeLine, setActiveLine] = useState<number | null>(null);
   const [anticip, setAnticip] = useState<Set<number>>(new Set());
   const [bigWin, setBigWin] = useState<{ tier: WinTier; amount: number; multiplier: number } | null>(null);
-  const [auto, setAuto] = useState(0);
   const [pulls, setPulls] = useState(0);
-  const [history, setHistory] = useState<{ bet: number; win: number }[]>([]);
-  const autoRef = useRef(0);
-  autoRef.current = auto;
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [stats, setStats] = useState<SessionStats>(EMPTY_STATS);
+  const [feature, setFeature] = useState<FeatureState>({ machine: machine.id, freeSpins: null, bonus: null });
+  /** Aviso de función especial (giros gratis concedidos o terminados, bono activado). */
+  const [announce, setAnnounce] = useState<{ title: string; text: string; amount?: number } | null>(null);
+  const [bonusOpen, setBonusOpen] = useState(false);
+  const [paytable, setPaytable] = useState(false);
+  const historyId = useRef(0);
   const loop = useRef<LoopHandle | null>(null);
   const presentToken = useRef(0);
-  const totalBet = betPerLine * lines;
-  const canAfford = user?.unlimited || (user?.balance ?? 0) >= totalBet;
+  const freeMode = !!feature.freeSpins;
+  const totalBet = freeMode ? feature.freeSpins!.betPerLine * feature.freeSpins!.lines : betPerLine * lines;
+  const canAfford = freeMode || user?.unlimited || (user?.balance ?? 0) >= totalBet;
+  const bonusPending = !!feature.bonus && !feature.bonus.done;
+
+  // Recupera giros gratis o un bono pendientes (recarga de página, otro dispositivo).
+  useEffect(() => {
+    api.get<FeatureState>(`/api/games/slots/state?machine=${machine.id}`).then((f) => {
+      setFeature(f);
+      if (f.bonus && !f.bonus.done) setBonusOpen(true);
+    }).catch(() => undefined);
+  }, [machine.id]);
 
   // ── Motor de los rodillos: un único bucle rAF para los cinco ──
   // Callbacks de referencia estables: no rompen la memoización de los rodillos.
   const reelRefs = useMemo(() => Array.from({ length: 5 }, (_, i) => (el: ReelHandle | null) => void (reels.current[i] = el)), []);
-  const motions = useRef<ReelState[]>(REEL_STRIPS.map((strip, i) => createReel(strip.length, INITIAL_STOPS[i]!)));
+  const motions = useRef<ReelState[]>(strips.map((strip, i) => createReel(strip.length, INITIAL_STOPS[i]! % strip.length)));
   const raf = useRef<number | null>(null);
   const spinning = useRef(false);
   const slamRequested = useRef(false);
@@ -189,7 +267,6 @@ export default function SlotsPage() {
       loop.current?.stop(50);
       counterAnim.current?.stop();
       presentToken.current += 1;
-      autoRef.current = 0;
     },
     [],
   );
@@ -239,7 +316,7 @@ export default function SlotsPage() {
   };
 
   /** Presentación de un resultado ya liquidado. No bloquea: se puede volver a girar en cualquier momento. */
-  const present = (r: SlotSpinResult, p: SlotPresentation): void => {
+  const present = (r: MachineSpinResult, p: SlotPresentation): void => {
     const token = ++presentToken.current;
     const alive = (): boolean => token === presentToken.current;
     setPlan(p);
@@ -297,18 +374,23 @@ export default function SlotsPage() {
       slam();
       return;
     }
-    if (!canAfford) {
-      notify('error', 'Saldo insuficiente para esta apuesta.');
-      setAuto(0);
+    if (bonusPending) {
+      setBonusOpen(true);
       return;
     }
+    if (!canAfford) {
+      notify('error', 'Saldo insuficiente para esta apuesta.');
+      return;
+    }
+    setAnnounce(null);
     spinning.current = true;
     slamRequested.current = false;
     stopPresentation();
     setPhase('spinning');
     setAnticip(new Set());
     setPulls((n) => n + 1);
-    if (user && !user.unlimited && user.balance !== null) setBalance({ balance: user.balance - totalBet, unlimited: false });
+    // Los giros gratis no cobran nada.
+    if (!freeMode && user && !user.unlimited && user.balance !== null) setBalance({ balance: user.balance - totalBet, unlimited: false });
 
     const lvl = levelRef.current;
     const animated = lvl !== 'off';
@@ -317,7 +399,16 @@ export default function SlotsPage() {
     const prevStops = motions.current.map((m) => mod(m.pos, m.L));
     const done = motions.current.map((_, i) => new Promise<void>((res) => (stopWaiters.current[i] = res)));
     let landedCount = 0;
-    let grid: SlotSymbol[][] | null = null;
+    let grid: string[][] | null = null;
+    // Anticipación honesta: solo cuando ya son visibles los símbolos que de verdad activan una función.
+    const anticipationCount = (g: string[][], upTo: number): number => {
+      if (scatterId) return g.slice(0, upTo).flat().filter((x) => x === scatterId).length;
+      if (machine.bonus) return machine.bonus.reels.filter((r) => r < upTo && g[r]!.includes(machine.bonus!.symbol)).length;
+      return 0;
+    };
+    const remainingTriggerReels = (from: number): number[] =>
+      machine.bonus && !scatterId ? machine.bonus.reels.filter((r) => r >= from) : Array.from({ length: 5 - from }, (_, k) => from + k);
+    const needed = scatterId ? 3 : machine.bonus?.minCount ?? 99;
 
     onLand.current = (i: number) => {
       landedCount += 1;
@@ -326,9 +417,10 @@ export default function SlotsPage() {
       reels.current[i]?.thud();
       // Anticipación honesta: con 2 estrellas ya visibles, los rodillos restantes se iluminan.
       if (grid && lvl === 'full' && !slamRequested.current) {
-        const scatters = grid.slice(0, i + 1).flat().filter((x) => x === 'scatter').length;
-        if (scatters >= 2 && i < 4) {
-          setAnticip(new Set(Array.from({ length: 4 - i }, (_, k) => i + 1 + k)));
+        const seen = anticipationCount(grid, i + 1);
+        const rest = remainingTriggerReels(i + 1);
+        if (seen === needed - 1 && rest.length > 0) {
+          setAnticip(new Set(rest));
           audio.play('anticipation');
         } else setAnticip((a) => (a.has(i) ? new Set([...a].filter((x) => x !== i)) : a));
       }
@@ -344,7 +436,7 @@ export default function SlotsPage() {
 
     let res: SpinResponse;
     try {
-      res = await api.post<SpinResponse>('/api/games/slots/spin', { betPerLine, lines, idempotencyKey: newKey() });
+      res = await api.post<SpinResponse>('/api/games/slots/spin', { machine: machine.id, betPerLine, lines, idempotencyKey: newKey() });
     } catch (err) {
       // Sin resultado: los rodillos vuelven a la ventana anterior y no se cobra nada.
       if (animated) {
@@ -355,7 +447,6 @@ export default function SlotsPage() {
       loop.current?.stop();
       spinning.current = false;
       setPhase('idle');
-      setAuto(0);
       if (user) setBalance({ balance: user.balance, unlimited: user.unlimited });
       notify('error', err instanceof ApiError ? err.message : 'No se pudo girar.');
       return;
@@ -369,9 +460,10 @@ export default function SlotsPage() {
       const base = slamNow ? now : Math.max(now, t0 + SPIN_MIN[lvl]);
       const gap = slamNow ? 70 : STOP_GAP[lvl];
       let extra = 0;
+      const slowReels = new Set<number>();
+      for (let i = 1; i < 5; i += 1) if (anticipationCount(r.grid, i) === needed - 1) for (const x of remainingTriggerReels(i)) slowReels.add(x);
       r.stops.forEach((stop, i) => {
-        const scattersBefore = r.grid.slice(0, i).flat().filter((x) => x === 'scatter').length;
-        if (lvl === 'full' && !slamNow && i >= 2 && scattersBefore >= 2) extra += ANTICIPATION_MS;
+        if (lvl === 'full' && !slamNow && slowReels.has(i)) extra += ANTICIPATION_MS;
         requestStop(motions.current[i]!, stop, base + i * gap + extra, slamNow);
       });
       kick();
@@ -392,21 +484,60 @@ export default function SlotsPage() {
     setStops(r.stops);
     setResult(r);
     setBalance(res.balance);
-    setHistory((h) => [{ bet: r.totalBet, win: r.totalWin }, ...h].slice(0, 12));
+    const wasFree = r.mode === 'free';
+    setFeature(res.feature);
+    // Estadísticas reales: la racha cuenta tiradas premiadas seguidas y se rompe con la primera sin premio.
+    setStats((st) => {
+      const hit = r.totalWin > 0;
+      const streak = hit ? st.streak + 1 : 0;
+      return {
+        ...st,
+        spins: st.spins + (wasFree ? 0 : 1),
+        freeSpins: st.freeSpins + (wasFree ? 1 : 0),
+        bonuses: st.bonuses + (r.bonusTriggered ? 1 : 0),
+        bet: st.bet + r.charged,
+        won: st.won + r.totalWin,
+        biggest: Math.max(st.biggest, r.totalWin),
+        hits: st.hits + (hit ? 1 : 0),
+        streak,
+        bestStreak: Math.max(st.bestStreak, streak),
+      };
+    });
+    const top = r.lineWins.slice().sort((a, b) => b.payout - a.payout)[0];
+    const entry: HistoryEntry = top
+      ? {
+          id: ++historyId.current, kind: wasFree ? 'free' : 'line',
+          symbols: top.group ? machine.groups.find((g) => g.id === top.group)!.symbols.slice(0, 3) as string[] : Array.from({ length: top.count }, () => top.symbol),
+          text: `${top.group ? machine.groups.find((g) => g.id === top.group)!.label : `${top.count} × ${labels.get(top.symbol) ?? top.symbol}`}${top.wildMultiplied ? ' (×2)' : ''}${r.lineWins.length > 1 ? ` +${r.lineWins.length - 1} líneas` : ''}`,
+          win: r.totalWin, bet: r.charged,
+        }
+      : r.scatterWin
+        ? { id: ++historyId.current, kind: 'scatter', symbols: [scatterId!, scatterId!, scatterId!], text: `${r.scatterWin.count} estrellas`, win: r.totalWin, bet: r.charged }
+        : { id: ++historyId.current, kind: wasFree ? 'free' : 'none', symbols: [], text: wasFree ? 'Giro gratis' : 'Sin premio', win: 0, bet: r.charged };
+    setHistory((h) => [entry, ...h].slice(0, 12));
     celebrate(res.achievements);
     present(r, planSlotPresentation(r));
 
-    if (autoRef.current > 0) {
-      const pause = r.totalWin === 0 ? 350 : r.tier === 'big' || r.tier === 'mega' ? 2600 : 1100;
+    // Funciones especiales: se anuncian después de ver el resultado. Nada se juega solo.
+    const after = speed === 0 ? 0 : r.totalWin > 0 ? 1600 : 700;
+    if (r.freeSpinsAwarded > 0) {
       window.setTimeout(() => {
-        if (autoRef.current > 0 && !spinning.current) {
-          setAuto((a) => a - 1);
-          void spinRef.current();
-        }
-      }, pause * Math.max(speed, 0.4));
+        audio.play('winBig');
+        setAnnounce({ title: `¡${r.freeSpinsAwarded} giros gratis!`, text: `Todos los premios ×${machine.freeSpins?.multiplier ?? 1}. Pulsa girar para jugar cada uno.` });
+      }, after);
+    } else if (wasFree && !res.feature.freeSpins) {
+      const won = (feature.freeSpins?.won ?? 0) + r.totalWin;
+      window.setTimeout(() => setAnnounce({ title: 'Giros gratis terminados', text: 'Ganado durante los giros gratis', amount: won }), after);
+    }
+    if (r.bonusTriggered) {
+      window.setTimeout(() => {
+        audio.play('winBig');
+        machineFx.current?.play('burst', [{ x: 0.5, y: 0.45 }]);
+        setBonusOpen(true);
+      }, after + 400);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canAfford, notify, user, setBalance, totalBet, betPerLine, lines, speed, celebrate, cell, kick]);
+  }, [canAfford, notify, user, setBalance, totalBet, betPerLine, lines, speed, celebrate, cell, kick, machine, freeMode, bonusPending, feature, labels, scatterId]);
 
   const spinRef = useRef(spin);
   spinRef.current = spin;
@@ -421,11 +552,6 @@ export default function SlotsPage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  const startAuto = (n: number): void => {
-    setAuto(n - 1);
-    void spin();
-  };
 
   const stepBet = (dir: 1 | -1): void => {
     const i = BET_STEPS.indexOf(betPerLine);
@@ -444,13 +570,24 @@ export default function SlotsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <GameHeader title="Aurum Royale" subtitle="Cinco rodillos, veinte líneas. El servidor decide las paradas antes de que empiecen a girar." />
+      <Link to="/slots" className="mb-3 inline-flex items-center gap-1.5 text-sm text-niebla hover:text-marfil"><ArrowLeft className="h-4 w-4" /> Máquinas</Link>
+      <GameHeader title={machine.name} subtitle={`${machine.theme} · ${machine.tagline} El servidor decide las paradas antes de que giren.`}>
+        <Button variant="outline" size="sm" onClick={() => setPaytable(true)}><BookOpen className="h-4 w-4" /> Tabla de premios</Button>
+      </GameHeader>
+      <div className="-mt-3 mb-5 flex flex-wrap gap-2" aria-label="Funciones de la máquina">
+        {machineFeatures(machine).map((f) => <Badge key={f} tone="muted">{f}</Badge>)}
+      </div>
+      <Modal open={paytable} onClose={() => setPaytable(false)} title={`${machine.name}: tabla de premios`} wide>
+        <SlotPaytable machine={machine} />
+      </Modal>
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
         {/* Máquina */}
         <div
           className={cx(
             level === 'off' && 'motion-off',
-            'relative overflow-hidden rounded-[36px] border border-oro/40 bg-gradient-to-b from-[#1c2747] via-abismo to-[#070b16] p-4 shadow-hondo transition-shadow duration-700 sm:p-6',
+            'relative overflow-hidden rounded-[36px] border bg-gradient-to-b p-4 shadow-hondo transition-shadow duration-700 sm:p-6',
+            theme.frame,
+            freeMode && 'shadow-[0_0_0_2px_rgba(127,240,228,0.5),0_0_60px_-10px_rgba(127,240,228,0.5)]',
             tier === 'mega' ? 'shadow-[0_0_0_2px_rgba(235,217,166,0.8),0_0_120px_-10px_rgba(235,217,166,0.75)]' : tier === 'big' ? 'shadow-[0_0_0_1px_rgba(235,217,166,0.6),0_0_80px_-10px_rgba(235,217,166,0.55)]' : tier === 'medium' ? 'shadow-[0_0_50px_-15px_rgba(235,217,166,0.45)]' : '',
           )}
         >
@@ -471,7 +608,15 @@ export default function SlotsPage() {
           <Celebration ref={machineFx} level={effects} className="pointer-events-none absolute inset-0 z-20 h-full w-full" />
 
           {/* Marquesina con luces */}
-          <div className="relative mb-4 flex items-center justify-between rounded-2xl border border-oro/30 bg-noche/80 px-4 py-3">
+          {freeMode && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-2xl border border-[#7ff0e4]/40 bg-[#7ff0e4]/10 px-4 py-2 text-sm text-marfil" role="status" data-testid="free-spins">
+              <span className="flex items-center gap-1.5 font-semibold text-[#9ff5ec]"><Gift className="h-4 w-4" /> Giros gratis</span>
+              <span>{feature.freeSpins!.total - feature.freeSpins!.left + 1} de {feature.freeSpins!.total}</span>
+              <span>Premios ×{feature.freeSpins!.multiplier}</span>
+              <span>Ganado: <span className="text-oro-claro">{credits(feature.freeSpins!.won)}</span></span>
+            </motion.div>
+          )}
+          <div className={cx('relative mb-4 flex items-center justify-between rounded-2xl border px-4 py-3', theme.marquee)}>
             <div className="flex gap-1.5" aria-hidden>
               {Array.from({ length: 6 }, (_, i) => (
                 <span key={i} className={cx('h-2 w-2 rounded-full bg-oro-claro', tier ? 'animate-[marquee-glow_0.8s_ease-in-out_infinite]' : 'opacity-40')} style={{ animationDelay: `${i * 0.12}s` }} />
@@ -479,7 +624,7 @@ export default function SlotsPage() {
             </div>
             <div className="text-center" aria-live="polite">
               <p className="text-xs text-niebla">{tier ? TIER_TEXT[tier] : phase === 'spinning' ? 'Girando…' : 'Premio'}</p>
-              <p className="font-display text-3xl text-oro-claro tabular-nums">
+              <p className={cx('font-display text-3xl tabular-nums', theme.accent)}>
                 <span ref={counterRef}>0</span>
               </p>
             </div>
@@ -498,11 +643,13 @@ export default function SlotsPage() {
               <Bulbs count={Math.round(winW / 34)} mode={bulbMode} />
               <div className="relative rounded-2xl border-4 border-[#3a2c12] bg-[#120d05] shadow-[inset_0_6px_20px_rgba(0,0,0,0.8),0_0_0_1px_rgba(235,217,166,0.25)]" style={{ width: winW + 8 }}>
                 <div className="flex" style={{ gap: GAP }}>
-                  {REEL_STRIPS.map((strip, i) => (
+                  {strips.map((strip, i) => (
                     <Reel
                       key={i}
                       ref={reelRefs[i]}
                       strip={strip}
+                      special={special}
+                      bg={theme.reel}
                       stop={stops[i]!}
                       cell={cell}
                       highlight={highlights[i]!}
@@ -591,7 +738,7 @@ export default function SlotsPage() {
               {presenting && lineStage === 'cycle' && current && (
                 <span className="flex items-center gap-2 text-marfil">
                   <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: current.color }} />
-                  Línea {current.line + 1}: {current.count} × {SLOT_SYMBOL_LABELS[current.symbol]} = <span className="text-oro-claro">{credits(current.payout)}</span>
+                  Línea {current.line + 1}: {current.group ? machine.groups.find((g) => g.id === current.group)?.label : `${current.count} × ${labels.get(current.symbol) ?? current.symbol}`}{current.wildMultiplied ? ` (comodín ×${machine.wildMultiplier})` : ''} = <span className="text-oro-claro">{credits(current.payout)}</span>
                   <span className="text-niebla">({(activeLine ?? 0) + 1} de {plan.lines.length}{plan.scatter ? `, estrellas ${credits(plan.scatter.payout)}` : ''})</span>
                 </span>
               )}
@@ -602,26 +749,62 @@ export default function SlotsPage() {
             </div>
           </div>
 
+          {/* Avisos de funciones especiales */}
+          <AnimatePresence>
+            {announce && (
+              <motion.button
+                type="button"
+                onClick={() => setAnnounce(null)}
+                className="absolute inset-0 z-30 grid place-items-center bg-black/55 backdrop-blur-[2px]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                aria-label="Cerrar aviso"
+                data-testid="feature-announce"
+              >
+                <motion.div className="text-center" initial={{ scale: 0.7, y: 12 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}>
+                  <p className="font-display text-[clamp(2rem,6vw,3.6rem)] leading-none gold-text drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">{announce.title}</p>
+                  {announce.amount !== undefined && <p className="mt-2 font-display text-5xl text-marfil">{credits(announce.amount)}</p>}
+                  <p className="mt-2 text-sm text-marfil">{announce.text}</p>
+                  <p className="mt-4 text-xs text-niebla">Pulsa para continuar</p>
+                </motion.div>
+              </motion.button>
+            )}
+          </AnimatePresence>
+          {bonusOpen && feature.bonus && (
+            <ChestBonus
+              machine={machine.id}
+              bonus={feature.bonus}
+              onUpdate={(b) => setFeature((f) => ({ ...f, bonus: b }))}
+              onClose={() => {
+                setBonusOpen(false);
+                setStats((st) => ({ ...st, won: st.won + (feature.bonus?.won ?? 0), biggest: Math.max(st.biggest, feature.bonus?.won ?? 0) }));
+                setHistory((h) => [{ id: ++historyId.current, kind: 'bonus' as const, symbols: ['chest', 'chest', 'chest'], text: 'Bono de cofres', win: feature.bonus?.won ?? 0, bet: 0 }, ...h].slice(0, 12));
+                setFeature((f) => ({ ...f, bonus: null }));
+              }}
+            />
+          )}
+
           {/* Consola */}
           <div className="mt-4 grid items-center gap-4 rounded-2xl border border-linea bg-noche/70 p-4 sm:grid-cols-[1fr_auto_1fr]">
             <div className="flex flex-col gap-3">
               <div>
                 <p className="mb-1.5 text-xs text-niebla">Líneas activas</p>
-                <Segmented label="Líneas activas" value={String(lines)} options={DEFAULT_SLOT_LIMITS.allowedLines.map((l) => ({ value: String(l), label: String(l) }))} onChange={(v) => phase !== 'spinning' && setLines(Number(v))} />
+                <Segmented label="Líneas activas" value={String(lines)} options={machine.limits.allowedLines.map((l) => ({ value: String(l), label: String(l) }))} onChange={(v) => phase !== 'spinning' && !freeMode && setLines(Number(v))} />
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-niebla">Por línea</span>
-                <button className="grid h-8 w-8 place-items-center rounded-full border border-linea text-marfil hover:border-oro/60 disabled:opacity-40" onClick={() => stepBet(-1)} disabled={phase === 'spinning' || betPerLine === BET_STEPS[0]} aria-label="Bajar apuesta por línea">
+                <button className="grid h-8 w-8 place-items-center rounded-full border border-linea text-marfil hover:border-oro/60 disabled:opacity-40" onClick={() => stepBet(-1)} disabled={phase === 'spinning' || freeMode || betPerLine === BET_STEPS[0]} aria-label="Bajar apuesta por línea">
                   <Minus className="h-4 w-4" />
                 </button>
                 <span className="w-10 text-center font-display text-xl text-marfil" aria-live="polite">{betPerLine}</span>
-                <button className="grid h-8 w-8 place-items-center rounded-full border border-linea text-marfil hover:border-oro/60 disabled:opacity-40" onClick={() => stepBet(1)} disabled={phase === 'spinning' || betPerLine === BET_STEPS[BET_STEPS.length - 1]} aria-label="Subir apuesta por línea">
+                <button className="grid h-8 w-8 place-items-center rounded-full border border-linea text-marfil hover:border-oro/60 disabled:opacity-40" onClick={() => stepBet(1)} disabled={phase === 'spinning' || freeMode || betPerLine === BET_STEPS[BET_STEPS.length - 1]} aria-label="Subir apuesta por línea">
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
               <p className="text-xs text-niebla">
-                {betPerLine} × {lines} líneas = <span className="text-marfil">{credits(totalBet)}</span>
-                {balanceAfter !== null && <> · saldo tras girar: <span className={balanceAfter < 0 ? 'text-[#f1a3ad]' : 'text-marfil'}>{credits(Math.max(0, balanceAfter))}</span></>}
+                {freeMode ? <>Giro gratis con la apuesta de {feature.freeSpins!.betPerLine} × {feature.freeSpins!.lines} líneas: no se cobra</> : <>{betPerLine} × {lines} líneas = <span className="text-marfil">{credits(totalBet)}</span></>}
+                {balanceAfter !== null && !freeMode && <> · saldo tras girar: <span className={balanceAfter < 0 ? 'text-[#f1a3ad]' : 'text-marfil'}>{credits(Math.max(0, balanceAfter))}</span></>}
               </p>
             </div>
 
@@ -633,7 +816,7 @@ export default function SlotsPage() {
                 title={!canAfford ? 'Saldo insuficiente para esta apuesta' : undefined}
                 whileHover={{ scale: 1.05, filter: 'brightness(1.08)' }}
                 whileTap={{ scale: 0.92 }}
-                aria-label={phase === 'spinning' ? 'Frenar los rodillos' : `Girar por ${totalBet} créditos`}
+                aria-label={phase === 'spinning' ? 'Frenar los rodillos' : bonusPending ? 'Abrir el bono de cofres' : freeMode ? 'Jugar giro gratis' : `Girar por ${totalBet} créditos`}
                 className="group relative grid h-28 w-28 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="absolute inset-1 rounded-full bg-oro/30 opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-100" aria-hidden />
@@ -650,7 +833,7 @@ export default function SlotsPage() {
                 </span>
               </motion.button>
               <p className="text-xs text-niebla">
-                {phase === 'spinning' ? 'Pulsa para frenar' : phase === 'presenting' && plan ? (plan.total > 0 ? `Ganas ${credits(plan.total)}` : 'Sin premio') : `Girar por ${credits(totalBet)}`}
+                {phase === 'spinning' ? 'Pulsa para frenar' : bonusPending ? 'Bono pendiente' : freeMode ? `Giro gratis (${feature.freeSpins!.left} restantes)` : phase === 'presenting' && plan ? (plan.total > 0 ? `Ganas ${credits(plan.total)}` : 'Sin premio') : `Girar por ${credits(totalBet)}`}
               </p>
             </div>
 
@@ -674,46 +857,54 @@ export default function SlotsPage() {
                   <Sparkles className="h-3.5 w-3.5" /> {prefs.effects === 'full' ? 'Efectos' : prefs.effects === 'reduced' ? 'Efectos reducidos' : 'Sin efectos'}
                 </button>
               </div>
-              <p className="text-xs text-niebla">Giro automático</p>
-              {auto > 0 ? (
-                <Button variant="danger" size="sm" onClick={() => setAuto(0)}>
-                  <Square className="h-3.5 w-3.5" /> Detener ({auto} restantes)
-                </Button>
-              ) : (
-                <div className="flex gap-1.5">
-                  {[10, 25, 50].map((n) => (
-                    <Button key={n} variant="outline" size="sm" onClick={() => startAuto(n)} disabled={phase === 'spinning' || !canAfford}>
-                      <Repeat className="h-3.5 w-3.5" /> {n}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              <p className="max-w-[220px] text-right text-[11px] leading-snug text-niebla">Cada giro automático cobra {credits(totalBet)} y se detiene si no hay saldo.</p>
+              <p className="max-w-[220px] text-right text-[11px] leading-snug text-niebla">Cada tirada se inicia solo cuando la pides. Barra espaciadora: girar o frenar.</p>
             </div>
           </div>
         </div>
 
-        {/* Panel lateral */}
+        {/* Panel lateral: estadísticas reales de la sesión e historial de combinaciones */}
         <aside className="flex flex-col gap-4">
+          <div className="panel p-5" data-testid="session-stats">
+            <h2 className="mb-3 flex items-center justify-between text-xl text-marfil">
+              Sesión
+              <span className={cx('flex items-center gap-1 rounded-full px-2 py-0.5 text-sm', stats.streak > 1 ? 'bg-oro/20 text-oro-claro' : 'text-niebla')} title="Tiradas premiadas seguidas" data-testid="win-streak">
+                <Flame className="h-4 w-4" /> {stats.streak}
+              </span>
+            </h2>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+              <dt className="text-niebla">Tiradas</dt><dd className="text-right tabular-nums text-marfil">{stats.spins}{stats.freeSpins > 0 ? ` + ${stats.freeSpins} gratis` : ''}</dd>
+              <dt className="text-niebla">Apostado</dt><dd className="text-right tabular-nums text-marfil">{credits(stats.bet)}</dd>
+              <dt className="text-niebla">Ganado</dt><dd className="text-right tabular-nums text-marfil">{credits(stats.won)}</dd>
+              <dt className="text-niebla">Balance</dt><dd className={cx('text-right tabular-nums', stats.won - stats.bet >= 0 ? 'text-exito' : 'text-[#f1a3ad]')}>{stats.won - stats.bet >= 0 ? '+' : ''}{credits(stats.won - stats.bet)}</dd>
+              <dt className="text-niebla">Mayor premio</dt><dd className="text-right tabular-nums text-marfil">{credits(stats.biggest)}</dd>
+              <dt className="text-niebla">Tiradas premiadas</dt><dd className="text-right tabular-nums text-marfil">{stats.spins + stats.freeSpins > 0 ? `${Math.round((stats.hits / (stats.spins + stats.freeSpins)) * 100)} %` : '—'}</dd>
+              <dt className="text-niebla">Mejor racha</dt><dd className="text-right tabular-nums text-marfil">{stats.bestStreak}</dd>
+              {machine.bonus && <><dt className="text-niebla">Bonos</dt><dd className="text-right tabular-nums text-marfil">{stats.bonuses}</dd></>}
+            </dl>
+            <p className="mt-3 text-[11px] leading-snug text-niebla">La racha cuenta resultados reales y no cambia las probabilidades de la siguiente tirada.</p>
+          </div>
           <div className="panel p-5">
-            <h2 className="mb-3 text-xl text-marfil">Últimas tiradas</h2>
+            <h2 className="mb-3 text-xl text-marfil">Historial</h2>
             {history.length === 0 ? (
               <p className="text-sm text-niebla">Tus tiradas de esta sesión aparecerán aquí.</p>
             ) : (
-              <ul className="space-y-1.5 text-sm">
-                {history.map((h, i) => (
-                  <li key={history.length - i} className="flex justify-between">
-                    <span className="text-niebla">Apuesta {credits(h.bet)}</span>
-                    <span className={h.win > 0 ? 'text-exito' : 'text-niebla'}>{h.win > 0 ? `+${credits(h.win)}` : '—'}</span>
-                  </li>
-                ))}
+              <ul className="space-y-1.5 text-sm" data-testid="slot-history">
+                <AnimatePresence initial={false}>
+                  {history.map((h) => (
+                    <motion.li key={h.id} layout initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2">
+                      <span className="flex w-[66px] shrink-0">{h.symbols.slice(0, 3).map((sym, i) => <SlotSymbolArt key={i} symbol={sym} size={22} />)}</span>
+                      <span className={cx('min-w-0 flex-1 truncate', h.win > 0 ? 'text-marfil' : 'text-niebla')}>{h.text}</span>
+                      <span className={h.win > 0 ? 'text-exito' : 'text-niebla'}>{h.win > 0 ? `+${credits(h.win)}` : '—'}</span>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
               </ul>
             )}
           </div>
           <div className="panel p-5 text-sm text-niebla">
             <h2 className="mb-2 text-xl text-marfil">Cómo se paga</h2>
-            <p>Tres o más símbolos iguales seguidos desde el primer rodillo en una línea activa. El comodín sustituye a todos menos a la estrella. Tres estrellas en cualquier posición pagan sobre la apuesta total.</p>
-            <p className="mt-2">Las celebraciones dependen del premio obtenido en esta tirada y no anticipan las siguientes. RTP teórico exacto: 95,26 %.</p>
+            <p>Tres o más símbolos iguales seguidos desde el primer rodillo en una línea activa. Las celebraciones dependen del premio de esta tirada y no anticipan las siguientes.</p>
+            <button className="mt-2 text-oro-claro hover:underline" onClick={() => setPaytable(true)}>Ver la tabla de premios y el RTP</button>
             <div className="mt-3"><OddsNote /></div>
           </div>
         </aside>

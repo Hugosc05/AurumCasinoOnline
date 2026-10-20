@@ -1,4 +1,4 @@
-import { PAYLINES, type LineWin, type ScatterWin, type SlotSpinResult, type WinTier } from '@aurum/engine';
+import { PAYLINES, type MachineScatterWin, type MachineSpinResult, type WinTier } from '@aurum/engine';
 
 /**
  * Plan de presentación de una tirada de slots (función pura).
@@ -26,7 +26,7 @@ export const CELEBRATION_BY_TIER: Readonly<Record<WinTier, CelebrationLevel>> = 
 
 export type SlotPresentationEvent =
   | { type: 'REELS_STOPPED'; stops: number[] }
-  | { type: 'WINNING_LINE_DETECTED'; index: number; line: number; rows: readonly number[]; symbol: LineWin['symbol']; count: number; payout: number; cells: [number, number][]; color: string }
+  | { type: 'WINNING_LINE_DETECTED'; index: number; line: number; rows: readonly number[]; symbol: string; group: string | null; wildMultiplied: boolean; count: number; payout: number; cells: [number, number][]; color: string }
   | { type: 'SCATTER_WIN'; count: number; payout: number; cells: [number, number][] }
   | { type: 'TOTAL_WIN'; amount: number; tier: WinTier; multiplier: number }
   | { type: 'CELEBRATION'; level: CelebrationLevel };
@@ -34,12 +34,12 @@ export type SlotPresentationEvent =
 export interface SlotPresentation {
   events: SlotPresentationEvent[];
   lines: Extract<SlotPresentationEvent, { type: 'WINNING_LINE_DETECTED' }>[];
-  scatter: ScatterWin | null;
+  scatter: MachineScatterWin | null;
   total: number;
   celebration: CelebrationLevel;
 }
 
-export function planSlotPresentation(result: SlotSpinResult): SlotPresentation {
+export function planSlotPresentation(result: MachineSpinResult): SlotPresentation {
   const lines = result.lineWins
     .slice()
     .sort((a, b) => b.payout - a.payout || a.line - b.line)
@@ -49,6 +49,8 @@ export function planSlotPresentation(result: SlotSpinResult): SlotPresentation {
       line: w.line,
       rows: PAYLINES[w.line]!,
       symbol: w.symbol,
+      group: w.group,
+      wildMultiplied: w.wildMultiplied,
       count: w.count,
       payout: w.payout,
       cells: w.cells,

@@ -37,7 +37,7 @@ test('blackjack: las cartas repartidas se giran y muestran su valor', async ({ p
 
 test('slots: los rodillos arrancan al pulsar, sin esperar, y se puede volver a girar enseguida', async ({ page }) => {
   await register(page);
-  await page.goto('/slots');
+  await page.goto('/slots/aurum-royale');
   const spin = page.getByRole('button', { name: /Girar por/ });
   await expect(spin).toBeEnabled();
   // En desarrollo, Vite compila módulos al vuelo la primera vez: se espera a que termine.
