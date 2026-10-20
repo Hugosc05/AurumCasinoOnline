@@ -1,6 +1,6 @@
 import { DEFAULT_ROULETTE_LIMITS, ROULETTE_BET_LABELS, ROULETTE_PAYOUTS, WHEEL_ORDER, numberColor, type RouletteBet, type RouletteResult } from '@aurum/engine';
 import { AnimatePresence, motion } from 'motion/react';
-import { Eraser, Repeat2, RotateCcw, Sparkles, Table2, Undo2 } from 'lucide-react';
+import { Brush, Eraser, Repeat2, RotateCcw, Sparkles, Table2, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChipRack, GameHeader, OddsNote, OutcomeBanner, SkipButton, type Outcome } from '../../components/GameKit';
 import { useFlyingChips } from '../../components/FlyingChips';
@@ -12,8 +12,9 @@ import { credits, cx } from '../../lib/format';
 import { useNotify } from '../../state/notify';
 import { useSession } from '../../state/session';
 import type { Achievement, Balance } from '../../state/types';
-import { BettingBoard, type PlacedBet } from './BettingBoard';
-import type { Zone } from './board';
+import { BettingBoard, ZONES, type PlacedBet } from './BettingBoard';
+import { betKey, type Zone } from './board';
+import { Formations } from './Formations';
 import { RouletteWheel, type WheelHandle } from './RouletteWheel';
 
 interface SpinResponse {
@@ -48,8 +49,21 @@ export default function RoulettePage() {
   const { layer, fly } = useFlyingChips(speed);
 
   const [chip, setChip] = useState(25);
-  const [bets, setBets] = useState<Map<string, PlacedBet>>(new Map());
-  const [undo, setUndo] = useState<{ key: string; amount: number }[]>([]);
+  const [bets, setBetsState] = useState<Map<string, PlacedBet>>(new Map());
+  /** Copia síncrona de las apuestas: un trazo rápido coloca varias fichas antes de volver a renderizar. */
+  const betsRef = useRef(bets);
+  const setBets = useCallback((next: Map<string, PlacedBet> | ((b: Map<string, PlacedBet>) => Map<string, PlacedBet>)) => {
+    const value = typeof next === 'function' ? next(betsRef.current) : next;
+    betsRef.current = value;
+    setBetsState(value);
+  }, []);
+  /** Deshacer por grupos: un toque o un trazo completo se deshace de una vez. */
+  const [undo, setUndo] = useState<{ group: number; key: string; bet: PlacedBet['bet']; delta: number }[]>([]);
+  const group = useRef(1);
+  const flown = useRef(0);
+  const [tool, setTool] = useState<'chip' | 'erase'>('chip');
+  const [confirming, setConfirming] = useState(false);
+  const [skipConfirm, setSkipConfirm] = useState(false);
   const [lastBets, setLastBets] = useState<Map<string, PlacedBet> | null>(null);
   const [phase, setPhase] = useState<Phase>('betting');
   const [result, setResult] = useState<RouletteResult | null>(null);
@@ -61,6 +75,8 @@ export default function RoulettePage() {
   const busy = useRef(false);
 
   const total = useMemo(() => [...bets.values()].reduce((a, b) => a + b.amount, 0), [bets]);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   const available = user?.unlimited ? Infinity : (user?.balance ?? 0);
 
   useEffect(() => {
@@ -83,68 +99,122 @@ export default function RoulettePage() {
     return null;
   }, [phase]);
 
-  const place = useCallback(
-    (zone: Zone, el: Element) => {
-      if (phase === 'spinning') return;
+  /** Añade una ficha a una zona respetando límites y saldo. Devuelve false si no se pudo. */
+  const addChip = useCallback(
+    (zone: Zone, el: Element | null, quiet: boolean): boolean => {
+      if (phaseRef.current === 'spinning') return false;
       const fresh = ensureFreshBoard();
-      const current = fresh ?? bets;
+      const current = fresh ?? betsRef.current;
       const cur = current.get(zone.key)?.amount ?? 0;
       const inside = 'numbers' in zone.bet;
       const max = inside ? DEFAULT_ROULETTE_LIMITS.maxInside : DEFAULT_ROULETTE_LIMITS.maxOutside;
       const add = Math.min(chip, max - cur);
       const totalNow = [...current.values()].reduce((a, b) => a + b.amount, 0);
-      if (add <= 0) {
-        notify('info', `Máximo por ${inside ? 'apuesta interior' : 'apuesta exterior'}: ${credits(max)}`);
-        return;
-      }
-      if (totalNow + add > available) {
-        notify('error', 'No tienes saldo suficiente para esa ficha.');
-        return;
-      }
-      if (totalNow + add > DEFAULT_ROULETTE_LIMITS.maxTotal) {
-        notify('info', `Máximo total por giro: ${credits(DEFAULT_ROULETTE_LIMITS.maxTotal)}`);
-        return;
-      }
-      if (!current.has(zone.key) && current.size >= DEFAULT_ROULETTE_LIMITS.maxBets) {
-        notify('info', `Máximo ${DEFAULT_ROULETTE_LIMITS.maxBets} apuestas distintas por giro`);
-        return;
-      }
+      const fail = (msg: string, kind: 'info' | 'error' = 'info'): boolean => {
+        if (!quiet) notify(kind, msg);
+        return false;
+      };
+      if (add <= 0) return fail(`Máximo por ${inside ? 'apuesta interior' : 'apuesta exterior'}: ${credits(max)}`);
+      if (totalNow + add > available) return fail('No tienes saldo suficiente para esa ficha.', 'error');
+      if (totalNow + add > DEFAULT_ROULETTE_LIMITS.maxTotal) return fail(`Máximo total por giro: ${credits(DEFAULT_ROULETTE_LIMITS.maxTotal)}`);
+      if (!current.has(zone.key) && current.size >= DEFAULT_ROULETTE_LIMITS.maxBets) return fail(`Máximo ${DEFAULT_ROULETTE_LIMITS.maxBets} apuestas distintas por giro`);
       audio.play('chip', speed ? DURATION.chip * speed * 0.85 : 0);
-      void fly(rackRef.current?.querySelector(`[data-chip="${chip}"]`) ?? null, el, chip, 30);
+      if (el && !quiet) void fly(rackRef.current?.querySelector(`[data-chip="${chip}"]`) ?? null, el, chip, 30);
       const next = new Map(current);
       next.set(zone.key, { bet: zone.bet, amount: cur + add });
       setBets(next);
-      setUndo((u) => [...(fresh ? [] : u), { key: zone.key, amount: add }]);
+      const g = group.current;
+      setUndo((u) => [...(fresh ? [] : u), { group: g, key: zone.key, bet: zone.bet, delta: add }]);
+      return true;
     },
-    [phase, ensureFreshBoard, bets, chip, available, notify, fly, speed],
+    [ensureFreshBoard, chip, available, notify, fly, speed, setBets],
   );
 
-  const remove = useCallback(
+  const removeZone = useCallback(
     (key: string) => {
-      if (phase !== 'betting') return;
-      setBets((b) => {
-        const n = new Map(b);
-        n.delete(key);
-        return n;
-      });
-      setUndo((u) => u.filter((x) => x.key !== key));
+      if (phaseRef.current !== 'betting') return;
+      const cur = betsRef.current.get(key);
+      if (!cur) return;
+      const n = new Map(betsRef.current);
+      n.delete(key);
+      setBets(n);
+      const g = group.current;
+      setUndo((u) => [...u, { group: g, key, bet: cur.bet, delta: -cur.amount }]);
       audio.play('chip');
     },
-    [phase],
+    [setBets],
   );
+
+  /** Toque simple: ficha o borrado según la herramienta. */
+  const place = useCallback(
+    (zone: Zone, el: Element) => {
+      if (tool === 'erase') removeZone(zone.key);
+      else addChip(zone, el, false);
+      group.current += 1;
+    },
+    [tool, addChip, removeZone],
+  );
+  const remove = useCallback((key: string) => {
+    removeZone(key);
+    group.current += 1;
+  }, [removeZone]);
+
+  /** Trazo de pintado: una ficha por zona atravesada (la primera vuela desde el estante). */
+  const paint = useCallback(
+    (zones: Zone[], elFor: (key: string) => Element | null) => {
+      for (const z of zones) {
+        if (tool === 'erase') removeZone(z.key);
+        else {
+          const first = flown.current !== group.current;
+          flown.current = group.current;
+          addChip(z, first ? elFor(z.key) : null, !first);
+        }
+      }
+    },
+    [tool, addChip, removeZone],
+  );
+  const strokeEnd = useCallback(() => {
+    group.current += 1;
+  }, []);
 
   const undoLast = (): void => {
     const last = undo[undo.length - 1];
-    if (!last) return;
-    setBets((b) => {
-      const n = new Map(b);
-      const cur = n.get(last.key);
-      if (!cur) return n;
-      if (cur.amount - last.amount <= 0) n.delete(last.key);
-      else n.set(last.key, { ...cur, amount: cur.amount - last.amount });
-      return n;
-    });
-    setUndo((u) => u.slice(0, -1));
+    if (!last || phase !== 'betting') return;
+    const entries = undo.filter((u) => u.group === last.group);
+    const n = new Map(betsRef.current);
+    for (const u of entries.slice().reverse()) {
+      const cur = n.get(u.key)?.amount ?? 0;
+      const amount = cur - u.delta;
+      if (amount <= 0) n.delete(u.key);
+      else n.set(u.key, { bet: u.bet, amount });
+    }
+    setBets(n);
+    setUndo((u) => u.filter((x) => x.group !== last.group));
+  };
+
+  /** Coloca una distribución completa (formación o repetición) sin apostar: el usuario la revisa y confirma. */
+  const loadDistribution = (list: { bet: PlacedBet['bet']; amount: number }[]): boolean => {
+    const next = new Map<string, PlacedBet>();
+    for (const b of list) {
+      const key = betKey(b.bet);
+      if (!ZONES.some((z) => z.key === key)) {
+        notify('error', 'La formación contiene una apuesta que no existe en el tapete.');
+        return false;
+      }
+      next.set(key, { bet: ZONES.find((z) => z.key === key)!.bet, amount: (next.get(key)?.amount ?? 0) + b.amount });
+    }
+    const t = [...next.values()].reduce((a, b) => a + b.amount, 0);
+    if (t > available) {
+      notify('error', `Saldo insuficiente: la formación suma ${credits(t)}.`);
+      return false;
+    }
+    ensureFreshBoard();
+    audio.play('chips');
+    setBets(next);
+    const g = ++group.current;
+    setUndo([...next.entries()].map(([key, v]) => ({ group: g, key, bet: v.bet, delta: v.amount })));
+    group.current += 1;
+    return true;
   };
 
   const repeat = (double = false): void => {
@@ -166,9 +236,18 @@ export default function RoulettePage() {
     audio.play('chips');
     setBets(next);
     setUndo([]);
+    group.current += 1;
+  };
+
+  /** El giro nunca empieza solo: primero se revisa y confirma la distribución. */
+  const requestSpin = (): void => {
+    if (busy.current || phase !== 'betting' || total === 0) return;
+    if (skipConfirm) void spin();
+    else setConfirming(true);
   };
 
   const spin = async (): Promise<void> => {
+    setConfirming(false);
     if (busy.current || phase !== 'betting' || total === 0) return;
     busy.current = true;
     setPhase('spinning');
@@ -281,6 +360,8 @@ export default function RoulettePage() {
               bets={bets}
               onPlace={place}
               onRemove={remove}
+              onPaint={paint}
+              onStrokeEnd={strokeEnd}
               locked={phase === 'spinning'}
               winning={phase === 'result' ? result?.number ?? null : null}
               wonKeys={phase === 'result' ? wonKeys : null}
@@ -292,7 +373,14 @@ export default function RoulettePage() {
           <div className="panel flex flex-col gap-4 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div ref={rackRef}>
-                <ChipRack value={chip} onChange={setChip} disabled={phase === 'spinning'} values={[1, 5, 25, 100, 500, 1000]} />
+                <ChipRack value={chip} onChange={(v) => { setChip(v); setTool('chip'); }} disabled={phase === 'spinning'} values={[1, 5, 25, 100, 500, 1000]} />
+              </div>
+              <div className="flex rounded-full border border-linea p-0.5" role="radiogroup" aria-label="Herramienta">
+                {([['chip', 'Fichas', Brush], ['erase', 'Borrar', Trash2]] as const).map(([v, label, Icon]) => (
+                  <button key={v} role="radio" aria-checked={tool === v} onClick={() => setTool(v)} className={cx('flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm', tool === v ? 'bg-oro text-noche' : 'text-niebla hover:text-marfil')} data-testid={`tool-${v}`}>
+                    <Icon className="h-4 w-4" /> {label}
+                  </button>
+                ))}
               </div>
               <div className="text-right text-sm">
                 <p className="text-niebla">Apuesta total</p>
@@ -303,8 +391,13 @@ export default function RoulettePage() {
               <Button variant="ghost" size="sm" onClick={undoLast} disabled={phase !== 'betting' || undo.length === 0} disabledReason="No hay fichas que deshacer">
                 <Undo2 className="h-4 w-4" /> Deshacer
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => { setBets(new Map()); setUndo([]); }} disabled={phase !== 'betting' || bets.size === 0}>
-                <Eraser className="h-4 w-4" /> Retirar todo
+              <Button variant="ghost" size="sm" onClick={() => {
+                const g = ++group.current;
+                setUndo((u) => [...u, ...[...betsRef.current.entries()].map(([key, v]) => ({ group: g, key, bet: v.bet, delta: -v.amount }))]);
+                group.current += 1;
+                setBets(new Map());
+              }} disabled={phase !== 'betting' || bets.size === 0}>
+                <Eraser className="h-4 w-4" /> Limpiar mesa
               </Button>
               <Button variant="ghost" size="sm" onClick={() => repeat(false)} disabled={phase === 'spinning' || !lastBets}>
                 <Repeat2 className="h-4 w-4" /> Repetir
@@ -315,8 +408,9 @@ export default function RoulettePage() {
               <Button
                 className="ml-auto min-w-[150px]"
                 size="lg"
-                onClick={() => void spin()}
+                onClick={requestSpin}
                 loading={phase === 'spinning'}
+                data-testid="roulette-spin"
                 disabled={phase !== 'betting' || total === 0}
                 disabledReason={phase === 'result' ? 'Coloca una ficha para empezar una nueva ronda' : total === 0 ? 'Coloca al menos una ficha' : null}
               >
@@ -324,12 +418,44 @@ export default function RoulettePage() {
               </Button>
             </div>
             <p className="text-xs text-niebla">
-              Clic o Enter para poner ficha. Clic derecho, Mayús+clic o Supr para retirarla. Los bordes entre números son caballos, cuadros, transversales y seisenas.
+              Toca para poner una ficha o mantén pulsado y arrastra para pintar varias (ratón, dedo o lápiz). El trazo pinta el tipo de casilla donde empieza: número, caballo, cuadro o apuesta exterior. Con «Borrar» el trazo retira fichas. Clic derecho, Mayús+clic o Supr retiran una. Nada se apuesta hasta que confirmas el giro.
             </p>
             <OddsNote />
           </div>
         </div>
       </div>
+
+      <Formations
+        current={[...bets.values()]}
+        disabled={phase === 'spinning'}
+        onLoad={loadDistribution}
+      />
+
+      <Modal open={confirming} onClose={() => setConfirming(false)} title="Confirmar apuestas">
+        <ul className="max-h-60 space-y-1 overflow-y-auto text-sm" data-testid="confirm-list">
+          {[...bets.values()].map((b) => {
+            const z = ZONES.find((x) => x.key === betKey(b.bet));
+            return (
+              <li key={betKey(b.bet)} className="flex justify-between border-b border-linea/40 py-1">
+                <span className="text-marfil">{z?.label ?? ROULETTE_BET_LABELS[b.bet.kind]}</span>
+                <span className="tabular-nums text-niebla">{credits(b.amount)} · paga {ROULETTE_PAYOUTS[b.bet.kind]} a 1</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-3 text-sm text-niebla">
+          {bets.size} {bets.size === 1 ? 'apuesta' : 'apuestas'} por un total de <span className="text-marfil">{credits(total)}</span>
+          {!user?.unlimited && user?.balance !== null && user?.balance !== undefined ? ` · saldo tras apostar: ${credits(user.balance - total)}` : ''}.
+        </p>
+        <label className="mt-3 flex items-center gap-2 text-xs text-niebla">
+          <input type="checkbox" className="h-4 w-4 accent-[#cfae6b]" checked={skipConfirm} onChange={(e) => setSkipConfirm(e.target.checked)} />
+          No volver a preguntar en esta visita
+        </label>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setConfirming(false)}>Seguir apostando</Button>
+          <Button onClick={() => void spin()} autoFocus data-testid="confirm-spin"><Sparkles className="h-4 w-4" /> Confirmar y girar</Button>
+        </div>
+      </Modal>
 
       <Modal open={showPays} onClose={() => setShowPays(false)} title="Tabla de pagos">
         <table className="w-full text-sm">

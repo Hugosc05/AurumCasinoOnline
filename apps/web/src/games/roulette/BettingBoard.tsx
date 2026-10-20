@@ -1,8 +1,8 @@
 import { RED_NUMBERS, type RouletteBetSpec } from '@aurum/engine';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { denomFor } from '../../components/Chip';
 import { cx } from '../../lib/format';
-import { BOARD_H, BOARD_W, CELL_H, CELL_W, OUT_H, ZERO_W, buildZones, cellX, cellY, numberAt, type Zone } from './board';
+import { BOARD_H, BOARD_W, CELL_H, CELL_W, OUT_H, ZERO_W, advanceStroke, beginStroke, buildZones, cellX, cellY, numberAt, zoneAt, type Stroke, type Zone } from './board';
 
 export interface PlacedBet {
   bet: RouletteBetSpec;
@@ -34,8 +34,13 @@ function BoardChip({ x, y, amount, rotateLabel, state }: { x: number; y: number;
 
 interface Props {
   bets: Map<string, PlacedBet>;
+  /** Toque simple sobre una zona (o Intro con el teclado). */
   onPlace: (zone: Zone, el: Element) => void;
   onRemove: (key: string) => void;
+  /** Zonas nuevas atravesadas durante un trazo de pintado. */
+  onPaint: (zones: Zone[], el: (key: string) => Element | null) => void;
+  /** Fin de un trazo (para agrupar el deshacer). */
+  onStrokeEnd: () => void;
   locked: boolean;
   winning: number | null;
   wonKeys: Set<string> | null;
@@ -44,7 +49,51 @@ interface Props {
   onHover: (key: string | null) => void;
 }
 
-export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove, locked, winning, wonKeys, vertical, hoverKey, onHover }: Props) {
+export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove, onPaint, onStrokeEnd, locked, winning, wonKeys, vertical, hoverKey, onHover }: Props) {
+  const groupRef = useRef<SVGGElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const stroke = useRef<Stroke | null>(null);
+
+  /** Punto del puntero en coordenadas del tapete horizontal (sirve también con el tapete girado en móvil). */
+  const toBoard = (e: React.PointerEvent): { x: number; y: number } | null => {
+    const g = groupRef.current;
+    const m = g?.getScreenCTM();
+    if (!g || !m) return null;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+    return { x: p.x, y: p.y };
+  };
+  const elFor = (key: string): Element | null => svgRef.current?.querySelector(`[data-zone="${CSS.escape(key)}"]`) ?? null;
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>): void => {
+    if (locked || (e.pointerType === 'mouse' && e.button !== 0) || e.altKey || e.shiftKey) return;
+    const p = toBoard(e);
+    if (!p) return;
+    stroke.current = beginStroke(ZONES, p);
+    if (stroke.current) e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>): void => {
+    const p = toBoard(e);
+    if (!p) return;
+    if (e.pointerType !== 'mouse' || stroke.current) onHover(zoneAt(ZONES, p.x, p.y)?.key ?? null);
+    const s = stroke.current;
+    if (!s || locked) return;
+    const hits = advanceStroke(s, ZONES, p);
+    if (hits.length > 0) onPaint(hits, elFor);
+  };
+  const finish = (e: React.PointerEvent<SVGSVGElement>, cancelled: boolean): void => {
+    const s = stroke.current;
+    stroke.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    if (!s) return;
+    if (!s.dragging && !cancelled) {
+      const z = ZONES.find((x) => x.key === s.startKey);
+      const el = elFor(s.startKey);
+      if (z && el) onPlace(z, el);
+    }
+    onStrokeEnd();
+    if (e.pointerType !== 'mouse') onHover(null);
+  };
+
   const hovered = useMemo(() => {
     if (!hoverKey) return new Set<number>();
     const z = ZONES.find((x) => x.key === hoverKey);
@@ -72,13 +121,22 @@ export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove
 
   return (
     <svg
+      ref={svgRef}
       viewBox={vertical ? `-6 -6 ${BOARD_H + 12} ${BOARD_W + 12}` : `-6 -6 ${BOARD_W + 12} ${BOARD_H + 12}`}
       className="w-full select-none"
+      // Con el tapete activo, el gesto pinta en lugar de desplazar la página (ratón, táctil y lápiz).
+      style={{ touchAction: locked ? 'auto' : 'none' }}
       role="group"
       aria-label="Tapete de apuestas de la ruleta"
+      data-testid="roulette-board"
       onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={(e) => finish(e, false)}
+      onPointerCancel={(e) => finish(e, true)}
+      onPointerLeave={() => !stroke.current && onHover(null)}
     >
-      <g transform={vertical ? `translate(${BOARD_H} 0) rotate(90)` : undefined}>
+      <g ref={groupRef} transform={vertical ? `translate(${BOARD_H} 0) rotate(90)` : undefined}>
         {/* Fondo y líneas del tapete */}
         <rect x="0" y="0" width={BOARD_W} height={BOARD_H} rx="10" fill="#0c4430" stroke="#e8d9b0" strokeOpacity="0.85" strokeWidth="2" />
         <path d={`M${ZERO_W} 0 L0 ${numbersH / 2} L${ZERO_W} ${numbersH}`} fill="none" stroke="#e8d9b0" strokeOpacity="0.6" strokeWidth="1.5" />
@@ -154,14 +212,12 @@ export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove
             tabIndex={z.focusable && !locked ? 0 : -1}
             aria-label={`${z.label}${bets.get(z.key) ? `, apostado ${bets.get(z.key)!.amount}` : ''}`}
             aria-disabled={locked}
-            onPointerEnter={() => onHover(z.key)}
-            onPointerLeave={() => onHover(null)}
+            onPointerEnter={(e) => e.pointerType === 'mouse' && onHover(z.key)}
             onFocus={() => onHover(z.key)}
             onBlur={() => onHover(null)}
             onClick={(e) => {
-              if (locked) return;
-              if (e.altKey || e.shiftKey) onRemove(z.key);
-              else onPlace(z, e.currentTarget);
+              // Colocar ficha lo resuelve el gestor de punteros; aquí solo Alt/Mayús+clic para retirar.
+              if (!locked && (e.altKey || e.shiftKey)) onRemove(z.key);
             }}
             onContextMenu={(e) => {
               e.preventDefault();

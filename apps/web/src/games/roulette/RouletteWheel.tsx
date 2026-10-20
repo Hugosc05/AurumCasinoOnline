@@ -49,7 +49,7 @@ const WheelFace = memo(function WheelFace({ highlight }: { highlight: number | n
           <g key={n}>
             <path d={sector(R_NUM_IN, R_POCKET_OUT, a1, a2)} fill={COLORS[col]} stroke="#c9a85f" strokeWidth="1.2" />
             <path d={sector(R_POCKET_IN, R_NUM_IN, a1, a2)} fill={COLORS[col]} stroke="#d8bb74" strokeWidth="1.6" />
-            <path d={sector(R_POCKET_IN, R_NUM_IN, a1, a2)} fill="rgba(0,0,0,0.42)" />
+            <path d={sector(R_POCKET_IN, R_NUM_IN, a1, a2)} fill="url(#pocketDepth)" />
             {highlight === i && <path d={sector(R_POCKET_IN, R_POCKET_OUT, a1, a2)} fill="rgba(255,236,180,0.35)" stroke="#fff3cf" strokeWidth="2.5" />}
             <text
               x={tx}
@@ -67,6 +67,20 @@ const WheelFace = memo(function WheelFace({ highlight }: { highlight: number | n
           </g>
         );
       })}
+      {/* Separadores metálicos en relieve entre bolsillos (con brillo y sombra) */}
+      {WHEEL_ORDER.map((_, i) => {
+        const a = i * POCKET_DEG - POCKET_DEG / 2;
+        const [x1, y1] = polar(R_POCKET_IN, a);
+        const [x2, y2] = polar(R_NUM_IN, a);
+        return (
+          <g key={`f${i}`}>
+            <line x1={x1 + 1.2} y1={y1 + 1.2} x2={x2 + 1.2} y2={y2 + 1.2} stroke="rgba(0,0,0,0.55)" strokeWidth="3.2" />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="url(#fret)" strokeWidth="2.6" strokeLinecap="round" />
+          </g>
+        );
+      })}
+      <circle cx={C} cy={C} r={R_NUM_IN} fill="none" stroke="url(#gold)" strokeWidth="2.2" />
+      <circle cx={C} cy={C} r={R_POCKET_OUT} fill="none" stroke="url(#gold)" strokeWidth="2" />
       {/* Cono central y torreta */}
       <circle cx={C} cy={C} r={R_POCKET_IN} fill="url(#coneGrad)" stroke="#c9a85f" strokeWidth="2" />
       {Array.from({ length: 8 }, (_, i) => (
@@ -82,7 +96,14 @@ const WheelFace = memo(function WheelFace({ highlight }: { highlight: number | n
           </g>
         );
       })}
+      {/* Vetas de la madera del cono */}
+      {Array.from({ length: 9 }, (_, i) => (
+        <circle key={`g${i}`} cx={C} cy={C} r={R_CONE - 52 - i * 6.5} fill="none" stroke={i % 2 ? 'rgba(255,214,160,0.05)' : 'rgba(0,0,0,0.12)'} strokeWidth={i % 3 === 0 ? 2 : 1} />
+      ))}
+      <circle cx={C} cy={C} r="30" fill="url(#gold)" opacity="0.35" />
       <circle cx={C} cy={C} r="22" fill="url(#gold)" stroke="#6b5326" strokeWidth="1.5" />
+      <path d={`M${C} ${C - 22} L${C + 6} ${C - 44} L${C - 6} ${C - 44} Z`} fill="url(#gold)" opacity="0.9" />
+      <circle cx={C} cy={C - 46} r="5" fill="url(#gold)" stroke="#6b5326" strokeWidth="1" />
       <circle cx={C - 6} cy={C - 7} r="6" fill="rgba(255,255,255,0.55)" />
     </>
   );
@@ -106,6 +127,7 @@ interface Props {
 export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWheel({ highlight = null, idle = false, initialPocket = 0, className, label }, ref) {
   const wheelRef = useRef<SVGGElement>(null);
   const ballRef = useRef<SVGGElement>(null);
+  const shadowRef = useRef<SVGEllipseElement>(null);
   const state = useRef({ wheel: 0, ballRel: initialPocket * POCKET_DEG, radius: 0 });
   const raf = useRef<number | null>(null);
   const running = useRef<{ plan: SpinPlan; start: number; resolve: () => void; skip: boolean; loop: LoopHandle; lastTickPocket: number; dropped: boolean } | null>(null);
@@ -116,6 +138,12 @@ export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWhe
     const r = R_BALL_SEAT + (R_TRACK - R_BALL_SEAT) * s.radius;
     const [x, y] = polar(r, s.wheel + s.ballRel);
     ballRef.current?.setAttribute('transform', `translate(${x} ${y})`);
+    const sh = shadowRef.current;
+    if (sh) {
+      sh.setAttribute('cx', String(2 + s.radius * 4));
+      sh.setAttribute('cy', String(3 + s.radius * 6));
+      sh.setAttribute('rx', String(10 + s.radius * 3));
+    }
   };
 
   useEffect(() => {
@@ -247,6 +275,20 @@ export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWhe
           <stop offset="0.5" stopColor="#e8e8ea" />
           <stop offset="1" stopColor="#8d8f96" />
         </radialGradient>
+        <radialGradient id="pocketDepth" cx="50%" cy="50%" r="50%">
+          <stop offset="0.78" stopColor="#000" stopOpacity="0.2" />
+          <stop offset="0.93" stopColor="#000" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#000" stopOpacity="0.35" />
+        </radialGradient>
+        <linearGradient id="fret" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#8a8d96" />
+          <stop offset="0.5" stopColor="#fafbff" />
+          <stop offset="1" stopColor="#7c7f88" />
+        </linearGradient>
+        <radialGradient id="ballShadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor="#000" stopOpacity="0.6" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
+        </radialGradient>
         <radialGradient id="sheen" cx="35%" cy="25%" r="75%">
           <stop offset="0" stopColor="#fff" stopOpacity="0.16" />
           <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
@@ -255,7 +297,12 @@ export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWhe
       {/* Cuenco fijo */}
       <circle cx={C} cy={C} r={R_OUT + 6} fill="#0a0603" />
       <circle cx={C} cy={C} r={R_OUT} fill="url(#woodOuter)" stroke="#8e7340" strokeWidth="2" />
+      {Array.from({ length: 7 }, (_, i) => (
+        <circle key={`w${i}`} cx={C} cy={C} r={R_OUT - 4 - i * 2.4} fill="none" stroke={i % 2 ? 'rgba(255,200,140,0.05)' : 'rgba(0,0,0,0.18)'} strokeWidth="1" />
+      ))}
       <circle cx={C} cy={C} r={R_TRACK + 14} fill="url(#trackGrad)" stroke="#a88a4e" strokeWidth="1.2" />
+      {/* Brillo de la pista pulida */}
+      <path d={`M${polar(R_TRACK + 6, -60).join(' ')} A${R_TRACK + 6} ${R_TRACK + 6} 0 0 1 ${polar(R_TRACK + 6, 40).join(' ')}`} fill="none" stroke="rgba(255,240,210,0.16)" strokeWidth="8" strokeLinecap="round" />
       <circle cx={C} cy={C} r={R_POCKET_OUT + 18} fill="#1a110a" stroke="#6b5326" strokeWidth="1" />
       {diamonds.map((a) => {
         const [x, y] = polar(R_POCKET_OUT + 30, a);
@@ -267,8 +314,11 @@ export const RouletteWheel = forwardRef<WheelHandle, Props>(function RouletteWhe
       </g>
       {/* Bola */}
       <g ref={ballRef}>
-        <circle r="10" cy="3" fill="rgba(0,0,0,0.45)" />
+        {/* Sombra: más separada y difusa en la pista (la bola va más alta), pegada en el bolsillo */}
+        <ellipse ref={shadowRef} rx="11" ry="9" cx="3" cy="5" fill="url(#ballShadow)" />
+        {highlight !== null && <circle r="15" fill="none" stroke="#fff3cf" strokeWidth="2.5" className="motion-safe-only" style={{ animation: 'marquee-glow 0.9s ease-in-out infinite' }} />}
         <circle r="9" fill="url(#ballGrad)" />
+        <circle r="3" cx="-3" cy="-3" fill="#fff" opacity="0.85" />
       </g>
       <circle cx={C} cy={C} r={R_OUT} fill="url(#sheen)" pointerEvents="none" />
       {/* Indicador fijo */}

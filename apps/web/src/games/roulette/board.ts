@@ -106,3 +106,86 @@ export function buildZones(): Zone[] {
   add(inside('corner', [0, 1, 2, 3]), ZERO_W - E / 2, numbersH - E / 2, E, E, 'Cuadro 0-1-2-3');
   return z;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Pintado de apuestas por arrastre (lógica pura, independiente del DOM)      */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Categoría de pintado. Un trazo solo coloca fichas en zonas de la misma
+ * categoría que la zona donde empezó: si empiezas en un número, pintas
+ * plenos; si empiezas en una línea entre dos números, pintas caballos; si
+ * empiezas en un cruce, cuadros. Así, al pasar por encima de los bordes no se
+ * crean apuestas que no se querían, y cada zona conserva su regla real.
+ */
+export type PaintCategory = 'straight' | 'split' | 'street' | 'corner' | 'sixline' | 'outside';
+
+export function paintCategory(bet: RouletteBetSpec): PaintCategory {
+  if (bet.kind === 'straight' || bet.kind === 'split' || bet.kind === 'street' || bet.kind === 'corner' || bet.kind === 'sixline') return bet.kind;
+  return 'outside';
+}
+
+/** Zona bajo un punto (coordenadas del tapete horizontal). Las zonas finas de borde tienen prioridad. */
+export function zoneAt(zones: readonly Zone[], x: number, y: number): Zone | null {
+  for (let i = zones.length - 1; i >= 0; i -= 1) {
+    const z = zones[i]!;
+    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return z;
+  }
+  return null;
+}
+
+/**
+ * Zonas atravesadas por un segmento del puntero. Se muestrea cada pocos
+ * píxeles para no saltarse casillas cuando el movimiento es rápido.
+ */
+export function zonesAlong(zones: readonly Zone[], from: { x: number; y: number }, to: { x: number; y: number }, step = 4): Zone[] {
+  const out: Zone[] = [];
+  const seen = new Set<string>();
+  const dist = Math.hypot(to.x - from.x, to.y - from.y);
+  const n = Math.max(1, Math.ceil(dist / step));
+  for (let i = 0; i <= n; i += 1) {
+    const t = i / n;
+    const z = zoneAt(zones, from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+    if (z && !seen.has(z.key)) {
+      seen.add(z.key);
+      out.push(z);
+    }
+  }
+  return out;
+}
+
+/** Desplazamiento mínimo (px del tapete) para que un toque se convierta en trazo. */
+export const DRAG_THRESHOLD = 8;
+
+export interface Stroke {
+  category: PaintCategory;
+  /** Zonas ya tocadas en este trazo (no se repite ficha al quedarse encima). */
+  visited: Set<string>;
+  last: { x: number; y: number };
+  start: { x: number; y: number };
+  dragging: boolean;
+  startKey: string;
+}
+
+export function beginStroke(zones: readonly Zone[], p: { x: number; y: number }): Stroke | null {
+  const z = zoneAt(zones, p.x, p.y);
+  if (!z) return null;
+  return { category: paintCategory(z.bet), visited: new Set(), last: p, start: p, dragging: false, startKey: z.key };
+}
+
+/**
+ * Avanza el trazo hasta el punto `p` y devuelve las zonas nuevas sobre las
+ * que hay que actuar (colocar o borrar ficha). Mientras no se supere el
+ * umbral de arrastre no devuelve nada: un toque simple se resuelve al soltar.
+ */
+export function advanceStroke(stroke: Stroke, zones: readonly Zone[], p: { x: number; y: number }): Zone[] {
+  if (!stroke.dragging) {
+    if (Math.hypot(p.x - stroke.start.x, p.y - stroke.start.y) < DRAG_THRESHOLD) return [];
+    stroke.dragging = true;
+    stroke.last = stroke.start;
+  }
+  const hits = zonesAlong(zones, stroke.last, p).filter((z) => paintCategory(z.bet) === stroke.category && !stroke.visited.has(z.key));
+  for (const z of hits) stroke.visited.add(z.key);
+  stroke.last = p;
+  return hits;
+}

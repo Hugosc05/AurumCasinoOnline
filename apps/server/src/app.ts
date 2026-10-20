@@ -22,6 +22,7 @@ import { gameRoutes } from './routes/games';
 import { meRoutes } from './routes/me';
 import { publicRoutes } from './routes/public';
 import { adsCallbackRoute, adsRoutes } from './routes/ads';
+import { formationRoutes } from './routes/formations';
 import { AdsService, createAdProvider } from './ads/ads';
 
 export interface RunningApp {
@@ -100,6 +101,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
 
   app.use('/api', publicRoutes(ctx));
   app.use('/api/auth', authRoutes(ctx));
+  app.use('/api/me/formations', formationRoutes(ctx));
   app.use('/api/me', meRoutes(ctx));
   app.use('/api/games', gameRoutes(ctx));
   app.use('/api/admin', adminRoutes(ctx));

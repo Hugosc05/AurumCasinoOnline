@@ -47,13 +47,53 @@ test('ruleta: apostar, girar y liquidar', async ({ page }) => {
   await page.goto('/ruleta');
   await page.locator('[data-zone="red"]').click();
   await page.locator('[data-zone="straight:17"]').click();
-  await page.getByRole('button', { name: /Girar/ }).click();
+  await page.getByTestId('roulette-spin').click();
+  // Nunca gira sin confirmar: primero aparece el resumen.
+  await expect(page.getByTestId('confirm-list').locator('li')).toHaveCount(2);
+  await page.getByTestId('confirm-spin').click();
   await expect(page.getByText(/Gana|Sin premio|Recuperas/).first()).toBeVisible({ timeout: 15000 });
   const tx = await page.evaluate(() => fetch('/api/me/transactions').then((x) => x.json()));
   expect(tx.items.some((t: { reason: string; amount: number }) => t.reason === 'bet' && t.amount === -50)).toBe(true);
   expect(await balance(page)).toBeGreaterThanOrEqual(0);
   await page.goto('/perfil?tab=historial');
   await expect(page.getByText('Ruleta').first()).toBeVisible();
+});
+
+test('ruleta: pintar apuestas arrastrando, deshacer el trazo, guardar y cargar una formación', async ({ page }) => {
+  await register(page);
+  await fastMode(page);
+  await page.goto('/ruleta');
+  const center = async (key: string) => {
+    const b = (await page.locator(`[data-zone="${key}"]`).boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+  const a = await center('straight:3');
+  const b = await center('straight:12');
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 12 });
+  await page.mouse.move(a.x, a.y, { steps: 6 }); // volver por encima no duplica
+  await page.mouse.up();
+  await expect(page.getByText('Apuesta total').locator('..')).toContainText('100'); // 4 plenos × 25
+  // Deshacer quita el trazo entero.
+  await page.getByRole('button', { name: 'Deshacer' }).click();
+  await expect(page.getByText('Apuesta total').locator('..')).toHaveText(/Apuesta total\s*0\s*$/);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 12 });
+  await page.mouse.up();
+  await page.getByTestId('save-formation').click();
+  await page.getByLabel('Nombre').fill('Fila superior');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByTestId('formation-item')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Limpiar mesa' }).click();
+  await expect(page.getByText('Apuesta total').locator('..')).toHaveText(/Apuesta total\s*0\s*$/);
+  // Cargar coloca las fichas, pero no apuesta: el saldo no cambia hasta confirmar.
+  await page.getByTestId('formation-item').getByRole('button', { name: 'Cargar' }).click();
+  await expect(page.getByText('Apuesta total').locator('..')).toContainText('100');
+  expect(await balance(page)).toBe(10000);
+  await page.reload();
+  await expect(page.getByTestId('formation-item')).toContainText('Fila superior');
 });
 
 test('blackjack: repartir y jugar una mano completa', async ({ page }) => {

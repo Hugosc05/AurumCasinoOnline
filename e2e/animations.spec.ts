@@ -60,11 +60,13 @@ test('slots: los rodillos arrancan al pulsar, sin esperar, y se puede volver a g
   const moved = await page.evaluate(() => (window as unknown as { __moved: Promise<number> }).__moved);
   expect(moved).toBeLessThan(400);
   // Durante el giro el botón sirve para frenar.
+  // Si la tirada concede giros gratis (azar real), el botón pasa a «Jugar giro gratis»: también vale.
   await expect(page.getByRole('button', { name: 'Frenar los rodillos' })).toBeVisible();
   await page.getByRole('button', { name: 'Frenar los rodillos' }).click();
-  await expect(page.getByRole('button', { name: /Girar por/ })).toBeVisible({ timeout: 6000 });
+  await expect(page.getByRole('button', { name: /Girar por|Jugar giro gratis/ })).toBeVisible({ timeout: 6000 });
   await expect(page.getByText(/Sin premio esta vez|línea premiada|líneas premiadas|estrellas/).first()).toBeVisible({ timeout: 4000 });
-  // Se puede girar otra vez inmediatamente, aunque se esté mostrando el premio.
+  // Se puede girar otra vez inmediatamente, aunque se esté mostrando el premio (o el aviso de giros gratis).
+  await page.getByRole('button', { name: 'Cerrar aviso' }).click({ timeout: 500 }).catch(() => undefined);
   await page.getByRole('button', { name: /Girar por/ }).click();
   await expect(page.getByRole('button', { name: 'Frenar los rodillos' })).toBeVisible({ timeout: 1000 });
   await expect(page.getByRole('button', { name: /Girar por/ })).toBeVisible({ timeout: 8000 });
