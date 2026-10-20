@@ -26,7 +26,7 @@ export interface HandSummary {
 }
 
 export interface Snapshot {
-  table: { id: string; name: string; smallBlind: number; bigBlind: number; minBuyIn: number; maxBuyIn: number; maxSeats: number; enabled: boolean };
+  table: { id: string; name: string; smallBlind: number; bigBlind: number; minBuyIn: number; maxBuyIn: number; maxSeats: number; enabled: boolean; mode: 'bots' | 'public' | 'private'; roomId: string | null; chipMode: 'wallet' | 'room'; maxBots: number };
   seats: (SeatView | null)[];
   hand: PokerPublicHand | null;
   you: { seat: number | null; legal: LegalActions | null };

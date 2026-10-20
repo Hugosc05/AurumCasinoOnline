@@ -21,6 +21,8 @@ const LeaderboardPage = lazy(() => import('./pages/Leaderboard'));
 const BotsPage = lazy(() => import('./pages/Bots'));
 const RecoveryPage = lazy(() => import('./pages/Recovery'));
 const FriendsPage = lazy(() => import('./pages/Friends'));
+const RoomsPage = lazy(() => import('./rooms/RoomsPage'));
+const RoomPage = lazy(() => import('./rooms/RoomPage'));
 const PromotionsPage = lazy(() => import('./pages/Promotions'));
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 const CardGallery = lazy(() => import('./dev/CardGallery'));
@@ -60,6 +62,8 @@ export function App() {
           <Route path="bots" element={<BotsPage />} />
           <Route path="sin-saldo" element={<RequireAuth><RecoveryPage /></RequireAuth>} />
           <Route path="amigos" element={<RequireAuth><FriendsPage /></RequireAuth>} />
+          <Route path="salas" element={<RequireAuth><RoomsPage /></RequireAuth>} />
+          <Route path="salas/:roomId" element={<RequireAuth><RoomPage /></RequireAuth>} />
           <Route path="promociones" element={<PromotionsPage />} />
           <Route path="reglas" element={<InfoPage kind="rules" />} />
           <Route path="ayuda" element={<InfoPage kind="help" />} />

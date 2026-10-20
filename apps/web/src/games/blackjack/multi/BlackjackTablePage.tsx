@@ -114,8 +114,9 @@ function SeatPlate({ seat, index, n, g, isTurn, onSit, canSit }: {
   );
 }
 
-export default function BlackjackTablePage() {
-  const { tableId = '' } = useParams();
+export default function BlackjackTablePage({ tableId: tableIdProp, embedded = false }: { tableId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const tableId = tableIdProp ?? params.tableId ?? '';
   const nav = useNavigate();
   const { user, speed, effects, motion: level } = useSession();
   const { notify } = useNotify();
@@ -352,10 +353,10 @@ export default function BlackjackTablePage() {
   else status = 'Turno del crupier';
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-6 sm:px-6">
+    <div className={embedded ? '' : 'mx-auto max-w-6xl px-3 py-6 sm:px-6'}>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Link to="/blackjack" className="inline-flex items-center gap-1.5 text-sm text-niebla hover:text-marfil"><ArrowLeft className="h-4 w-4" /> Mesas</Link>
-        <h1 className="text-3xl text-marfil sm:text-4xl">{snap.table.name}</h1>
+        {!embedded && <Link to="/blackjack" className="inline-flex items-center gap-1.5 text-sm text-niebla hover:text-marfil"><ArrowLeft className="h-4 w-4" /> Mesas</Link>}
+        {embedded ? <h2 className="text-2xl text-marfil">Mesa</h2> : <h1 className="text-3xl text-marfil sm:text-4xl">{snap.table.name}</h1>}
         <Badge tone={mode.tone}>{mode.label}</Badge>
         <span className="text-sm text-niebla">Apuesta {credits(snap.table.minBet)} – {credits(snap.table.maxBet)}</span>
         <span className={cx('ml-auto inline-flex items-center gap-1.5 text-xs', connected ? 'text-exito' : 'text-aviso')} role="status">

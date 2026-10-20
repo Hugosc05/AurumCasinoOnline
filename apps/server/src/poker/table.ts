@@ -43,6 +43,13 @@ export interface TableConfig {
   maxBots: number;
   targetPlayers: number;
   enabled: boolean;
+  /** Sala privada a la que pertenece la mesa (no aparece en el salón público). */
+  roomId?: string | null;
+  /**
+   * wallet: las fichas salen del monedero y vuelven al levantarse (como en las mesas públicas).
+   * room: fichas propias de la sala, iguales para todos y sin tocar el monedero.
+   */
+  chipMode?: 'wallet' | 'room';
 }
 
 interface SeatState {
@@ -123,6 +130,12 @@ export class PokerTable {
   handsPlayed = 0;
   lastError: string | null = null;
   private stopped = false;
+  /** Fichas de sala de quien se levanta (para que al volver no reciba fichas nuevas). */
+  private roomStacks = new Map<string, number>();
+
+  private get roomChips(): boolean {
+    return this.cfg.chipMode === 'room';
+  }
 
   constructor(
     public cfg: TableConfig,
@@ -170,7 +183,7 @@ export class PokerTable {
       enabled: this.cfg.enabled,
       handsPlayed: this.handsPlayed,
       free: this.seats.filter((x) => x === null).length,
-      mode: this.cfg.maxBots > 0 ? ('bots' as const) : ('public' as const),
+      mode: this.cfg.roomId ? ('private' as const) : this.cfg.maxBots > 0 ? ('bots' as const) : ('public' as const),
     };
   }
 
@@ -189,7 +202,10 @@ export class PokerTable {
         maxBuyIn: this.cfg.maxBuyIn,
         maxSeats: this.cfg.maxSeats,
         enabled: this.cfg.enabled,
-        mode: this.cfg.maxBots > 0 ? ('bots' as const) : ('public' as const),
+        mode: this.cfg.roomId ? ('private' as const) : this.cfg.maxBots > 0 ? ('bots' as const) : ('public' as const),
+        roomId: this.cfg.roomId ?? null,
+        chipMode: this.cfg.chipMode ?? 'wallet',
+        maxBots: this.cfg.maxBots,
       },
       seats: this.seats.map((s, i) => {
         if (!s) return null;
@@ -215,7 +231,8 @@ export class PokerTable {
       actionCount: this.actionCount,
       deadline: this.deadline,
       history: this.history.slice(0, 10),
-      demo: this.humanCount() === 0,
+      // «Solo juegan bots» solo es cierto si hay bots sentados (nunca en una sala vacía sin bots).
+      demo: this.humanCount() === 0 && this.seats.some((s) => s?.kind === 'bot'),
       seq: this.seq,
       serverTime: Date.now(),
     };
@@ -256,7 +273,11 @@ export class PokerTable {
   sit(userId: string, username: string, buyIn: number, preferredSeat?: number): number {
     if (!this.cfg.enabled) throw new AppError(503, 'TABLE_DISABLED', 'Mesa desactivada');
     if (this.hasUser(userId)) throw new AppError(409, 'ALREADY_SEATED', 'Ya estás sentado en esta mesa');
-    if (!Number.isInteger(buyIn) || buyIn < this.cfg.minBuyIn || buyIn > this.cfg.maxBuyIn) {
+    if (this.roomChips) {
+      // Fichas de sala: todos empiezan igual; quien vuelve recupera las que tenía.
+      buyIn = this.roomStacks.get(userId) ?? this.cfg.maxBuyIn;
+      if (buyIn <= 0) throw new AppError(409, 'NO_ROOM_CHIPS', 'Te has quedado sin fichas de esta sala');
+    } else if (!Number.isInteger(buyIn) || buyIn < this.cfg.minBuyIn || buyIn > this.cfg.maxBuyIn) {
       throw new AppError(400, 'INVALID_BUYIN', `La entrada debe estar entre ${this.cfg.minBuyIn} y ${this.cfg.maxBuyIn}`);
     }
     let seat = preferredSeat !== undefined && this.seats[preferredSeat] === null ? preferredSeat : this.seats.findIndex((s) => s === null);
@@ -269,13 +290,15 @@ export class PokerTable {
       }
     }
     if (seat === -1) throw new AppError(409, 'TABLE_FULL', 'Mesa completa. Inténtalo al terminar la mano.');
-    this.db.tx(() => {
-      debit(this.db, userId, buyIn, 'poker_buyin', { meta: { table: this.cfg.id } });
-      this.db.run(
-        'INSERT INTO poker_seats (table_id, seat, user_id, stack, joined_at) VALUES (?, ?, ?, ?, ?)',
-        this.cfg.id, seat, userId, buyIn, nowIso(),
-      );
-    });
+    if (!this.roomChips) {
+      this.db.tx(() => {
+        debit(this.db, userId, buyIn, 'poker_buyin', { meta: { table: this.cfg.id } });
+        this.db.run(
+          'INSERT INTO poker_seats (table_id, seat, user_id, stack, joined_at) VALUES (?, ?, ?, ?, ?)',
+          this.cfg.id, seat, userId, buyIn, nowIso(),
+        );
+      });
+    }
     this.seats[seat] = {
       kind: 'human', id: userId, name: username, stack: buyIn, connected: true, disconnectedAt: null,
       timeouts: 0, leaving: false, joinedAt: Date.now(),
@@ -310,7 +333,11 @@ export class PokerTable {
     const s = this.seats[seat];
     if (!s) return;
     this.seats[seat] = null;
-    if (s.kind === 'human') {
+    if (s.kind === 'human' && this.roomChips) {
+      this.roomStacks.set(s.id, s.stack);
+      this.hub.sendToUser(s.id, { t: 'poker.left', tableId: this.cfg.id, cashOut: 0, roomChips: s.stack });
+      this.hub.emitLocal('seat', s.id);
+    } else if (s.kind === 'human') {
       this.db.tx(() => {
         if (s.stack > 0) credit(this.db, s.id, s.stack, 'poker_cashout', { meta: { table: this.cfg.id } });
         this.db.run('DELETE FROM poker_seats WHERE table_id = ? AND user_id = ?', this.cfg.id, s.id);
@@ -632,6 +659,8 @@ export class PokerTable {
             continue;
           }
           if (p.contributed <= 0 && won <= 0) continue;
+          // Con fichas de sala no hay nada que liquidar en el monedero ni en las estadísticas.
+          if (this.roomChips) continue;
           // Ronda "settled" sin movimiento de monedero: las fichas están en la mesa.
           const roundId = randomUUID();
           let category = -1;
@@ -670,6 +699,7 @@ export class PokerTable {
   }
 
   private persistHumanStacks(): void {
+    if (this.roomChips) return;
     for (const s of this.seats) {
       if (s?.kind === 'human') this.db.run('UPDATE poker_seats SET stack = ? WHERE table_id = ? AND user_id = ?', s.stack, this.cfg.id, s.id);
     }

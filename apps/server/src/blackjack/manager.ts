@@ -53,6 +53,17 @@ function parseMsg<T extends z.ZodType>(schema: T, msg: unknown): z.infer<T> {
 export class BlackjackManager {
   readonly tables = new Map<string, BlackjackTable>();
   private lobbyTimer: NodeJS.Timeout | null = null;
+  /** Permiso para mesas de salas privadas (lo decide el servicio de salas, en el servidor). */
+  private access: (tableId: string, userId: string | null) => boolean = () => true;
+
+  setAccess(fn: (tableId: string, userId: string | null) => boolean): void {
+    this.access = fn;
+  }
+
+  private assertAccess(tableId: string, userId: string | null): void {
+    const t = this.tables.get(tableId);
+    if (t?.cfg.roomId && !this.access(tableId, userId)) throw new AppError(403, 'ROOM_FORBIDDEN', 'Esta mesa es de una sala privada a la que no perteneces');
+  }
   private lobbyWatchers = new Set<RtClient>();
 
   constructor(
@@ -86,6 +97,7 @@ export class BlackjackManager {
       for (const t of this.tables.values()) {
         if (t.cfg.id !== m.tableId && t.hasUser(c.userId!)) throw new AppError(409, 'ALREADY_SEATED', `Ya estás sentado en ${t.cfg.name}`);
       }
+      this.assertAccess(m.tableId, c.userId);
       const table = this.get(m.tableId);
       table.sit(c.userId!, c.username!, m.seat);
       if (c.bjWatching !== table.cfg.id) this.watch(c, table.cfg.id);
@@ -154,6 +166,7 @@ export class BlackjackManager {
 
   watch(c: RtClient, id: string): void {
     const table = this.get(id);
+    this.assertAccess(id, c.userId);
     if (c.bjWatching && c.bjWatching !== id) this.tables.get(c.bjWatching)?.unwatch(c);
     if (c.userId) table.setConnected(c.userId, true);
     table.watch(c);
@@ -166,7 +179,8 @@ export class BlackjackManager {
   }
 
   lobby() {
-    return [...this.tables.values()].filter((t) => t.cfg.enabled).map((t) => t.summary());
+    // Las mesas de salas privadas nunca aparecen en el salón público.
+    return [...this.tables.values()].filter((t) => t.cfg.enabled && !t.cfg.roomId).map((t) => t.summary());
   }
 
   private scheduleLobby(): void {
@@ -176,6 +190,20 @@ export class BlackjackManager {
       const tables = this.lobby();
       for (const c of this.lobbyWatchers) this.hub.send(c, { t: 'bj.lobby', tables });
     }, 400);
+  }
+
+  addRoomTable(cfg: BjTableConfig): BlackjackTable {
+    const t = new BlackjackTable(cfg, this.db, this.hub, this.botPool, this.timings);
+    this.tables.set(cfg.id, t);
+    return t;
+  }
+
+  /** Cierre controlado: anula las rondas abiertas devolviendo las apuestas y elimina la mesa. */
+  removeRoomTable(id: string): void {
+    const t = this.tables.get(id);
+    if (!t?.cfg.roomId) return;
+    t.shutdown();
+    this.tables.delete(id);
   }
 
   diagnostics() {

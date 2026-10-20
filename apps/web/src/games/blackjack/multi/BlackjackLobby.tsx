@@ -1,6 +1,6 @@
 import { Bot, Eye, Lock, User, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { GameHeader } from '../../../components/GameKit';
 import { Badge, Button, EmptyState, Spinner } from '../../../components/ui';
 import { api } from '../../../lib/api';
@@ -11,6 +11,7 @@ import type { LobbyTable } from './model';
 export const MODE_INFO = {
   bots: { label: 'Demo con bots', tone: 'muted' as const, text: 'Bots automatizados ocupan asientos libres. Puedes sentarte en cualquier momento.' },
   public: { label: 'Pública · solo personas', tone: 'green' as const, text: 'Sin bots: solo juegan las personas que se sienten.' },
+  private: { label: 'Sala privada', tone: 'gold' as const, text: 'Solo entran los miembros de la sala, con código o invitación.' },
 };
 
 const PHASE_TEXT: Record<LobbyTable['phase'], string> = {
@@ -41,7 +42,9 @@ export default function BlackjackLobby() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <GameHeader title="Blackjack" subtitle="Seis barajas, el crupier se planta en 17, blackjack 3 a 2. Mismas reglas en todas las mesas." />
+      <GameHeader title="Blackjack" subtitle="Seis barajas, el crupier se planta en 17, blackjack 3 a 2. Mismas reglas en todas las mesas.">
+        <Button variant="outline" size="sm" onClick={() => nav('/salas?crear=blackjack')}>Crear sala privada</Button>
+      </GameHeader>
       {!enabled && <p className="mb-4 rounded-xl border border-aviso/40 bg-aviso/10 p-3 text-sm text-aviso">El blackjack está desactivado temporalmente por la administración.</p>}
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -96,7 +99,7 @@ export default function BlackjackLobby() {
 
       <div className="mt-8 grid gap-3 text-sm text-niebla md:grid-cols-2">
         <p className="flex gap-2"><Bot className="mt-0.5 h-4 w-4 shrink-0" /> Los bots son jugadores automatizados del casino, no personas. Llevan siempre la etiqueta BOT, apuestan dentro de los límites y juegan con estrategias legales. No ven las cartas ocultas y no influyen en las reglas del crupier.</p>
-        <p className="flex gap-2"><Lock className="mt-0.5 h-4 w-4 shrink-0" /> Las salas privadas con invitación para jugar con amigos se crean desde la sección de salas privadas.</p>
+        <p className="flex gap-2"><Lock className="mt-0.5 h-4 w-4 shrink-0" /> <span>¿Con amigos? <Link to="/salas?crear=blackjack" className="text-oro-claro hover:underline">Crea una sala privada</Link> y comparte el código.</span></p>
       </div>
     </div>
   );

@@ -45,7 +45,9 @@ export default function PokerLobby() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <GameHeader title="Texas Hold'em" subtitle="Mesas en tiempo real. Si faltan jugadores, se sientan bots identificados como tales." />
+      <GameHeader title="Texas Hold'em" subtitle="Mesas en tiempo real. Si faltan jugadores, se sientan bots identificados como tales.">
+        <Button variant="outline" size="sm" onClick={() => nav('/salas?crear=poker')}>Crear sala privada</Button>
+      </GameHeader>
       {!enabled && <p className="mb-4 rounded-xl border border-aviso/40 bg-aviso/10 p-3 text-sm text-aviso">El póker está desactivado temporalmente por la administración.</p>}
       {!tables ? (
         <Spinner />

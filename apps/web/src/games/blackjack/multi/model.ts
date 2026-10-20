@@ -28,7 +28,7 @@ export interface MultiRoundHand {
 }
 
 export interface MultiSnapshot {
-  table: { id: string; name: string; minBet: number; maxBet: number; maxSeats: number; enabled: boolean; mode: 'bots' | 'public' };
+  table: { id: string; name: string; minBet: number; maxBet: number; maxSeats: number; enabled: boolean; mode: 'bots' | 'public' | 'private'; roomId: string | null; maxBots: number };
   phase: 'idle' | 'betting' | 'playing' | 'settled';
   roundNo: number;
   seats: (MultiSeat | null)[];
@@ -70,7 +70,7 @@ export interface LobbyTable {
   free: number;
   watchers: number;
   phase: MultiSnapshot['phase'];
-  mode: 'bots' | 'public';
+  mode: 'bots' | 'public' | 'private';
   roundsPlayed: number;
 }
 

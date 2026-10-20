@@ -41,6 +41,8 @@ export interface BjTableConfig {
   maxBots: number;
   targetPlayers: number;
   enabled: boolean;
+  /** Sala privada a la que pertenece la mesa (no aparece en el salón público). */
+  roomId?: string | null;
 }
 
 export interface BjTimings {
@@ -179,7 +181,8 @@ export class BlackjackTable {
     return this.phase === 'playing' && !!this.state && this.state.seats.some((s) => s.seat === seat);
   }
 
-  mode(): 'bots' | 'public' {
+  mode(): 'bots' | 'public' | 'private' {
+    if (this.cfg.roomId) return 'private';
     return this.cfg.maxBots > 0 ? 'bots' : 'public';
   }
 
@@ -224,6 +227,8 @@ export class BlackjackTable {
         maxSeats: this.seats.length,
         enabled: this.cfg.enabled,
         mode: this.mode(),
+        roomId: this.cfg.roomId ?? null,
+        maxBots: this.cfg.maxBots,
       },
       phase: this.phase,
       roundNo: this.roundNo,

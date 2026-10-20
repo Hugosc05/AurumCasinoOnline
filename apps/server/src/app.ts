@@ -25,6 +25,8 @@ import { adsCallbackRoute, adsRoutes } from './routes/ads';
 import { formationRoutes } from './routes/formations';
 import { socialRoutes } from './routes/social';
 import { SocialService } from './social/social';
+import { RoomService } from './rooms/rooms';
+import { roomRoutes } from './routes/rooms';
 import { AdsService, createAdProvider } from './ads/ads';
 
 export interface RunningApp {
@@ -64,9 +66,11 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     for (const t of poker.tables.values()) if (t.hasUser(userId)) return 'poker';
     return blackjack.seatedTable(userId) ? 'blackjack' : null;
   });
-  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, startedAt: Date.now() };
+  const rooms = new RoomService(database, realtime, poker, blackjack, social);
+  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, rooms, startedAt: Date.now() };
   poker.init();
   blackjack.init();
+  rooms.init();
 
   const app = express();
   app.disable('x-powered-by');
@@ -114,6 +118,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   app.use('/api/admin', adminRoutes(ctx));
   app.use('/api/ads', adsRoutes(ctx));
   app.use('/api/social', socialRoutes(ctx));
+  app.use('/api/rooms', roomRoutes(ctx));
   app.use('/api', (_req, _res, next) => next(notFound('Ruta de API no encontrada')));
 
   // Producción: el servidor entrega también el frontend compilado (un único proceso, un único puerto).
@@ -140,6 +145,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     server,
     async close() {
       clearInterval(sessionSweep);
+      rooms.shutdown();
       poker.shutdown();
       blackjack.shutdown();
       realtime.close();

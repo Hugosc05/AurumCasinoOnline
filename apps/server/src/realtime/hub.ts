@@ -62,6 +62,8 @@ export class RealtimeHub {
   private heartbeat: NodeJS.Timeout | null = null;
   private msgLimiter = new RateLimiter(40, 5_000);
   private presenceTimer: NodeJS.Timeout | null = null;
+  /** Al apagar, los cierres de socket ya no notifican a nadie (la base de datos se cierra después). */
+  private closing = false;
 
   constructor(private readonly db: Database, private readonly config: AppConfig) {}
 
@@ -151,6 +153,7 @@ export class RealtimeHub {
     ws.on('message', (data) => this.onMessage(client, data.toString()));
     ws.on('close', () => {
       this.clients.delete(client);
+      if (this.closing) return;
       for (const fn of this.disconnectListeners) {
         try {
           fn(client);
@@ -253,6 +256,7 @@ export class RealtimeHub {
   }
 
   close(): void {
+    this.closing = true;
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.presenceTimer) clearTimeout(this.presenceTimer);
     for (const c of this.clients) c.ws.terminate();

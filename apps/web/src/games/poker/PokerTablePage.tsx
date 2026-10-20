@@ -186,8 +186,9 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
   );
 }
 
-export default function PokerTablePage() {
-  const { tableId = '' } = useParams();
+export default function PokerTablePage({ tableId: tableIdProp, embedded = false }: { tableId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const tableId = tableIdProp ?? params.tableId ?? '';
   const nav = useNavigate();
   const { user, speed, effects, prefs, updatePrefs } = useSession();
   const assistMode: AssistMode = prefs.pokerAssist ?? 'beginner';
@@ -387,6 +388,11 @@ export default function PokerTablePage() {
       return;
     }
     if (!snap) return;
+    if (snap.table.chipMode === 'room') {
+      // Fichas de sala: iguales para todos y sin tocar el saldo.
+      socket.send({ t: 'poker.sit', tableId, buyIn: snap.table.maxBuyIn });
+      return;
+    }
     const cap = user.unlimited ? snap.table.maxBuyIn : Math.min(snap.table.maxBuyIn, user.balance ?? 0);
     if (cap < snap.table.minBuyIn) {
       notify('error', `Necesitas al menos ${credits(snap.table.minBuyIn)} créditos para sentarte aquí.`);
@@ -417,10 +423,11 @@ export default function PokerTablePage() {
   if (!snap) return <Spinner label="Conectando con la mesa…" />;
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-6 sm:px-6">
+    <div className={embedded ? '' : 'mx-auto max-w-6xl px-3 py-6 sm:px-6'}>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Link to="/poker" className="inline-flex items-center gap-1.5 text-sm text-niebla hover:text-marfil"><ArrowLeft className="h-4 w-4" /> Mesas</Link>
-        <h1 className="text-3xl text-marfil sm:text-4xl">{snap.table.name}</h1>
+        {!embedded && <Link to="/poker" className="inline-flex items-center gap-1.5 text-sm text-niebla hover:text-marfil"><ArrowLeft className="h-4 w-4" /> Mesas</Link>}
+        {embedded ? <h2 className="text-2xl text-marfil">Mesa</h2> : <h1 className="text-3xl text-marfil sm:text-4xl">{snap.table.name}</h1>}
+        {snap.table.chipMode === 'room' && <span className="rounded-full border border-oro/40 px-2 py-0.5 text-xs text-oro-claro">Fichas de sala</span>}
         <span className="text-sm text-niebla">Ciegas {credits(snap.table.smallBlind)}/{credits(snap.table.bigBlind)}</span>
         <span className={cx('ml-auto inline-flex items-center gap-1.5 text-xs', connected ? 'text-exito' : 'text-aviso')}>
           {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />} {connected ? 'En directo' : 'Reconectando…'}
