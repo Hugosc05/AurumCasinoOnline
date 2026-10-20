@@ -28,6 +28,7 @@ export function meRoutes(ctx: AppContext): Router {
     const user = req.user!;
     const prefs = { ...readPrefs(user.prefs_json), ...patch };
     db.run('UPDATE users SET prefs_json = ? WHERE id = ?', JSON.stringify(prefs), user.id);
+    if (patch.invisible !== undefined) ctx.social.presenceChanged(user.id);
     res.json({ preferences: prefs });
   });
 

@@ -23,6 +23,8 @@ import { meRoutes } from './routes/me';
 import { publicRoutes } from './routes/public';
 import { adsCallbackRoute, adsRoutes } from './routes/ads';
 import { formationRoutes } from './routes/formations';
+import { socialRoutes } from './routes/social';
+import { SocialService } from './social/social';
 import { AdsService, createAdProvider } from './ads/ads';
 
 export interface RunningApp {
@@ -57,7 +59,12 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     betweenRoundsMs: fast ? 0 : 2_500,
   }, bots);
   const ads = new AdsService(database, config, createAdProvider(config));
-  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, startedAt: Date.now() };
+  const social = new SocialService(database, realtime);
+  social.setSeatLookup((userId) => {
+    for (const t of poker.tables.values()) if (t.hasUser(userId)) return 'poker';
+    return blackjack.seatedTable(userId) ? 'blackjack' : null;
+  });
+  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, startedAt: Date.now() };
   poker.init();
   blackjack.init();
 
@@ -106,6 +113,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   app.use('/api/games', gameRoutes(ctx));
   app.use('/api/admin', adminRoutes(ctx));
   app.use('/api/ads', adsRoutes(ctx));
+  app.use('/api/social', socialRoutes(ctx));
   app.use('/api', (_req, _res, next) => next(notFound('Ruta de API no encontrada')));
 
   // Producción: el servidor entrega también el frontend compilado (un único proceso, un único puerto).

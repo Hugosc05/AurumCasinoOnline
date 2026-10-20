@@ -4,6 +4,7 @@ import type { PokerManager } from './poker/manager';
 import type { BlackjackManager } from './blackjack/manager';
 import type { BotPool } from './bots/pool';
 import type { AdsService } from './ads/ads';
+import type { SocialService } from './social/social';
 import type { RealtimeHub } from './realtime/hub';
 
 export interface AppContext {
@@ -14,5 +15,6 @@ export interface AppContext {
   blackjack: BlackjackManager;
   bots: BotPool;
   ads: AdsService;
+  social: SocialService;
   startedAt: number;
 }

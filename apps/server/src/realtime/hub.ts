@@ -56,6 +56,9 @@ export class RealtimeHub {
   private nextId = 1;
   private handlers = new Map<string, Handler>();
   private disconnectListeners: ((c: RtClient) => void)[] = [];
+  private connectListeners: ((c: RtClient) => void)[] = [];
+  /** Avisos internos entre servicios (p. ej., un usuario se sienta o se levanta de una mesa). */
+  private local = new Map<string, Set<(userId: string) => void>>();
   private heartbeat: NodeJS.Timeout | null = null;
   private msgLimiter = new RateLimiter(40, 5_000);
   private presenceTimer: NodeJS.Timeout | null = null;
@@ -68,6 +71,29 @@ export class RealtimeHub {
 
   onDisconnect(fn: (c: RtClient) => void): void {
     this.disconnectListeners.push(fn);
+  }
+
+  onConnect(fn: (c: RtClient) => void): void {
+    this.connectListeners.push(fn);
+  }
+
+  onLocal(event: 'seat', fn: (userId: string) => void): void {
+    let set = this.local.get(event);
+    if (!set) {
+      set = new Set();
+      this.local.set(event, set);
+    }
+    set.add(fn);
+  }
+
+  emitLocal(event: 'seat', userId: string): void {
+    for (const fn of this.local.get(event) ?? []) {
+      try {
+        fn(userId);
+      } catch (err) {
+        logger.error('Error en un aviso interno', err);
+      }
+    }
   }
 
   attach(server: Server): void {
@@ -138,6 +164,13 @@ export class RealtimeHub {
       /* el cierre se gestiona en 'close' */
     });
     this.send(client, { t: 'hello', userId: client.userId, online: this.onlineCount() });
+    for (const fn of this.connectListeners) {
+      try {
+        fn(client);
+      } catch (err) {
+        logger.error('Error en conexión WS', err);
+      }
+    }
     this.schedulePresence();
   }
 

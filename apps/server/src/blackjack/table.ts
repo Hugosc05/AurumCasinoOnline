@@ -325,6 +325,7 @@ export class BlackjackTable {
       missed: 0, timeouts: 0, leaving: false, bet: null, roundId: null,
     };
     logger.info('Jugador sentado en mesa de blackjack', { table: this.cfg.id, seat });
+    this.hub.emitLocal('seat', userId);
     this.markExcessBots();
     this.broadcast([{ type: 'seat', seat }]);
     this.ensureRunning();
@@ -354,6 +355,7 @@ export class BlackjackTable {
     if (s.kind === 'human') {
       if (s.roundId) this.voidRound(s.roundId, 'left_before_deal');
       this.hub.sendToUser(s.id, { t: 'bj.left', tableId: this.cfg.id });
+      this.hub.emitLocal('seat', s.id);
     } else {
       this.bots.release(s.id, s.stack + (s.bet ?? 0));
     }

@@ -1,10 +1,11 @@
 import { AnimatePresence, animate, motion } from 'motion/react';
-import { Coins, LogOut, Menu, Settings2, Shield, User as UserIcon, Volume2, VolumeX, X } from 'lucide-react';
+import { Coins, DoorOpen, LogOut, Menu, Settings2, Shield, User as UserIcon, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { credits, cx } from '../lib/format';
 import { socket, type WsStatus } from '../lib/ws';
 import { LOW_BALANCE } from '../lib/economy';
+import { NotificationBell } from '../social/NotificationBell';
 import { useSession } from '../state/session';
 import { Button } from './ui';
 
@@ -142,6 +143,7 @@ function Header() {
           {user ? (
             <>
               <BalancePill />
+              <NotificationBell />
               <div className="relative hidden sm:block">
                 <button
                   onClick={() => setMenu((m) => !m)}
@@ -165,6 +167,8 @@ function Header() {
                         Sesión de <span className="text-marfil">{user.username}</span>
                       </p>
                       <MenuLink to="/perfil" icon={<UserIcon className="h-4 w-4" />}>Perfil e historial</MenuLink>
+                      <MenuLink to="/amigos" icon={<Users className="h-4 w-4" />}>Amigos</MenuLink>
+                      <MenuLink to="/salas" icon={<DoorOpen className="h-4 w-4" />}>Salas privadas</MenuLink>
                       <MenuLink to="/perfil?tab=ajustes" icon={<Settings2 className="h-4 w-4" />}>Sonido y animaciones</MenuLink>
                       {user.role === 'admin' && <MenuLink to="/admin" icon={<Shield className="h-4 w-4" />}>Administración</MenuLink>}
                       <button
@@ -211,7 +215,7 @@ function Header() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              {[...NAV, { to: '/blackjack', label: 'Blackjack' }, { to: '/ruleta', label: 'Ruleta' }, { to: '/slots', label: 'Slots' }].map((n) => (
+              {[...NAV, { to: '/blackjack', label: 'Blackjack' }, { to: '/ruleta', label: 'Ruleta' }, { to: '/slots', label: 'Slots' }, ...(user ? [{ to: '/amigos', label: 'Amigos' }, { to: '/salas', label: 'Salas privadas' }] : [])].map((n) => (
                 <NavLink key={n.to} to={n.to} end={'end' in n} className={({ isActive }) => cx('rounded-lg px-3 py-2.5', isActive ? 'bg-white/5 text-oro-claro' : 'text-marfil')}>
                   {n.label}
                 </NavLink>

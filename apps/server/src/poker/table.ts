@@ -282,6 +282,7 @@ export class PokerTable {
     };
     this.hub.sendToUser(userId, { t: 'balance', ...getBalance(this.db, userId) });
     logger.info('Jugador sentado en mesa de póker', { table: this.cfg.id, seat });
+    this.hub.emitLocal('seat', userId);
     // Si sobran bots respecto al objetivo, uno abandonará al terminar la mano.
     this.markExcessBots();
     this.broadcastSnapshot();
@@ -316,6 +317,7 @@ export class PokerTable {
       });
       this.hub.sendToUser(s.id, { t: 'balance', ...getBalance(this.db, s.id) });
       this.hub.sendToUser(s.id, { t: 'poker.left', tableId: this.cfg.id, cashOut: s.stack });
+      this.hub.emitLocal('seat', s.id);
     } else {
       this.bots.release(s.id, s.stack);
     }

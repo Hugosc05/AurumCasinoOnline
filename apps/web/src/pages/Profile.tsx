@@ -153,6 +153,11 @@ export default function ProfilePage() {
               <p className="mt-2 text-xs text-niebla">Principiante explica cada combinación y las reglas; estándar muestra la combinación, las cartas iluminadas y la probabilidad de mejorar; avanzado, solo la combinación. Nunca decide por ti.</p>
             </div>
             <div>
+              <p className="mb-2 text-marfil">Presencia</p>
+              <Segmented label="Presencia para tus amigos" value={prefs.invisible ? 'invisible' : 'visible'} onChange={(v) => void updatePrefs({ invisible: v === 'invisible' })} options={[{ value: 'visible', label: 'Visible' }, { value: 'invisible', label: 'Invisible' }]} />
+              <p className="mt-2 text-xs text-niebla">En modo invisible tus amigos te ven siempre desconectado y no saben si estás jugando.</p>
+            </div>
+            <div>
               <p className="mb-2 text-marfil">Sonido <span className="text-xs text-niebla">(desactivado por defecto)</span></p>
               <div className="flex flex-wrap items-center gap-4">
                 <Segmented label="Sonido" value={prefs.sound ? 'on' : 'off'} onChange={(v) => void updatePrefs({ sound: v === 'on' })} options={[{ value: 'on', label: 'Activado' }, { value: 'off', label: 'Silencio' }]} />
