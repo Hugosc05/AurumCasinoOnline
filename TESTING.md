@@ -10,14 +10,14 @@ Para E2E hace falta descargar una vez el navegador: `npx playwright install chro
 
 ## Resultado de la última ejecución
 
-Ejecutado el 15/10/2026 en Linux con Node 22.22:
+Ejecutado el 20/10/2026 en Linux con Node 22.22 (versión 1.3.0):
 
-- `npm test`: **16 archivos, 272 pruebas, todas correctas**.
-- `npm run test:e2e:dev`: **2 pruebas, correctas** (servidor de desarrollo con React en modo estricto).
-- `npm run test:e2e`: **9 pruebas, todas correctas** (Chromium incluido con Playwright 1.56; escritorio y móvil Pixel 7).
+- `npm test`: **26 archivos, 379 pruebas, todas correctas**.
+- `npm run test:e2e`: **17 pruebas, todas correctas** (Chromium; escritorio y móvil Pixel 7).
 - `npm run typecheck`: sin errores.
+- `npm audit --omit=dev`: 0 vulnerabilidades.
 
-No se ha ejecutado todavía en Windows: el código no depende de binarios nativos propios, pero conviene lanzar `npm test` tras la primera instalación.
+`npm run test:e2e:dev` (2 pruebas de animación contra el servidor de desarrollo) pasó en la 1.2.0 y no se ha vuelto a lanzar en esta versión. No se ha ejecutado todavía en Windows.
 
 ## Aleatoriedad controlada
 
@@ -31,41 +31,36 @@ Las pruebas de integración que usan el RNG real comprueban invariantes (el sald
 
 ## Cobertura por área
 
-### Blackjack (`packages/engine/test/blackjack.test.ts`, 17)
-Ases blandos y duros, blackjack natural (3:2), blackjack de ambos, peek del crupier, bust sin robo del crupier, victoria del jugador y del crupier, empate, S17 y H17, doblar, acciones ilegales y tras liquidar, división, límites de apuesta, carta tapada oculta en la vista pública, rebarajado por penetración.
+### Motores (`packages/engine/test`, 134)
+- `blackjack.test.ts` (17): ases blandos y duros, blackjack natural (3:2), peek, S17/H17, doblar, dividir, acciones ilegales, límites, carta tapada oculta en la vista pública, rebarajado por penetración.
+- `blackjackTable.test.ts` (15): mesa con varios asientos contra un crupier común, turnos en orden, liquidación independiente por asiento, estrategias legales de los bots, vista pública sin la carta tapada.
+- `poker.test.ts` (36): categorías y desempates, rueda A-5, botes secundarios, ciegas y botón, all-in, subida mínima, vista pública sin cartas ajenas, 150 manos de bots con conservación de fichas, equidad Monte Carlo.
+- `assistant.test.ts` (25): descripción de la mano en cada calle, cartas de la combinación frente a acompañamiento, uso de cartas propias, proyectos de color y escalera y probabilidad exacta de mejorar.
+- `roulette.test.ts` (24): casillas, colores, todas las modalidades de apuesta y sus pagos, cero, ventaja de la casa 1/37.
+- `slots.test.ts` (17): líneas, comodín y multiplicador, scatter, combinaciones especiales, giros gratis, bono de cofres, RTP exacto calculado desde la definición de cada máquina y convergencia de la simulación.
 
-### Póker (`packages/engine/test/poker.test.ts`, 36)
-Las diez categorías y su orden, rueda A-5, sin escaleras circulares, escalera de color al 5, desempates por kicker, doble pareja, full con dos tríos, color, empate exacto, botes secundarios (incluidos aportes de retirados), apuesta no igualada, rotación del botón y ciegas, heads-up, acciones fuera de turno, subida mínima, saldo insuficiente, mano completa hasta el showdown, all-in con bote secundario y conservación de fichas, reparto automático con todos all-in, all-in corto que no reabre, vista pública sin cartas ajenas, 150 manos de bots con conservación de fichas, fórmula de Chen, equidad Monte Carlo (AA ≈ 85 %), decisiones de bots y que nunca se retiran pudiendo pasar.
+### Servidor (`apps/server/test`, 84)
+- `auth.test.ts` (17): hash, cookies, CSRF, orígenes, cabeceras, roles, bloqueo, saldo ilimitado del administrador, limitación de registros.
+- `games.test.ts` (17): liquidación, idempotencia, saldo insuficiente, **doble liquidación imposible**, **concurrencia**, blackjack con secuencia, logros, juegos desactivados.
+- `poker.test.ts` (6): partida por WebSocket sin ver cartas ajenas, desconexiones, acciones inválidas, reembolso tras caída.
+- `blackjack.test.ts` (11): mesas multijugador con bots y solo personas, carta tapada que no viaja antes de tiempo, validación de apuestas, dos personas en la misma mesa, sin sesión, nombres de bot reservados, perfiles públicos, límites nuevos sin afectar a la ronda abierta, un bot nunca en dos mesas, reembolso tras reinicio, migración de bots.
+- `economy.test.ts` (10): periodo diario en Madrid y cambios de hora, reclamación única con peticiones simultáneas, racha, saldo inicial configurable, anuncios sin proveedor, simulación prohibida en producción, tiempo mínimo, idempotencia y límite diario, **el navegador no puede concederse la recompensa**, firmas falsas rechazadas.
+- `slots.test.ts` (4): máquinas, giros gratis sin cobro, bono de cofres con premios no enviados y sin repetir cofre.
+- `formations.test.ts` (4): CRUD, validación con el motor, comprobación de saldo al cargar, aislamiento por usuario.
+- `social.test.ts` (5): solicitudes y permisos de cada parte, sin duplicados, sin datos privados, bots no son usuarios, presencia real y modo invisible, notificaciones por dueño.
+- `rooms.test.ts` (9): códigos, acceso solo para miembros, sala fuera del salón público, sala llena, código caducado y renovado, cierre con devolución de fichas, **póker privado con cartas privadas solo para su dueño**, blackjack privado, salas solo para amigos e invitaciones, traspaso de anfitrión y cierre automático, ajustes bloqueados, límite de intentos de código.
+- `persistence.test.ts` (1): saldo, historial y sesión tras reiniciar.
 
-### Ruleta (`packages/engine/test/roulette.test.ts`, 24)
-37 casillas únicas, alternancia de colores en la rueda, colores, sorteo con RNG inyectado, validez de caballos, transversales, cuadros y seisenas, límites, pago de cada una de las 13 modalidades, apuestas perdedoras, tratamiento del cero, liquidación combinada y ventaja de la casa 1/37 en todas las apuestas.
+### Interfaz (`apps/web/src`, 161)
+Cartas SVG (111), secuenciador (7), trayectoria de la ruleta (5), tapete y pintado por arrastre (9), física de rodillos (7), presentación de slots (3), modelos de blackjack individual (4) y multijugador (7), modelo y asistente de póker (2 + 6).
 
-### Slots (`packages/engine/test/slots.test.ts`, 12)
-20 líneas únicas, evaluación de izquierda a derecha, sustitución del comodín y mejor pago, scatter sobre apuesta total, líneas activas, límites de apuesta, coherencia entre paradas, cuadrícula y liquidación (500 tiradas), RNG inyectado, categorías de premio, separación de scatters, RTP exacto y convergencia de una simulación de 200.000 tiradas.
-
-### Seguridad y persistencia (`apps/server/test`, 41)
-- `auth.test.ts` (17): registro con hash scrypt y cookie httpOnly/SameSite, duplicados, validación, intento de auto-asignarse rol o saldo, login por usuario y correo, logout, bloqueo tras 5 fallos, usuario inexistente, cookie inventada, CSRF, origen no permitido, JSON mal formado, cabeceras de seguridad, roles (401/403/200), saldo ilimitado del administrador sin alterar el saldo guardado, protección del rol, ajustes auditados y suspensión, limitación de registros.
-- `games.test.ts` (17): liquidación de ruleta y libro mayor, rechazo de apuestas inválidas sin cobrar, idempotencia, saldo insuficiente, coherencia premio/cuadrícula en slots, límites, manos completas de blackjack con control de secuencia y carta oculta, una mano a la vez y recuperación, manos ajenas, **doble liquidación imposible**, **concurrencia** (25 tiradas simultáneas con saldo para 5), misma clave en paralelo, promociones, estadísticas y logros, actividad anonimizada, juegos desactivados, diagnóstico.
-- `poker.test.ts` (6): lobby real, partida completa por WebSocket sin ver cartas ajenas y con cobro al levantarse, **desconexión que no bloquea la mesa**, acciones fuera de turno y entradas inválidas, WebSocket sin sesión, **reembolso de fichas tras una caída del servidor**.
-- `persistence.test.ts` (1): saldo, historial y sesión tras reiniciar el servidor.
-
-### Interfaz (`apps/web/src/**/*.test.ts`, 23)
-Secuenciador de animaciones (orden, velocidad, anti doble clic, saltar ejecuta todos los efectos, cancelar, errores, animaciones desactivadas), trayectoria de la ruleta (termina en el bolsillo del servidor para los 37 números, deceleración continua, continuidad), tapete (todas las zonas generan apuestas válidas para el servidor), recorrido de rodillos (empieza y termina en las ventanas correctas siguiendo la tira real), modelos visuales de blackjack y póker.
-
-### Cartas (`apps/web/src/components/cards/cards.test.tsx`, 111)
-Para las 52 cartas: rango y palo correctos, color del palo en índices y pips, número de pips, as y figuras, índice inferior girado, ausencia de elementos `<text>` (no dependen de fuentes), variante compacta e identificadores SVG únicos. Una carta boca abajo no expone rango ni palo en el DOM, y la variante compacta se elige según el tamaño real en pantalla.
-
-### Física de los rodillos (`apps/web/src/games/slots/reelMotion.test.ts`, 7)
-Termina siempre exactamente en la parada del servidor (todas las paradas de las cinco tiras) con un único evento de parada; sigue girando si el resultado tarda; movimiento continuo sin saltos de velocidad ni de la fracción visible; durante la frenada los símbolos solo caen y después rebotan; la parada rápida acorta el giro sin cambiar el resultado; modo reducido sin rebote; fotogramas muy largos (pestaña en segundo plano).
-
-### Presentación de slots (`apps/web/src/games/slots/presentation.test.ts`, 3)
-En 3000 tiradas: las líneas dibujadas son exactamente las del motor (ni inventadas ni omitidas), cada celda resaltada está en el recorrido real de la línea, la suma presentada es el premio liquidado, un único evento de total, celebración según la categoría real y orden de mayor a menor premio.
-
-### Extremo a extremo (`e2e/`, 9 + 2 en desarrollo)
-Animaciones reales (`animations.spec.ts`, también contra el servidor de desarrollo): las cartas de blackjack se giran y muestran la cara; los rodillos se mueven en menos de 400 ms tras pulsar, se frenan al pulsar de nuevo y se puede volver a girar durante la presentación. Registro, cierre e inicio de sesión; ruleta; blackjack; slots; póker contra bots (ver las propias cartas y levantarse); acceso de administración; móvil sin desbordamiento horizontal y menú.
+### Extremo a extremo (`e2e/`, 17 + 2 en desarrollo)
+Registro, cierre e inicio de sesión; ruleta pintando por arrastre, deshacer y formaciones; blackjack individual y multijugador; recompensa diaria y ausencia de anuncios sin proveedor; slots (cobro, tabla de premios, sin giro automático); póker contra bots viendo solo las propias cartas; administración; **amigos con dos navegadores** (solicitud, notificación en tiempo real, presencia, modo invisible); **salas privadas con dos navegadores** (crear, sin acceso sin código, código erróneo, entrar con código, ver miembros, cierre visto por ambos); móvil sin desbordamiento horizontal y pintado con el dedo; animaciones de cartas y rodillos.
 
 ## Comprobaciones manuales realizadas
 
 Con capturas automatizadas en Chromium (escritorio 1440 × 900 y móvil 390 × 844): reparto y volteo de cartas, barajado, giro de ruleta con la bola terminando en el número del servidor, apuestas ganadoras resaltadas y perdedoras retiradas, rodillos con parada escalonada y línea premiada, mesa de póker con bots actuando y controles del jugador, panel de administración. No se ha medido el rendimiento en equipos modestos reales.
 
 Versión 1.1 (14/10/2026), con capturas fotograma a fotograma en Chromium (1440 × 1000 y 412 × 915): galería de las 52 cartas a 96, 64 y 46 px; blackjack (extracción del zapato, vuelo, volteo, revelado dramático, derrota atenuada, recogida a la bandeja, totales sincronizados con las caras); póker (barajado central, reparto privado, cartas de rivales ocultas, retiradas que vuelven al crupier, flop/turn/river, fichas al bote); slots (parada escalonada, línea premiada coincidente con el motor y sus marcadores, atenuación, estados del botón); partículas de destello, ráfaga y fuegos artificiales en un banco de pruebas aislado. No se ha podido provocar un premio grande ni extraordinario real en la aplicación (el cartel correspondiente queda sin comprobar visualmente) ni escuchar el audio (entorno sin altavoces).
+
+Versión 1.3 (15–20/10/2026), con capturas en Chromium (1440 × 1000 y 390 × 844): asistente de póker en sus tres modos, crupier y mesa multijugador de blackjack apaisada y vertical, recompensas y pantalla de recuperación, las dos máquinas de slots con giros gratis y bono de cofres, ruleta con trazos pintados, confirmación y resultado, página de amigos y campana de notificaciones, creación de sala y vista de sala con dos personas conectadas.

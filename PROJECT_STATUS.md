@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado: 15/10/2026 — versión 1.2.0.
+Actualizado: 20/10/2026 — versión 1.3.0.
 
 ## Hecho y verificado
 
@@ -9,38 +9,42 @@ Actualizado: 15/10/2026 — versión 1.2.0.
 | Registro, login, logout, sesiones, bloqueo por intentos | Completo | Pruebas de integración + E2E |
 | Roles y administrador por CLI, saldo ilimitado | Completo | Pruebas de integración + E2E |
 | Monedero transaccional, idempotencia, liquidación única, concurrencia | Completo | Pruebas de integración |
-| Blackjack (reglas, zapato, crupier animado, barajado, reparto) | Completo | 17 pruebas de motor + integración + E2E + capturas |
-| Póker (motor, botes, bots, mesas en tiempo real, desconexiones) | Completo | 36 pruebas de motor + 6 de WebSocket + E2E + capturas |
-| Ruleta (todas las apuestas, rueda con bola física, tapete) | Completo | 24 pruebas de motor + trayectoria + E2E + capturas |
-| Slots (líneas, comodín, scatter, RTP exacto, rodillos) | Completo | 12 pruebas de motor + recorrido de rodillos + E2E + capturas |
-| Logros, rachas, promociones, clasificación, actividad anonimizada | Completo | Pruebas de integración |
-| Panel de administración | Completo | E2E + capturas |
-| Cartas SVG propias (52 + reverso) y volteo en dos fases | Completo | 111 pruebas + galería capturada en 3 tamaños |
-| Animaciones de blackjack, póker y slots y efectos de celebración | Completo | Pruebas de presentación + capturas fotograma a fotograma |
-| Slots tipo máquina real (giro inmediato, física, frenada rápida) — v1.2 | Completo | 7 pruebas de física + E2E en producción y desarrollo + medición de fotogramas |
+| Blackjack individual (reglas, zapato, barajado, reparto) | Completo | 17 pruebas de motor + integración + E2E |
+| Crupier nuevo (brazos articulados, mirada, poses) — v1.3 | Completo | Galería `/dev/crupier` + capturas |
+| Blackjack multijugador (asientos, ventana de apuestas, turnos, reembolso tras reinicio) — v1.3 | Completo | 15 pruebas de motor + 11 de servidor + 7 de modelo + E2E escritorio y móvil |
+| Póker (motor, botes, bots, mesas en tiempo real, desconexiones) | Completo | 36 pruebas de motor + 6 de WebSocket + E2E |
+| Asistente de manos de póker — v1.3 | Completo | 25 pruebas de motor + 6 de interfaz + capturas |
+| Identidad de bots (catálogo, avatares, banca compartida, perfiles públicos) — v1.3 | Completo | Integración + E2E |
+| Economía: recompensa diaria por zona horaria, racha, recuperación — v1.3 | Completo | 10 pruebas de servidor (incluye cambio de hora y concurrencia) + E2E |
+| Anuncios recompensados: interfaz de proveedor, simulación de desarrollo, confirmación firmada — v1.3 | Adaptador completo; **sin SDK de proveedor real** | Pruebas de firma, idempotencia, límites y bloqueo en producción |
+| Slots: dos máquinas, giros gratis, bono de cofres, RTP exacto, sin giro automático — v1.3 | Completo | 17 pruebas de motor + 4 de servidor + 10 de interfaz + E2E |
+| Ruleta: pintado por arrastre, formaciones, confirmación, rueda mejorada — v1.3 | Completo | 24 de motor + 9 de tapete + 4 de servidor + E2E escritorio y móvil |
+| Amigos, presencia real, modo invisible, notificaciones — v1.3 | Completo | 5 pruebas de servidor + E2E con dos navegadores |
+| Salas privadas de póker y blackjack — v1.3 | Completo (ver límites) | 9 pruebas de servidor + E2E con dos navegadores + capturas |
+| Logros, promociones, clasificación, actividad anonimizada | Completo | Pruebas de integración |
+| Panel de administración (incluye economía, anuncios y mesas de blackjack) | Completo | E2E + capturas |
 | Responsive (escritorio y móvil) | Completo | Capturas 1440 px y 390 px + E2E móvil |
-| Documentación | Completa | — |
+| Documentación | Actualizada para 1.3.0 | — |
 
 ## Límites actuales (no son errores)
 
-- **Una sola instancia**: las mesas de póker y los limitadores de frecuencia viven en memoria. Para varias instancias haría falta un almacén compartido (p. ej., Redis) y PostgreSQL.
+- **Anuncios**: no se integra ningún SDK de proveedor. Con `ADS_PROVIDER=none` (por defecto) la interfaz indica que no hay anuncios; `signed-callback` necesita un proveedor que llame a `/api/ads/callback` con la firma documentada.
+- **Salas privadas**: las salas de blackjack siempre usan el saldo (las fichas de sala solo existen en póker). Tras reiniciar el servidor, las salas abiertas se recrean con la mesa vacía (las fichas ya se reembolsaron). No hay chat ni moderación (expulsar o bloquear).
+- **Slots**: no hay símbolos expansivos; las funciones son comodín multiplicador, scatter, giros gratis, combinación especial y bono de cofres.
+- **Una sola instancia**: mesas, salas en juego y limitadores de frecuencia viven en memoria. Para varias instancias haría falta un almacén compartido (p. ej., Redis) y PostgreSQL.
 - **Bots**: razonables pero explotables (ver `GAME_RULES.md#bots`).
 - **Blackjack**: sin seguro ni rendición; una sola división por mano.
-- **Slots**: sin giros gratis ni bonos; una única máquina.
-- **Ruleta**: el cero no aplica *la partage*.
-- **Gráficos**: crupier y ruleta en 2D/2.5D (SVG); no se usa 3D.
-- **Música ambiental**: la preferencia existe, pero no hay pista musical (solo efectos sintetizados).
-- **Correo**: sin verificación de correo ni recuperación de contraseña por email (se restablece por CLI).
-- **Windows**: el código está pensado para Windows (sin binarios nativos propios, scripts multiplataforma), pero las pruebas se ejecutaron en Linux. Ejecuta `npm test` tras la primera instalación.
-- **Audio**: los sonidos se sintetizan y se han probado por código, pero no se han escuchado en este entorno; conviene revisar el volumen relativo en un equipo real.
-- **Premio grande/extraordinario**: las partículas (destello, ráfaga y fuegos artificiales) se han comprobado en un banco aislado, pero el cartel de premio grande no se ha visto en una tirada real porque no salió ninguno durante las capturas.
-- **Rendimiento**: medido en un navegador sin aceleración gráfica (contenedor Linux): blackjack y póker a ~58-60 fps en desarrollo y producción; slots con mediana de 17 ms por fotograma y picos por el compositor por software. En un equipo con GPU el compositor no debería ser el cuello de botella, pero no se ha medido en un PC real.
-- **`npm run dev` frente a `npm run jugar`**: el modo desarrollo de React es más pesado; para jugar, mejor `npm run jugar`.
+- **Ruleta**: el cero no aplica *la partage*. La rueda es 2.5D en SVG, no 3D (Three.js).
+- **Música ambiental**: la preferencia existe, pero no hay pista musical.
+- **Correo**: sin verificación ni recuperación de contraseña por email (se restablece por CLI).
+- **Windows**: el código no usa binarios nativos propios, pero las pruebas se ejecutaron en Linux. Ejecuta `npm test` tras la primera instalación.
+- **Audio**: sintetizado y probado por código, no escuchado en este entorno.
+- **Rendimiento**: medido en un navegador sin aceleración gráfica; no medido en un PC real.
 
 ## Siguientes pasos sugeridos
 
-1. Ejecutar `npm install`, `npm test` y `npm run dev` en Windows y revisar la experiencia.
-2. Añadir tabla de pagos visible dentro de las slots (ahora está en Reglas).
-3. Guardar el historial de manos de póker por jugador con repetición visual.
-4. Adaptador PostgreSQL y almacén compartido si se quiere desplegar con varias instancias.
-5. Música ambiental opcional con licencia libre verificada.
+1. Ejecutar `npm install`, `npm test` y `npm run jugar` en Windows y revisar la experiencia.
+2. Integrar el SDK de un proveedor de anuncios con verificación servidor a servidor, si se quieren anuncios reales.
+3. Fichas de sala para blackjack y persistencia del estado de las mesas de sala entre reinicios.
+4. Moderación en salas (expulsar) y bloqueo de usuarios en amigos.
+5. Adaptador PostgreSQL y almacén compartido para desplegar con varias instancias.

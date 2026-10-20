@@ -1,6 +1,6 @@
 # Aurum — casino con moneda virtual
 
-Plataforma de casino **exclusivamente de demostración**: blackjack con crupier animado, Texas Hold'em en tiempo real contra bots con estrategia propia, ruleta europea con bola física y slots de cinco rodillos. Se juega con créditos virtuales sin valor económico: no hay pagos, depósitos, retiradas ni conversión a dinero real.
+Plataforma de casino **exclusivamente de demostración**: blackjack individual y multijugador con crupier animado, Texas Hold'em en tiempo real con asistente de manos, ruleta europea con bola física y apuestas pintadas a mano, dos máquinas de slots con funciones especiales, amigos y salas privadas. Se juega con créditos virtuales sin valor económico: no hay pagos, depósitos, retiradas ni conversión a dinero real.
 
 Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pago y sin binarios nativos que compilar.
 
@@ -16,10 +16,14 @@ Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pag
 
 - **Cuentas**: registro, inicio de sesión por usuario o correo, sesiones con cookie httpOnly, bloqueo temporal tras intentos fallidos, perfil con estadísticas, historial, movimientos, logros y preferencias de sonido y animación.
 - **Monedero virtual transaccional**: cada movimiento guarda saldo anterior y posterior, motivo y partida; liquidación única, idempotencia y sin saldos negativos.
-- **Blackjack**: zapato de 6 barajas con penetración real, barajado tipo *riffle*, crupier 2D con poses, reparto carta a carta con trayectoria, sombra y volteo; doblar y dividir.
-- **Texas Hold'em**: mesas de 6 con ciegas, botes secundarios, all-in, temporizador de turno, multijugador humano real por WebSocket y bots con cuatro perfiles (conservador, agresivo, equilibrado, analítico) y tres dificultades.
-- **Ruleta europea**: tapete interactivo con todas las apuestas (pleno, caballo, transversal, cuadro, seisena, docenas, columnas, sencillas), rueda 2.5D con bola que frena, cae y rebota hasta el número que ya decidió el servidor.
-- **Slots Aurum Royale**: 5 × 3, 20 líneas, comodín y scatter, parada escalonada y anticipación; **RTP teórico exacto 95,2552 %** calculado por enumeración.
+- **Blackjack**: zapato de 6 barajas con penetración real, barajado tipo *riffle*, crupier ilustrado con brazos articulados, mirada y poses; doblar y dividir. Mesa individual y **mesas multijugador** de hasta 7 asientos contra un crupier común (demo con bots o solo personas).
+- **Texas Hold'em**: mesas de 6 con ciegas, botes secundarios, all-in, temporizador de turno, multijugador humano real por WebSocket y bots con perfiles y dificultades. **Asistente de manos** opcional (principiante, estándar, avanzado) que resalta tu combinación, explica qué cartas la forman y calcula la probabilidad exacta de mejorar.
+- **Bots identificados**: nombres de fantasía, avatares propios y etiqueta BOT siempre visible; nunca se presentan como personas ni cuentan como usuarios conectados.
+- **Ruleta europea**: todas las apuestas; se pintan arrastrando con ratón, dedo o lápiz, con borrado, deshacer por trazo y **formaciones guardadas**. El giro siempre se confirma. Rueda 2.5D con separadores metálicos, bola que frena, cae y rebota hasta el número que ya decidió el servidor.
+- **Slots**: *Aurum Royale* (giros gratis ×2, combinación especial) y *Tesoro del Arrecife* (ola comodín ×2, bono de cofres). RTP exacto calculado desde la definición (≈ 96 %), tabla de premios generada del motor, sin giro automático y sin mensajes engañosos de «casi premio».
+- **Economía virtual**: saldo inicial configurable, recompensa diaria con cuenta atrás y zona horaria, racha amable, pantalla de recuperación sin saldo y módulo de anuncios recompensados (desactivado por defecto; solo paga con confirmación firmada del proveedor).
+- **Amigos**: búsqueda, solicitudes, presencia real (disponible, jugando, desconectado), modo invisible y notificaciones en tiempo real.
+- **Salas privadas** de póker y blackjack: código de invitación con caducidad, invitar a amigos, privacidad, límites, bots opcionales (siempre marcados), fichas de sala en póker, traspaso de anfitrión y cierre con reembolso.
 - **Administración**: métricas, usuarios (ajuste de saldo con motivo, suspensión), partidas, bots, mesas, juegos habilitados, errores, auditoría y comprobación del libro mayor. El administrador tiene saldo ilimitado sin poder obtenerlo desde el cliente.
 
 ## Requisitos
@@ -66,8 +70,8 @@ Equivale a `npm run build` seguido de `npm start`.
 | `npm run build` | Compila el frontend en `apps/web/dist` |
 | `npm start` | Arranca el servidor (sirve `dist` si existe) |
 | `npm run jugar` | Compila y arranca la versión optimizada (http://localhost:3001) |
-| `npm test` | 272 pruebas unitarias y de integración (Vitest) |
-| `npm run test:e2e` | 9 pruebas de extremo a extremo con Playwright (versión compilada) |
+| `npm test` | 379 pruebas unitarias y de integración (Vitest) |
+| `npm run test:e2e` | 17 pruebas de extremo a extremo con Playwright (versión compilada) |
 | `npm run test:e2e:dev` | Pruebas de animación contra el servidor de desarrollo (modo estricto de React) |
 | `npm run typecheck` / `npm run lint` | Comprobación de tipos estricta de los tres paquetes |
 | `npm run db:migrate` | Aplica migraciones pendientes |
@@ -90,8 +94,8 @@ Las migraciones y los datos de demostración se aplican solos al arrancar el ser
 
 ```
 packages/engine   Motores puros: cartas, blackjack, póker (evaluador, mesa, botes, bots), ruleta, slots, logros
-apps/server       API REST + WebSocket, monedero, autenticación, mesas de póker, administración, CLI
-apps/web          Interfaz React: salón, juegos, perfil, promociones, panel de administración
+apps/server       API REST + WebSocket, monedero, autenticación, mesas de póker y blackjack, economía, anuncios, amigos, salas, administración, CLI
+apps/web          Interfaz React: salón, juegos, perfil, promociones, amigos, salas privadas, panel de administración
 e2e               Pruebas de extremo a extremo
 docs              Guía de animación y capturas
 ```
@@ -124,8 +128,9 @@ docs              Guía de animación y capturas
 Resumidos aquí; detalle en [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 - Los bots juegan de forma razonable, pero no son óptimos ni invencibles (ver [GAME_RULES.md](GAME_RULES.md#bots)).
-- Las mesas de póker viven en memoria del proceso: no hay escalado horizontal (un solo servidor).
-- No se implementan seguro ni rendición en blackjack, ni giros gratis en slots.
+- Las mesas viven en memoria del proceso: no hay escalado horizontal (un solo servidor). Tras un reinicio, las salas privadas siguen abiertas pero con la mesa vacía.
+- No se implementan seguro ni rendición en blackjack. Las salas de blackjack usan siempre el saldo (no hay fichas de sala).
+- Los anuncios recompensados no incluyen el SDK de ningún proveedor: solo el adaptador de confirmación firmada.
 - El crupier y la ruleta son 2D/2.5D (SVG), no 3D.
 
 ## Licencia

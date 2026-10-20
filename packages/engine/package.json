@@ -1,6 +1,6 @@
 {
   "name": "@aurum/engine",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "description": "Motores de juego puros (sin UI ni E/S): cartas, blackjack, póker, ruleta, slots y bots.",
@@ -9,7 +9,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "rtp": "tsx scripts/rtp.ts"
+    "rtp": "tsx scripts/rtp.ts",
+    "rules:md": "tsx scripts/rules-md.ts"
   },
   "devDependencies": {
     "tsx": "4.23.15"

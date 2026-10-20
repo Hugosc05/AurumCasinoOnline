@@ -23,6 +23,10 @@ flowchart LR
     WAL[Monedero<br/>libro mayor]
     RND[Rondas<br/>liquidación única]
     PKR[PokerManager<br/>mesas en memoria]
+    BJM[BlackjackManager<br/>mesas multijugador]
+    SOC[SocialService<br/>amigos, presencia, avisos]
+    ROOM[RoomService<br/>salas privadas]
+    ADS[AdsService<br/>anuncios recompensados]
     BOT[BotPool<br/>identidades de bot]
     LOG[Logger + auditoría]
   end
@@ -37,6 +41,13 @@ flowchart LR
   PKR --> BOT --> DB
   PKR --> WAL
   API --> LOG --> DB
+  HUB --> BJM --> ENG
+  BJM --> WAL
+  API --> SOC --> DB
+  API --> ROOM --> PKR
+  ROOM --> BJM
+  ROOM --> SOC
+  API --> ADS --> WAL
 ```
 
 ## Principios
@@ -73,9 +84,17 @@ erDiagram
   poker_tables ||--o{ poker_hands : historial
   bots }o--o{ poker_tables : "se sientan (en memoria)"
   game_rounds ||--o{ wallet_transactions : "round_id"
+  users ||--o{ ad_sessions : ve
+  users ||--o{ slot_sessions : "giros gratis / bono"
+  users ||--o{ roulette_formations : guarda
+  users ||--o{ friendships : "una fila por pareja"
+  users ||--o{ notifications : recibe
+  users ||--o{ rooms : anfitrion
+  rooms ||--o{ room_members : miembros
+  rooms ||--o{ room_invites : invitaciones
 ```
 
-Tablas auxiliares: `settings` (juegos habilitados, bonos), `audit_log`, `error_logs`, `schema_migrations`.
+Tablas auxiliares: `settings` (juegos habilitados, economía, anuncios), `blackjack_tables`, `audit_log`, `error_logs`, `schema_migrations`. Migraciones `001`–`007`, aplicadas en orden al arrancar.
 
 ## Monedero y rondas
 
@@ -132,13 +151,56 @@ sequenceDiagram
 - **Mesas sin humanos**: solo juegan si alguien está mirando (modo demostración marcado como tal). Sin público, quedan en reposo.
 - Multijugador humano: varias personas pueden sentarse en la misma mesa; la arquitectura es de un solo proceso (las mesas están en memoria).
 
+## Blackjack multijugador
+
+`BlackjackManager` mantiene mesas en memoria (`bj.*` por WebSocket) con el mismo motor que la mesa individual. Cada ronda pasa por apuestas (ventana con tiempo), reparto, turnos (tiempo límite con plantarse por defecto) y liquidación. Cada apuesta es una ronda idempotente del monedero; los límites se congelan al abrir la ronda. Tras un reinicio, las rondas abiertas se anulan y reembolsan. La carta tapada del crupier no se incluye en ninguna instantánea hasta que se revela.
+
+## Bots
+
+`BotPool` es el catálogo compartido de identidades de bot (nombre de fantasía, avatar SVG original, nivel, estrategia). Un bot solo puede estar en una mesa a la vez. Los bots **no son usuarios**: no tienen cuenta, no aparecen en la búsqueda de amigos, en la clasificación ni en los contadores de personas, y la interfaz los marca siempre como BOT. Sus nombres están reservados en el registro.
+
+## Economía y anuncios
+
+- **Recompensa diaria**: el periodo se calcula en el servidor (`economy/period.ts`) con la zona horaria configurada, incluidos los cambios de hora. La racha suma un escalón por cada día reclamado en los 6 anteriores (no castiga los días perdidos). Se reclama con una inserción única por `(usuario, tipo, día)` dentro de la transacción del abono.
+- **Anuncios recompensados** (`ads/ads.ts`): interfaz de proveedor con tres modos. `none` (por defecto); `dev-simulation` (etiquetado en pantalla y rechazado al arrancar con `NODE_ENV=production`); `signed-callback`, donde solo una llamada servidor a servidor firmada con HMAC y con identificador de transacción único (`provider_tx_id UNIQUE`) concede créditos, tras el tiempo mínimo y dentro del límite diario. **El navegador nunca concede la recompensa en producción.** No se incluye el SDK de ningún proveedor real.
+
+## Amigos, presencia y notificaciones
+
+`SocialService` guarda las amistades con una fila por pareja (`pair_key` único), lo que impide duplicados o estados contradictorios. La presencia se deriva de conexiones WebSocket reales y de los asientos ocupados (eventos `seat` del hub): disponible, jugando (póker o blackjack) o desconectado. El modo invisible hace que el usuario aparezca siempre desconectado. Las notificaciones se guardan en BD y se empujan por WebSocket (`notification`).
+
+## Salas privadas
+
+```mermaid
+sequenceDiagram
+  participant A as Anfitrión
+  participant S as RoomService
+  participant M as Poker/BlackjackManager
+  participant B as Invitado
+  A->>S: POST /api/rooms {juego, límites, privacidad}
+  S->>M: addRoomTable(room-<id>) con setAccess
+  S-->>A: código aleatorio (caduca en 24 h)
+  B->>S: POST /api/rooms/join {código} (limitado por usuario e IP)
+  S->>S: valida código, caducidad, aforo, privacidad
+  S-->>B: vista de la sala
+  B->>M: poker.watch/sit room-<id>
+  M->>S: ¿es miembro? (si no: ROOM_FORBIDDEN)
+```
+
+- Las mesas de sala no aparecen en el salón público y comparten el motor y las reglas de las mesas públicas.
+- **Fichas**: en `wallet` se entra con el saldo (como en una mesa pública); en `room` (solo póker) todos reciben las mismas fichas de sala, sin tocar el monedero ni registrar rondas.
+- **Ajustes**: los cambios de límites se aplican desde la siguiente mano; las fichas iniciales no cambian con la sala abierta.
+- **Anfitrión desconectado**: tras 90 s sin conexión el rol pasa a otro miembro conectado; si se va, pasa igualmente. Sin miembros, o tras 15 min sin nadie conectado, la sala se cierra: la mesa termina y las fichas en juego se reembolsan.
+- **Cartas privadas**: igual que en las mesas públicas, cada instantánea se filtra por destinatario en el servidor.
+- **Reinicios**: las salas abiertas se recrean al arrancar con su mesa vacía (las fichas que hubiera ya se reembolsaron en el arranque).
+
 ## Frontend
 
 - `components/Stage`: escenario con resolución de diseño fija que se escala; las posiciones de cartas y fichas se calculan en coordenadas del escenario. Blackjack y póker tienen una geometría apaisada y otra vertical para móvil.
 - `lib/anim/sequencer`: secuencias de pasos con duración, salto (`skip`), cancelación al desmontar y bloqueo anti doble clic.
 - `lib/audio`: motor de audio sintetizado; no se crea hasta la primera interacción.
 - `lib/ws`: socket único con reconexión exponencial y re-suscripción.
-- Cada juego tiene su modelo visual puro (`model.ts`, `rouletteAnim.ts`, `reelPlan.ts`) probado con Vitest.
+- Cada juego tiene su modelo visual puro (`model.ts`, `rouletteAnim.ts`, `reelMotion.ts`, `board.ts`) probado con Vitest.
+- `social/useSocial` y `NotificationBell`: amigos y notificaciones en tiempo real. `rooms/`: páginas de salas que incrustan las mismas mesas de póker y blackjack.
 
 ## Decisiones y alternativas descartadas
 

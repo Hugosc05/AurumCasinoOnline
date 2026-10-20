@@ -2,6 +2,25 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.3.0] — 2026-10-20
+
+### Añadido
+- **Póker**: asistente de manos para principiantes (resaltado de la combinación, explicación y probabilidad exacta de mejorar; modos principiante, estándar y avanzado).
+- **Blackjack**: mesas multijugador por WebSocket con varios asientos contra un crupier común, ventana de apuestas y turnos con tiempo; crupier nuevo con brazos articulados, mirada y poses.
+- **Bots**: catálogo con nombres de fantasía y avatares propios, banca compartida (un bot en una sola mesa), estadísticas reales y perfiles públicos; siempre etiquetados como bots.
+- **Economía**: recompensa diaria por zona horaria con cuenta atrás y racha amable, saldo inicial configurable, pantalla de recuperación y aviso de saldo bajo.
+- **Anuncios recompensados**: interfaz de proveedor (`ADS_PROVIDER`), simulación de desarrollo etiquetada y prohibida en producción, y confirmación servidor a servidor firmada con HMAC.
+- **Slots**: motor de máquinas configurables, *Tesoro del Arrecife* con bono de cofres, giros gratis, combinaciones especiales, tabla de premios desde el motor y estadísticas de sesión.
+- **Ruleta**: pintado de apuestas arrastrando (ratón, dedo, lápiz), borrado, deshacer por trazo, confirmación antes de girar y formaciones guardadas; rueda con más detalle.
+- **Amigos**: solicitudes, presencia real, modo invisible y notificaciones en tiempo real.
+- **Salas privadas** de póker y blackjack con código, invitaciones, privacidad, bots opcionales, fichas de sala en póker, traspaso de anfitrión y cierre con reembolso.
+- Migraciones `003`–`007`; 107 pruebas unitarias e integración y 8 E2E nuevas.
+
+### Cambiado
+- Slots: eliminado el giro automático.
+- El aviso «solo juegan bots» solo aparece si de verdad hay bots en la mesa.
+- `ws` actualizado a 8.22.0 (corrige dos avisos de seguridad de la 8.18.3).
+
 ## [1.2.0] — 2026-10-15
 
 ### Corregido

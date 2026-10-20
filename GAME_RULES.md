@@ -19,6 +19,10 @@ Todos los resultados se generan en el servidor con `crypto.randomInt` (generador
 
 Si te pasas de 21 pierdes aunque el crupier también se pase; si todas tus manos se pasan, el crupier no roba.
 
+### Mesas multijugador
+
+Mismas reglas, con varios asientos (hasta 7) contra un crupier común y un zapato de mesa. Cada ronda: ventana de apuestas con tiempo, reparto, turnos en orden de asiento (tiempo límite; al agotarse, te plantas) y liquidación independiente de cada asiento contra la mano del crupier. Hay mesas de demostración con bots y mesas solo para personas; los límites de cada mesa se muestran en el salón y los cambios de la administración se aplican desde la siguiente ronda.
+
 ## Texas Hold'em
 
 - Mesas de hasta 6 asientos con ciega pequeña y grande (Salón Esmeralda 5/10, Mesa Zafiro 25/50, Sala Obsidiana 100/200; configurables por el administrador).
@@ -30,11 +34,13 @@ Si te pasas de 21 pierdes aunque el crupier también se pase; si todas tus manos
 - Showdown: gana la mejor combinación de 5 cartas entre 7. Empates exactos se reparten; la ficha sobrante va al primer ganador a la izquierda del botón.
 - Tiempo por turno: 25 s (6 s si estás desconectado). Al agotarse: pasar si es posible, si no retirarse. Tras 3 tiempos agotados seguidos, o 2 minutos desconectado, se te levanta y tus fichas vuelven a tu saldo.
 
+**Asistente de manos** (opcional, en Perfil → Ajustes o en la mesa): resalta las cartas que forman tu combinación, explica en palabras qué tienes y, en modo estándar o avanzado, los proyectos de color o escalera y la probabilidad exacta de mejorar en la siguiente carta. Solo usa tus cartas y las comunitarias: no conoce las de nadie más.
+
 Categorías (de mayor a menor): escalera real, escalera de color, póker, full, color, escalera, trío, doble pareja, pareja, carta alta. A-2-3-4-5 es la escalera más baja; no hay escaleras "circulares" (Q-K-A-2-3).
 
 ### Bots
 
-Los bots son programas identificados como tales (nombre «Bot …», distintivo BOT y perfil visible). Solo se sientan para completar mesas y nunca se cuentan como jugadores ni aparecen en la clasificación.
+Los bots son programas identificados como tales: nombre de fantasía (nunca de personas reales), avatar propio, distintivo BOT siempre visible y perfil público en «Bots del casino». Solo se sientan en mesas de demostración o en salas privadas que lo permitan; nunca se cuentan como personas conectadas, no aparecen en la clasificación ni se pueden añadir como amigos. Un bot no puede estar en dos mesas a la vez.
 
 | Perfil | Comportamiento |
 | --- | --- |
@@ -71,58 +77,72 @@ El 0 hace perder todas las apuestas exteriores (no se aplica *la partage*). La v
 
 Límites: mínimo 1 por apuesta; 1.000 por apuesta interior, 10.000 por exterior, 50.000 por giro, 60 apuestas distintas.
 
+**Pintar apuestas**: con ratón, dedo o lápiz se puede tocar una casilla o arrastrar. Un trazo solo pinta el tipo de casilla en el que empieza (pleno, caballo, cuadro, transversal, seisena o exterior) y no repite ficha en la misma casilla. Hay goma de borrar, deshacer por trazo y limpiar mesa. Antes de girar siempre aparece un resumen para confirmar. Las **formaciones guardadas** solo guardan la distribución; al cargarlas el servidor comprueba que siguen siendo legales y que hay saldo.
+
 **Integridad**: el número se sortea antes de que empiece la animación. La trayectoria de la bola se calcula para terminar en ese bolsillo (función `planSpin`, probada para los 37 bolsillos); la posición final calculada en el navegador nunca decide nada.
 
-## Slots — Aurum Royale
+## Slots
 
-5 rodillos × 3 filas, 20 líneas fijas (se activan 1, 5, 10, 15 o 20, las primeras N). Apuesta por línea: 1 a 100. Apuesta total = apuesta por línea × líneas.
+Dos máquinas de 5 rodillos × 3 filas con 20 líneas (se activan las primeras N). Apuesta total = apuesta por línea × líneas. Las líneas se pagan de izquierda a derecha; en cada línea se paga solo la mejor combinación. El comodín sustituye a cualquier símbolo salvo los especiales (scatter y cofre). Pagos de línea en × apuesta por línea.
 
-### Pagos de línea (× apuesta por línea, desde el rodillo izquierdo)
+No hay giro automático: cada tirada se pide expresamente. La interfaz no muestra mensajes de «casi premio» ni anticipaciones que no correspondan al resultado ya decidido.
+
+### Aurum Royale
+
+Sietes, coronas y estrellas que abren giros gratis.
+
+5 × 3, 1, 5, 10, 15, 20 líneas activables. Apuesta por línea: 1 a 100.
 
 | Símbolo | ×3 | ×4 | ×5 |
 | --- | ---: | ---: | ---: |
-| J | 8 | 20 | 90 |
-| Q | 8 | 30 | 110 |
-| K | 12 | 40 | 150 |
-| A | 15 | 45 | 180 |
-| Trébol | 20 | 75 | 300 |
-| Campana | 30 | 100 | 450 |
-| Diamante | 45 | 150 | 750 |
-| Corona | 60 | 225 | 1.000 |
-| Siete | 90 | 400 | 2.000 |
-| Comodín (WILD) | 150 | 750 | 5.000 |
+| J | 5 | 14 | 63 |
+| Q | 5 | 18 | 72 |
+| K | 7 | 27 | 99 |
+| A | 9 | 32 | 126 |
+| Trébol | 14 | 50 | 198 |
+| Campana | 18 | 68 | 297 |
+| Diamante | 27 | 99 | 495 |
+| Corona | 41 | 153 | 675 |
+| Siete | 63 | 270 | 1350 |
+| Comodín | 99 | 495 | 3600 |
+| Joyas mezcladas (diamante, corona, siete) | 5 | 15 | 50 |
 
-- El comodín sustituye a cualquier símbolo salvo la estrella. En cada línea se paga solo la combinación de mayor premio (por ejemplo, W-W-W-7-7 paga cinco sietes).
-- **Estrella (scatter)**: 3, 4 o 5 visibles en cualquier posición pagan 2×, 10× o 50× la apuesta **total**. Las tiras están construidas para que nunca haya dos estrellas en la misma ventana de un rodillo.
+- Scatter en cualquier posición: 3 pagan 2×, 4 pagan 8×, 5 pagan 40× la apuesta total.
+- Giros gratis: 3 scatters dan 5, 4 scatters dan 8, 5 scatters dan 12, con premios ×2. Se juegan con la apuesta de la tirada que los activó, sin cobrar, y no se reactivan.
 
-### Composición de los rodillos
-
-| Rodillo | J | Q | K | A | Trébol | Campana | Diamante | Corona | Siete | Comodín | Estrella | Total |
-| --- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| 1 | 6 | 6 | 5 | 5 | 4 | 3 | 3 | 2 | 2 | 1 | 2 | 39 |
-| 2 | 6 | 5 | 5 | 4 | 4 | 3 | 3 | 2 | 2 | 2 | 2 | 38 |
-| 3 | 5 | 5 | 5 | 4 | 4 | 3 | 3 | 3 | 2 | 2 | 2 | 38 |
-| 4 | 6 | 5 | 5 | 4 | 4 | 3 | 3 | 2 | 2 | 2 | 2 | 38 |
-| 5 | 6 | 6 | 5 | 5 | 4 | 3 | 3 | 2 | 2 | 1 | 2 | 39 |
-
-Cada rodillo se detiene en una de sus posiciones con probabilidad uniforme e independiente (83.460.312 combinaciones de paradas).
-
-### RTP teórico (cálculo exacto)
-
-| Componente | Valor |
+| RTP | Valor |
 | --- | ---: |
-| Líneas | 86,8404 % |
-| Estrellas | 8,4148 % |
-| **Total** | **95,2552 %** |
-| Frecuencia de premio por línea | 3,0205 % |
+| Juego base (líneas + scatter) | 73,01 % |
+| Giros gratis (prob. 2,98 % por tirada) | 22,94 % |
+| **Total** | **95,95 %** |
 
-Método (`computeRtp` en `packages/engine/src/slots.ts`, ejecutable con `npm run rtp`):
+### Tesoro del Arrecife
 
-1. En una línea cualquiera, el símbolo de cada rodillo sigue la distribución de su tira y los rodillos son independientes. Se enumeran todas las combinaciones de símbolos ponderadas por su frecuencia y se suma `probabilidad × multiplicador`.
-2. Para las estrellas, la probabilidad de ver una en un rodillo es `3 · nº_estrellas / longitud` (gracias a la separación garantizada), y el número total sigue una distribución de Poisson-binomial.
-3. El RTP no depende del número de líneas activas porque los pagos de línea van sobre la apuesta por línea y los de estrella sobre la total.
+La ola dobla los premios y tres cofres abren el bono de tesoros.
 
-Una prueba compara el valor teórico con una simulación de 200.000 tiradas (tolerancia ±5 puntos, solo como comprobación de coherencia). El RTP es un promedio a muy largo plazo; en sesiones cortas la variación es enorme.
+5 × 3, 1, 5, 10, 15, 20 líneas activables. Apuesta por línea: 1 a 100.
+
+| Símbolo | ×3 | ×4 | ×5 |
+| --- | ---: | ---: | ---: |
+| Concha | 3 | 8 | 33 |
+| Estrella de mar | 3 | 10 | 40 |
+| Cangrejo | 5 | 17 | 66 |
+| Caballito de mar | 7 | 23 | 92 |
+| Tortuga | 10 | 33 | 145 |
+| Delfín | 17 | 59 | 264 |
+| Perla | 33 | 132 | 660 |
+| Ola (comodín ×2) | 66 | 330 | 1980 |
+
+- El comodín multiplica ×2 las líneas en las que sustituye.
+- Bono de cofres: 3 símbolos Cofre (bono) (rodillos 1, 3, 5) abren 9 cofres; eliges 3. Los premios (2, 3, 4, 5, 6, 8, 10, 15, 25 × apuesta total) se fijan y barajan en el servidor al activarse; los cofres sin abrir no se envían al navegador.
+
+| RTP | Valor |
+| --- | ---: |
+| Juego base (líneas) | 82,56 % |
+| Bono (prob. 0,52 % por tirada) | 13,49 % |
+| **Total** | **96,05 %** |
+
+**Método del RTP** (`computeMachineRtp` en `packages/engine/src/slotMachines.ts`; `npm run rtp` lo recalcula y `npm run rules:md -w packages/engine` regenera estas tablas): se enumeran las combinaciones de símbolos de una línea ponderadas por la frecuencia de cada tira (rodillos independientes y parada uniforme); scatter y cofres se calculan con su distribución exacta gracias a la separación garantizada en las tiras; los giros gratis se valoran como su número esperado × RTP del juego base × multiplicador; el bono, como la media de elegir 3 de los 9 premios. Una prueba compara cada valor con una simulación. El RTP es un promedio a muy largo plazo; en sesiones cortas la variación es enorme.
 
 ### Categorías de celebración
 
@@ -134,7 +154,12 @@ Se calculan exclusivamente a partir de rondas liquidadas: primera victoria, rach
 
 ## Promociones virtuales
 
-- **Bono diario**: 1.000 créditos, una vez al día (UTC).
+- **Recompensa diaria**: 1.000 créditos por defecto, una vez por día natural en la zona horaria configurada (Europe/Madrid por defecto, con los cambios de hora). Racha amable: +100 por cada uno de los 6 días anteriores en que se reclamó (hasta +600); saltarse un día no reinicia nada, solo deja de sumar ese día. La cuenta atrás muestra cuándo vuelve a estar disponible.
 - **Recarga de demostración**: 5.000 créditos si el saldo es inferior a 500, una vez al día. Queda registrada como movimiento propio; el historial no se altera.
+- **Anuncios recompensados**: desactivados por defecto. Si se configura un proveedor, cada anuncio completado y confirmado por el proveedor (llamada firmada servidor a servidor) da los créditos configurados, con límite diario.
 
-Importes configurables por el administrador.
+Importes configurables por el administrador. Nada de esto se puede comprar ni canjear: los créditos no tienen valor económico.
+
+## Salas privadas
+
+Póker y blackjack con las mismas reglas que las mesas públicas, solo para quien tenga el código o una invitación. El anfitrión fija nombre, asientos, límites, privacidad (con código o solo amigos) y si se admiten bots (que siguen marcados como bots). En póker se puede elegir **fichas de sala**: todos empiezan con las mismas fichas y el saldo no cambia. Los límites nuevos se aplican desde la siguiente mano. El código caduca a las 24 h y se puede renovar. Si el anfitrión se desconecta más de 90 s, la sala pasa a otro miembro conectado; sin nadie conectado durante 15 min, la sala se cierra y se devuelven las fichas.
