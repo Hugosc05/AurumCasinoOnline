@@ -72,6 +72,14 @@ Aurum no maneja dinero real, pero se trata como si lo hiciera: el saldo, los res
 - Revisión del 20/10/2026: `npm audit --omit=dev` sin vulnerabilidades tras actualizar `ws` a 8.22.0 (la 8.18.3 tenía dos avisos altos). Sin secretos ni bases de datos en el repositorio y sin cuentas administrativas con contraseña por defecto.
 - Dependencias mínimas y con versión fija. Revisa periódicamente con `npm audit` (algunos avisos pueden afectar solo a herramientas de desarrollo).
 
+## Modo online (`npm run online`)
+
+- El servidor escucha solo en `127.0.0.1`; el único acceso externo es el túnel de Cloudflare (HTTPS). No se abre ningún puerto del router.
+- Arranca con `NODE_ENV=production`: cookies `Secure`, HSTS, `upgrade-insecure-requests` y prohibida la simulación de anuncios.
+- `CLIENT_ORIGINS` se limita a la dirección del túnel y a la del propio equipo: CORS, la comprobación anti-CSRF y el *handshake* del WebSocket rechazan cualquier otro origen.
+- `TRUST_PROXY` confía en un solo salto: la IP de cada jugador es la que añade Cloudflare (la última de `X-Forwarded-For`), así que una cabecera falsificada por el cliente no sirve para saltarse los límites por IP.
+- `cloudflared` se descarga de la página oficial de versiones de Cloudflare en GitHub por HTTPS y se guarda en `tools/` (ignorado por git).
+
 ## Fuera de alcance / pendiente
 
 - HTTPS lo debe proporcionar un proxy inverso si se publica en Internet.

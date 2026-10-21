@@ -58,6 +58,22 @@ Compila el frontend y arranca el servidor en un solo proceso. Abre **http://loca
 
 Equivale a `npm run build` seguido de `npm start`.
 
+### Jugar online con amigos (gratis)
+
+```powershell
+npm run online
+```
+
+Compila, abre un túnel rápido de Cloudflare (gratuito, sin cuenta y sin abrir puertos del router) y arranca el servidor. En la consola aparece un enlace del tipo `https://palabras-al-azar.trycloudflare.com`: pásaselo a tus amigos y **entra tú también por ese enlace**. Cada uno se registra, tú creas una **sala privada** y les das el código.
+
+- La primera vez descarga `cloudflared`, el programa oficial de Cloudflare, en la carpeta `tools/` (no se sube al repositorio). Si ya lo tienes instalado, usa ese.
+- Tu PC hace de servidor: debe estar encendido, con esta ventana abierta, mientras jugáis. `Ctrl + C` cierra el túnel y el servidor.
+- **El enlace cambia cada vez** que ejecutas `npm run online`. Las cuentas y saldos se conservan (están en tu base de datos).
+- El servidor sigue escuchando solo en tu equipo (`127.0.0.1`); desde fuera solo se llega por el túnel, con HTTPS. Se arranca en modo producción y solo acepta peticiones desde ese enlace y desde tu propio equipo.
+- Cualquiera con el enlace puede registrarse, pero a tus salas solo se entra con el código o con tu invitación.
+- Los túneles rápidos de Cloudflare no tienen garantía de disponibilidad: si el enlace deja de responder, vuelve a ejecutar el comando. Para una dirección fija haría falta un túnel con cuenta de Cloudflare y un dominio propio.
+- Para empezar con la versión ya compilada: `npm run online -- --sin-compilar`.
+
 ### Parar
 
 `Ctrl + C` en la terminal. Al apagarse, el servidor devuelve a sus dueños las fichas que hubiera en las mesas de póker. Si el proceso se corta de golpe, esas fichas se reembolsan automáticamente en el siguiente arranque.
@@ -70,6 +86,7 @@ Equivale a `npm run build` seguido de `npm start`.
 | `npm run build` | Compila el frontend en `apps/web/dist` |
 | `npm start` | Arranca el servidor (sirve `dist` si existe) |
 | `npm run jugar` | Compila y arranca la versión optimizada (http://localhost:3001) |
+| `npm run online` | Igual, y además la publica por internet con un túnel gratuito de Cloudflare para jugar con amigos |
 | `npm test` | 379 pruebas unitarias y de integración (Vitest) |
 | `npm run test:e2e` | 17 pruebas de extremo a extremo con Playwright (versión compilada) |
 | `npm run test:e2e:dev` | Pruebas de animación contra el servidor de desarrollo (modo estricto de React) |
