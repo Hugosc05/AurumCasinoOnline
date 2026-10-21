@@ -12,7 +12,7 @@
     "admin:create": "tsx --no-warnings=ExperimentalWarning src/cli/createAdmin.ts"
   },
   "dependencies": {
-    "@aurum/engine": "1.2.0",
+    "@aurum/engine": "*",
     "cookie-parser": "1.4.7",
     "express": "5.1.0",
     "helmet": "8.1.0",
