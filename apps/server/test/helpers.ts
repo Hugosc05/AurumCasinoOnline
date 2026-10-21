@@ -30,6 +30,8 @@ export async function startServer(dbFile?: string, extra: Record<string, string>
     LOG_LEVEL: 'error',
     REGISTER_LIMIT_PER_HOUR: '1000',
     LOGIN_LIMIT_PER_15MIN: '1000',
+    // TEST_DB=pg: la misma batería contra PostgreSQL real (PGlite, persistido en la carpeta de la prueba).
+    ...(process.env.TEST_DB === 'pg' ? { DATABASE_URL: `pglite:${path.join(dir, 'pgdata')}` } : {}),
     ...extra,
   });
   const app = buildApp(config);

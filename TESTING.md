@@ -2,6 +2,7 @@
 
 ```bash
 npm test             # unitarias + integración (Vitest)
+npm run test:pg      # las del servidor contra PostgreSQL real (PGlite), como en Supabase
 npm run typecheck    # TypeScript estricto en los tres paquetes (incluye los tests)
 npm run test:e2e     # extremo a extremo (Playwright)
 ```
@@ -10,10 +11,12 @@ Para E2E hace falta descargar una vez el navegador: `npx playwright install chro
 
 ## Resultado de la última ejecución
 
-Ejecutado el 20/10/2026 en Linux con Node 22.22 (versión 1.3.0):
+Ejecutado el 21/10/2026 en Linux con Node 22.22 (versión 1.4.0):
 
-- `npm test`: **26 archivos, 379 pruebas, todas correctas**.
-- `npm run test:e2e`: **17 pruebas, todas correctas** (Chromium; escritorio y móvil Pixel 7).
+- `npm test`: **28 archivos, 385 pruebas, todas correctas** (SQLite).
+- `npm run test:pg`: **12 archivos, 90 pruebas del servidor, todas correctas** contra PostgreSQL 18 (PGlite 0.5.8; Supabase usa PostgreSQL 15–17, y el SQL empleado es estándar en todas).
+- `npm run test:e2e`: **17 pruebas, todas correctas** con SQLite y también con `E2E_DB=pg` (PostgreSQL).
+- Arranque en modo Render (producción, `HOST=0.0.0.0`, `DATABASE_URL`, `RENDER_EXTERNAL_URL`) contra PostgreSQL: salud, web, registro desde el origen público, CLI de administrador y caída de la base de datos (responde 503 sin tumbar el proceso).
 - `npm run typecheck`: sin errores.
 - `npm audit --omit=dev`: 0 vulnerabilidades.
 
@@ -39,7 +42,9 @@ Las pruebas de integración que usan el RNG real comprueban invariantes (el sald
 - `roulette.test.ts` (24): casillas, colores, todas las modalidades de apuesta y sus pagos, cero, ventaja de la casa 1/37.
 - `slots.test.ts` (17): líneas, comodín y multiplicador, scatter, combinaciones especiales, giros gratis, bono de cofres, RTP exacto calculado desde la definición de cada máquina y convergencia de la simulación.
 
-### Servidor (`apps/server/test`, 84)
+### Servidor (`apps/server/test`, 90; también con `npm run test:pg`)
+- `database.test.ts` (5): traducción de SQL a PostgreSQL, selección de motor, las pruebas ignoran una `DATABASE_URL` real, configuración de Render y del ping.
+- `readonly.test.ts` (1): todas las consultas de lectura del jugador y del panel con datos reales, y libro mayor cuadrado.
 - `auth.test.ts` (17): hash, cookies, CSRF, orígenes, cabeceras, roles, bloqueo, saldo ilimitado del administrador, limitación de registros.
 - `games.test.ts` (17): liquidación, idempotencia, saldo insuficiente, **doble liquidación imposible**, **concurrencia**, blackjack con secuencia, logros, juegos desactivados.
 - `poker.test.ts` (6): partida por WebSocket sin ver cartas ajenas, desconexiones, acciones inválidas, reembolso tras caída.

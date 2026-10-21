@@ -23,7 +23,15 @@ export function publicRoutes(ctx: AppContext): Router {
   const { db } = ctx;
 
   r.get('/health', (_req, res) => {
-    res.json({ ok: true, uptimeSec: Math.round((Date.now() - ctx.startedAt) / 1000) });
+    // Una consulta mínima: confirma que la base de datos responde y, con Supabase,
+    // cuenta como actividad (el plan gratuito pausa los proyectos inactivos).
+    let database = true;
+    try {
+      db.get('SELECT 1 AS ok');
+    } catch {
+      database = false;
+    }
+    res.status(database ? 200 : 503).json({ ok: database, database, uptimeSec: Math.round((Date.now() - ctx.startedAt) / 1000) });
   });
 
   /** Datos de la portada: juegos habilitados, mesas reales y presencia real. */

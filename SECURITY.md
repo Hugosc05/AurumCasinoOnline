@@ -72,6 +72,14 @@ Aurum no maneja dinero real, pero se trata como si lo hiciera: el saldo, los res
 - Revisión del 20/10/2026: `npm audit --omit=dev` sin vulnerabilidades tras actualizar `ws` a 8.22.0 (la 8.18.3 tenía dos avisos altos). Sin secretos ni bases de datos en el repositorio y sin cuentas administrativas con contraseña por defecto.
 - Dependencias mínimas y con versión fija. Revisa periódicamente con `npm audit` (algunos avisos pueden afectar solo a herramientas de desarrollo).
 
+## Despliegue en Render + Supabase
+
+- La cadena de conexión de Supabase solo existe como variable de entorno del servidor en Render (`DATABASE_URL`); el navegador nunca habla con la base de datos ni recibe credenciales.
+- Conexión cifrada (TLS). Por defecto no se verifica la cadena de certificados del *pooler* de Supabase (no es de una autoridad pública); para verificarla, define `DATABASE_SSL_CA` con el certificado que Supabase permite descargar.
+- `NODE_ENV=production`: cookies `Secure`, HSTS y simulación de anuncios prohibida. El origen permitido es la dirección pública que Render comunica en `RENDER_EXTERNAL_URL`.
+- Las pruebas nunca se conectan a una base de datos real: con `NODE_ENV=test` se ignora cualquier `DATABASE_URL` que no sea PGlite local.
+- El ping de mantenimiento llama a `/api/health`, que no expone datos (solo `ok`, `database` y tiempo activo).
+
 ## Modo online (`npm run online`)
 
 - El servidor escucha solo en `127.0.0.1`; el único acceso externo es el túnel de Cloudflare (HTTPS). No se abre ningún puerto del router.

@@ -52,20 +52,20 @@ export function seed(db: Database): { bots: number; tables: number } {
   let tables = 0;
   db.tx(() => {
     for (const [key, value] of Object.entries(DEFAULT_SETTINGS)) {
-      db.run('INSERT OR IGNORE INTO settings (key, value_json, updated_at) VALUES (?, ?, ?)', key, JSON.stringify(value), now);
+      db.run('INSERT INTO settings (key, value_json, updated_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING', key, JSON.stringify(value), now);
     }
     bots += seedBots(db, now);
     for (const t of BJ_TABLES) {
       tables += db.run(
-        `INSERT OR IGNORE INTO blackjack_tables (id, name, min_bet, max_bet, min_buy_in, max_buy_in, max_seats, max_bots, target_players, sort_order, created_at)
-         VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)`,
+        `INSERT INTO blackjack_tables (id, name, min_bet, max_bet, min_buy_in, max_buy_in, max_seats, max_bots, target_players, sort_order, created_at)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
         t.id, t.name, t.min, t.max, t.seats, t.bots, t.target, t.order, now,
       ).changes;
     }
     for (const t of DEMO_TABLES) {
       tables += db.run(
-        `INSERT OR IGNORE INTO poker_tables (id, name, small_blind, big_blind, min_buy_in, max_buy_in, max_seats, max_bots, target_players, sort_order, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO poker_tables (id, name, small_blind, big_blind, min_buy_in, max_buy_in, max_seats, max_bots, target_players, sort_order, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`,
         t.id, t.name, t.sb, t.bb, t.min, t.max, t.seats, t.bots, t.target, t.order, now,
       ).changes;
     }

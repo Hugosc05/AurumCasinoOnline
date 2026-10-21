@@ -36,7 +36,7 @@ export function recordOutcome(db: Database, input: OutcomeInput): { unlocked: Un
     const loss = net < 0 ? 1 : 0;
     const push = net === 0 ? 1 : 0;
 
-    db.run('INSERT OR IGNORE INTO user_stats (user_id, updated_at) VALUES (?, ?)', input.userId, now);
+    db.run('INSERT INTO user_stats (user_id, updated_at) VALUES (?, ?) ON CONFLICT DO NOTHING', input.userId, now);
     const prev = db.get<{ current_streak: number; best_streak: number; biggest_win: number; rounds: number; wins: number }>(
       'SELECT current_streak, best_streak, biggest_win, rounds, wins FROM user_stats WHERE user_id = ?',
       input.userId,
@@ -52,8 +52,9 @@ export function recordOutcome(db: Database, input: OutcomeInput): { unlocked: Un
     );
     db.run(
       `INSERT INTO user_game_stats (user_id, game, rounds, wins, losses, total_bet, total_payout) VALUES (?, ?, 1, ?, ?, ?, ?)
-       ON CONFLICT(user_id, game) DO UPDATE SET rounds = rounds + 1, wins = wins + excluded.wins, losses = losses + excluded.losses,
-         total_bet = total_bet + excluded.total_bet, total_payout = total_payout + excluded.total_payout`,
+       ON CONFLICT(user_id, game) DO UPDATE SET rounds = user_game_stats.rounds + 1, wins = user_game_stats.wins + excluded.wins,
+         losses = user_game_stats.losses + excluded.losses, total_bet = user_game_stats.total_bet + excluded.total_bet,
+         total_payout = user_game_stats.total_payout + excluded.total_payout`,
       input.userId, input.game, win, loss, input.bet, input.payout,
     );
 
@@ -75,7 +76,7 @@ export function recordOutcome(db: Database, input: OutcomeInput): { unlocked: Un
     const unlocked: UnlockedAchievement[] = [];
     for (const id of candidates) {
       const r = db.run(
-        'INSERT OR IGNORE INTO user_achievements (user_id, achievement_id, round_id, unlocked_at) VALUES (?, ?, ?, ?)',
+        'INSERT INTO user_achievements (user_id, achievement_id, round_id, unlocked_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
         input.userId, id, input.roundId, now,
       );
       if (r.changes === 1) unlocked.push({ ...ACHIEVEMENT_BY_ID[id], unlockedAt: now });

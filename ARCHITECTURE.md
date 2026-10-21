@@ -65,7 +65,27 @@ flowchart LR
 - Las operaciones de saldo son **síncronas**: una transacción `BEGIN IMMEDIATE … COMMIT` se ejecuta de principio a fin sin que otra petición del mismo proceso pueda intercalarse. Además las actualizaciones son condicionales (`balance + ? >= 0`) y la columna tiene `CHECK (balance >= 0)`.
 - Todas las consultas usan parámetros `?` (sin concatenación de datos del usuario).
 
-**Camino a PostgreSQL**: el esquema (`apps/server/src/db/migrations/001_init.sql`) usa tipos portables (TEXT para UUID, INTEGER para importes enteros). Para migrar habría que sustituir la clase `Database` por un adaptador `pg` con la misma interfaz (`get/all/run/tx`), convertir `?` a `$n` y hacer asíncronas las transacciones, manteniendo `SELECT … FOR UPDATE` en el monedero. Los motores y la interfaz no cambian.
+### PostgreSQL (Supabase) — v1.4
+
+Con `DATABASE_URL=postgresql://…` la misma clase `Database` usa PostgreSQL. Para no reescribir en asíncrono toda la lógica del monedero, las mesas y las salas (más de 240 consultas), la interfaz sigue siendo **síncrona**:
+
+```mermaid
+sequenceDiagram
+  participant M as Hilo principal (Express, WebSocket, mesas)
+  participant W as Hilo auxiliar (pgWorker.mjs)
+  participant P as PostgreSQL (Supabase)
+  M->>W: consulta n.º 42 (SQL con $1…$n, parámetros)
+  Note over M: Atomics.wait hasta que la memoria compartida diga 42
+  W->>P: una sola conexión (pg, TLS)
+  P-->>W: filas
+  W-->>M: respuesta 42 por MessagePort + Atomics.notify
+```
+
+- Una única conexión y el hilo principal esperando cada respuesta: un `BEGIN … COMMIT` no puede intercalarse con otra petición del proceso, exactamente como con SQLite. Es viable porque el servidor (Render) y la base de datos (Supabase) están en la misma región: 1–3 ms por consulta.
+- `sql.ts` traduce `?` → `$n` (sin tocar literales), protege alias en camelCase y adapta las migraciones (`AUTOINCREMENT` → `IDENTITY`, `COLLATE NOCASE` → `citext`, `INTEGER` → `BIGINT`). El SQL de la aplicación es portable (`ON CONFLICT`, `RETURNING`).
+- Los errores de restricción se normalizan (`UNIQUE constraint failed…`) para que la lógica de idempotencia funcione igual en los dos motores.
+- Cada petición lleva un número: una respuesta tardía (tras agotar los 20 s de espera) nunca se confunde con la siguiente. Si se cae la conexión, la siguiente consulta reconecta; una transacción en curso falla y se deshace.
+- Pruebas: `npm run test:pg` ejecuta toda la batería del servidor contra PostgreSQL real (PGlite, PostgreSQL compilado a WebAssembly, servido por un socket local y consultado con el mismo driver `pg`).
 
 ### Modelo de datos
 
@@ -206,7 +226,9 @@ sequenceDiagram
 
 | Decisión | Alternativa | Motivo |
 | --- | --- | --- |
-| `node:sqlite` | Prisma + PostgreSQL | Sin instalación ni binarios nativos en Windows; transacciones síncronas simples. |
+| `node:sqlite` en local | Prisma + PostgreSQL | Sin instalación ni binarios nativos en Windows; transacciones síncronas simples. |
+| PostgreSQL síncrono vía hilo auxiliar | Reescribir todo en asíncrono con `SELECT … FOR UPDATE` | Mismas garantías con un cambio acotado a la capa de datos; requiere BD en la misma región. |
+| Supabase | Firebase | Relacional con transacciones, claves únicas y restricciones `CHECK`: lo que protege los saldos. |
 | scrypt (`node:crypto`) | bcrypt/argon2 | Sin dependencias nativas; parámetros guardados en el hash. |
 | Sesión opaca en cookie httpOnly | JWT en localStorage | Revocable, no accesible desde JS. |
 | SVG + rAF para la ruleta | Three.js | Calidad suficiente con un coste de carga y CPU mucho menor; sin dependencia pesada. |

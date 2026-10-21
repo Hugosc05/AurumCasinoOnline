@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     },
   });
   const config = loadConfig();
-  const db = new Database(config.dbFile);
+  const db = new Database(config.dbTarget);
   migrate(db);
   seed(db);
 

@@ -1,6 +1,6 @@
 {
   "name": "aurum-casino",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "description": "Casino online con moneda exclusivamente virtual: blackjack, Texas Hold'em con bots, ruleta europea y slots.",
   "license": "MIT",
@@ -27,6 +27,7 @@
     "typecheck": "npm run typecheck -w @aurum/engine && npm run typecheck -w @aurum/server && npm run typecheck -w @aurum/web",
     "lint": "npm run typecheck",
     "test": "vitest run",
+    "test:pg": "node scripts/test-pg.mjs",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:dev": "playwright test -c playwright.dev.config.ts",

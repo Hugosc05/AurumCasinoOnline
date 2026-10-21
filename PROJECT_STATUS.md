@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Actualizado: 20/10/2026 — versión 1.3.0.
+Actualizado: 21/10/2026 — versión 1.4.0.
 
 ## Hecho y verificado
 
@@ -24,13 +24,15 @@ Actualizado: 20/10/2026 — versión 1.3.0.
 | Logros, promociones, clasificación, actividad anonimizada | Completo | Pruebas de integración |
 | Panel de administración (incluye economía, anuncios y mesas de blackjack) | Completo | E2E + capturas |
 | Responsive (escritorio y móvil) | Completo | Capturas 1440 px y 390 px + E2E móvil |
-| Documentación | Actualizada para 1.3.0 | — |
+| PostgreSQL / Supabase y despliegue en Render — v1.4 | Completo; **no desplegado todavía en Render/Supabase reales** | 90 pruebas de servidor y 17 E2E contra PostgreSQL (PGlite) + arranque en modo Render simulado |
+| Documentación | Actualizada para 1.4.0 (incluye DEPLOY.md) | — |
 
 ## Límites actuales (no son errores)
 
 - **Anuncios**: no se integra ningún SDK de proveedor. Con `ADS_PROVIDER=none` (por defecto) la interfaz indica que no hay anuncios; `signed-callback` necesita un proveedor que llame a `/api/ads/callback` con la firma documentada.
 - **Salas privadas**: las salas de blackjack siempre usan el saldo (las fichas de sala solo existen en póker). Tras reiniciar el servidor, las salas abiertas se recrean con la mesa vacía (las fichas ya se reembolsaron). No hay chat ni moderación (expulsar o bloquear).
 - **Slots**: no hay símbolos expansivos; las funciones son comodín multiplicador, scatter, giros gratis, combinación especial y bono de cofres.
+- **Render + Supabase**: la conexión real con Supabase y el despliegue en Render no se han probado desde aquí (requieren tus cuentas). El ping evita que el plan gratuito se duerma mientras el servicio está en marcha; tras un reinicio sin visitas puede dormirse hasta la siguiente visita (de ahí el monitor de UptimeRobot recomendado). Las cuentas del SQLite local no se copian a Supabase.
 - **Una sola instancia**: mesas, salas en juego y limitadores de frecuencia viven en memoria. Para varias instancias haría falta un almacén compartido (p. ej., Redis) y PostgreSQL.
 - **Bots**: razonables pero explotables (ver `GAME_RULES.md#bots`).
 - **Blackjack**: sin seguro ni rendición; una sola división por mano.

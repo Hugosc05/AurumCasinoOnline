@@ -352,7 +352,7 @@ export class RoomService {
     const target = this.db.get<{ id: string; username: string }>('SELECT id, username FROM users WHERE lower(username) = lower(?)', username.trim());
     if (!target || !this.social.areFriends(userId, target.id)) throw forbidden('Solo puedes invitar a tus amigos');
     if (this.db.get('SELECT 1 AS x FROM room_members WHERE room_id = ? AND user_id = ?', roomId, target.id)) throw conflict('ALREADY_MEMBER', 'Ya está en la sala');
-    this.db.run('INSERT OR IGNORE INTO room_invites (room_id, user_id, invited_by, created_at) VALUES (?, ?, ?, ?)', roomId, target.id, userId, nowIso());
+    this.db.run('INSERT INTO room_invites (room_id, user_id, invited_by, created_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING', roomId, target.id, userId, nowIso());
     const from = this.db.get<{ id: string; username: string }>('SELECT id, username FROM users WHERE id = ?', userId)!;
     this.social.notify(target.id, 'room_invite', { roomId, roomName: r.name, game: r.game, from });
     return { ok: true, invited: { id: target.id, username: target.username } };

@@ -2,6 +2,18 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.4.0] — 2026-10-21
+
+### Añadido
+- **PostgreSQL / Supabase**: con `DATABASE_URL` el servidor usa PostgreSQL en lugar de SQLite, con las mismas migraciones (traducidas al arrancar) y las mismas garantías del monedero. Las consultas se ejecutan en un hilo auxiliar y el servidor espera cada respuesta, así que las transacciones siguen siendo atómicas sin reescribir la lógica de juego.
+- **Render**: `render.yaml` (servicio web gratuito en Fráncfort), su dirección pública admitida automáticamente como origen y ping cada 5 minutos a `/api/health` para que no se duerma; `/api/health` comprueba también la base de datos.
+- `DEPLOY.md`: guía paso a paso para publicar en Render + Supabase.
+- `npm run test:pg` (las pruebas del servidor contra PostgreSQL real con PGlite) y `E2E_DB=pg` para las de extremo a extremo; pruebas nuevas de traducción SQL, configuración y todas las consultas de lectura.
+
+### Cambiado
+- SQL portable entre los dos motores: `ON CONFLICT DO NOTHING`, `RETURNING id`, columnas calificadas en los *upserts* y búsqueda en JSON sin funciones propias de SQLite.
+- Las pruebas ignoran cualquier `DATABASE_URL` real del entorno.
+
 ## [1.3.1] — 2026-10-21
 
 ### Añadido

@@ -342,7 +342,8 @@ export function adminRoutes(ctx: AppContext): Router {
   r.get('/diagnostics', (_req, res) => {
     let dbSize: number | null = null;
     try {
-      dbSize = ctx.config.dbFile === ':memory:' ? null : statSync(ctx.config.dbFile).size;
+      if (db.dialect === 'postgres') dbSize = db.get<{ n: number }>('SELECT pg_database_size(current_database()) AS n')?.n ?? null;
+      else dbSize = ctx.config.dbFile === ':memory:' ? null : statSync(ctx.config.dbFile).size;
     } catch {
       dbSize = null;
     }
@@ -353,10 +354,11 @@ export function adminRoutes(ctx: AppContext): Router {
       uptimeSec: Math.round((Date.now() - ctx.startedAt) / 1000),
       memoryMb: { rss: Math.round(mem.rss / 1e6), heapUsed: Math.round(mem.heapUsed / 1e6) },
       database: {
-        file: ctx.config.dbFile,
+        engine: db.dialect === 'postgres' ? 'PostgreSQL' : 'SQLite',
+        file: db.dialect === 'postgres' ? null : ctx.config.dbFile,
         sizeBytes: dbSize,
         migrations: db.all('SELECT version, name, applied_at AS appliedAt FROM schema_migrations ORDER BY version'),
-        integrity: db.get<{ quick_check: string }>('PRAGMA quick_check')?.quick_check ?? 'desconocido',
+        integrity: db.dialect === 'postgres' ? 'ok' : (db.get<{ quick_check: string }>('PRAGMA quick_check')?.quick_check ?? 'desconocido'),
       },
       realtime: { online: ctx.realtime.onlineCount(), connections: ctx.realtime.connectionCount() },
       poker: ctx.poker.diagnostics(),

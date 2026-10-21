@@ -1,0 +1,29 @@
+# Despliegue en Render (plan gratuito). En Render: New → Blueprint → elige este repositorio.
+# Solo tendrás que pegar DATABASE_URL (la cadena de conexión de Supabase). Guía completa: DEPLOY.md
+services:
+  - type: web
+    name: aurum-casino
+    runtime: node
+    plan: free
+    # Misma región que el proyecto de Supabase (eu-central-1, Fráncfort): cada consulta tarda 1–3 ms.
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render publica el servicio en su balanceador: hay que escuchar en todas las interfaces.
+      - key: HOST
+        value: 0.0.0.0
+      # La IP real de cada jugador llega en X-Forwarded-For desde el balanceador de Render.
+      - key: TRUST_PROXY
+        value: "true"
+      # Ping a sí mismo cada 5 minutos para que el plan gratuito no lo duerma.
+      - key: KEEPALIVE
+        value: "true"
+      # Cadena de conexión de Supabase («Session pooler», puerto 5432). Se pide al crear el servicio.
+      - key: DATABASE_URL
+        sync: false

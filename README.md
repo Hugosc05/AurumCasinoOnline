@@ -2,7 +2,7 @@
 
 Plataforma de casino **exclusivamente de demostración**: blackjack individual y multijugador con crupier animado, Texas Hold'em en tiempo real con asistente de manos, ruleta europea con bola física y apuestas pintadas a mano, dos máquinas de slots con funciones especiales, amigos y salas privadas. Se juega con créditos virtuales sin valor económico: no hay pagos, depósitos, retiradas ni conversión a dinero real.
 
-Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pago y sin binarios nativos que compilar.
+Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pago y sin binarios nativos que compilar. Para jugar con amigos por internet sin tener tu PC encendido, se puede publicar gratis en **Render + Supabase**: guía paso a paso en [DEPLOY.md](DEPLOY.md).
 
 ![Portada](docs/screenshots/home.png)
 
@@ -58,7 +58,11 @@ Compila el frontend y arranca el servidor en un solo proceso. Abre **http://loca
 
 Equivale a `npm run build` seguido de `npm start`.
 
-### Jugar online con amigos (gratis)
+### Publicarlo en internet (Render + Supabase)
+
+Sigue [DEPLOY.md](DEPLOY.md): el servidor queda en Render y la base de datos en Supabase (PostgreSQL), los dos gratis y sin tu PC encendido.
+
+### Jugar online desde tu PC (túnel temporal)
 
 ```powershell
 npm run online
@@ -87,7 +91,8 @@ Compila, abre un túnel rápido de Cloudflare (gratuito, sin cuenta y sin abrir 
 | `npm start` | Arranca el servidor (sirve `dist` si existe) |
 | `npm run jugar` | Compila y arranca la versión optimizada (http://localhost:3001) |
 | `npm run online` | Igual, y además la publica por internet con un túnel gratuito de Cloudflare para jugar con amigos |
-| `npm test` | 379 pruebas unitarias y de integración (Vitest) |
+| `npm test` | 385 pruebas unitarias y de integración (Vitest, SQLite) |
+| `npm run test:pg` | Las 90 pruebas del servidor contra PostgreSQL real (PGlite), como en Supabase |
 | `npm run test:e2e` | 17 pruebas de extremo a extremo con Playwright (versión compilada) |
 | `npm run test:e2e:dev` | Pruebas de animación contra el servidor de desarrollo (modo estricto de React) |
 | `npm run typecheck` / `npm run lint` | Comprobación de tipos estricta de los tres paquetes |
@@ -102,7 +107,7 @@ Las migraciones y los datos de demostración se aplican solos al arrancar el ser
 
 - **Frontend**: React 19, TypeScript estricto, Vite 6, Tailwind CSS 3, Motion (Framer Motion), Lucide. Tipografías Bodoni Moda y Manrope autoalojadas (sin peticiones a terceros).
 - **Backend**: Node.js, Express 5, `ws`, Zod, Helmet.
-- **Datos**: SQLite integrado en Node con migraciones SQL versionadas y repositorio propio; preparado para migrar a PostgreSQL (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
+- **Datos**: SQLite integrado en Node en local, o PostgreSQL (Supabase) si se define `DATABASE_URL`. Las mismas migraciones SQL versionadas sirven para los dos (ver [ARCHITECTURE.md](ARCHITECTURE.md)).
 - **Pruebas**: Vitest y Playwright.
 - **Audio**: sonidos sintetizados en el navegador con Web Audio (originales, sin licencias de terceros). **Desactivado por defecto**; se activa con el altavoz de la cabecera.
 - **Efectos**: partículas de celebración proporcionales al premio, regulables o desactivables en Perfil → Ajustes.
@@ -119,6 +124,7 @@ docs              Guía de animación y capturas
 
 ## Documentación
 
+- [DEPLOY.md](DEPLOY.md): publicarlo gratis en Render + Supabase
 - [ARCHITECTURE.md](ARCHITECTURE.md): arquitectura, diagramas y decisiones técnicas
 - [GAME_RULES.md](GAME_RULES.md): reglas, pagos y RTP de los cuatro juegos
 - [SECURITY.md](SECURITY.md): modelo de seguridad

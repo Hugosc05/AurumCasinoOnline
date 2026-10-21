@@ -196,7 +196,8 @@ export class SocialService {
     const r = this.pending(requestId);
     if (r.requester_id !== userId) throw forbidden('Solo puedes cancelar tus propias solicitudes');
     this.db.run('DELETE FROM friendships WHERE id = ?', r.id);
-    this.db.run(`DELETE FROM notifications WHERE user_id = ? AND kind = 'friend_request' AND json_extract(payload_json, '$.requestId') = ?`, r.addressee_id, r.id);
+    // Comparación sobre el texto JSON (portable entre SQLite y PostgreSQL); el id es un UUID sin comodines.
+    this.db.run(`DELETE FROM notifications WHERE user_id = ? AND kind = 'friend_request' AND payload_json LIKE ?`, r.addressee_id, `%"requestId":"${r.id}"%`);
     this.hub.sendToUser(r.addressee_id, { t: 'friends.changed' });
   }
 
@@ -210,8 +211,8 @@ export class SocialService {
 
   notify(userId: string, kind: 'friend_request' | 'friend_accepted' | 'room_invite', payload: Record<string, unknown>): void {
     const at = nowIso();
-    const r = this.db.run('INSERT INTO notifications (user_id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)', userId, kind, JSON.stringify(payload), at);
-    this.hub.sendToUser(userId, { t: 'notification', notification: { id: r.lastInsertRowid, kind, payload, readAt: null, createdAt: at } });
+    const r = this.db.get<{ id: number }>('INSERT INTO notifications (user_id, kind, payload_json, created_at) VALUES (?, ?, ?, ?) RETURNING id', userId, kind, JSON.stringify(payload), at)!;
+    this.hub.sendToUser(userId, { t: 'notification', notification: { id: Number(r.id), kind, payload, readAt: null, createdAt: at } });
     // Se conservan las 100 más recientes.
     this.db.run('DELETE FROM notifications WHERE user_id = ? AND id NOT IN (SELECT id FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 100)', userId, userId);
   }

@@ -37,7 +37,7 @@ export interface RunningApp {
 }
 
 export function buildApp(config: AppConfig, db?: Database): RunningApp {
-  const database = db ?? new Database(config.dbFile);
+  const database = db ?? new Database(config.dbTarget);
   logger.attach(database, config.LOG_LEVEL);
   migrate(database);
   seed(database);

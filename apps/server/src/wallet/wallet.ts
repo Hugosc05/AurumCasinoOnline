@@ -51,12 +51,12 @@ export function applyWalletMove(db: Database, userId: string, amount: number, re
       if (r.changes !== 1) throw new AppError(402, 'INSUFFICIENT_FUNDS', 'Saldo virtual insuficiente');
       after = before + amount;
     }
-    const tx = db.run(
+    const tx = db.get<{ id: number }>(
       `INSERT INTO wallet_transactions (user_id, amount, balance_before, balance_after, reason, round_id, unlimited, meta_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
       userId, amount, before, after, reason, opts.roundId ?? null, unlimited ? 1 : 0, opts.meta ? JSON.stringify(opts.meta) : null, nowIso(),
     );
-    return { userId, amount, balanceBefore: before, balanceAfter: after, unlimited, transactionId: tx.lastInsertRowid };
+    return { userId, amount, balanceBefore: before, balanceAfter: after, unlimited, transactionId: Number(tx!.id) };
   });
 }
 
