@@ -445,7 +445,7 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
       )}
 
       <div className="relative rounded-[50%/40%] p-2">
-        <Stage width={g.w} height={g.h} maxHeightVh={narrow ? 92 : 70}>
+        <Stage width={g.w} height={g.h} maxHeightVh={narrow ? 78 : 60}>
           {/* Mesa ovalada */}
           <div className="rail absolute rounded-[50%]" style={{ left: g.cx - g.rx + 20, top: g.cy - g.ry + 60, width: (g.rx - 20) * 2, height: (g.ry - 60) * 2 }} />
           <div className="felt absolute rounded-[50%] shadow-[inset_0_0_60px_rgba(0,0,0,0.6)]" style={{ left: g.cx - g.rx + 44, top: g.cy - g.ry + 84, width: (g.rx - 44) * 2, height: (g.ry - 84) * 2 }} />
@@ -560,13 +560,15 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
         </Stage>
       </div>
 
-      {/* Asistente de manos (debajo de las cartas del jugador) */}
-      {heroSeat !== null && vis.handId && (
-        <HandAssistant insight={insight} mode={assistMode} onMode={(m) => void updatePrefs({ pokerAssist: m })} folded={heroFolded} />
-      )}
-
-      {/* Controles del jugador */}
-      <div className="panel mt-4 p-4 sm:p-5">
+      {/* Controles del jugador: justo debajo de la mesa y fijos al borde inferior de la pantalla
+          mientras se juega, para no tener que desplazarse en cada turno. */}
+      <div
+        className={cx(
+          'panel sticky bottom-2 z-30 mt-3 border-white/10 bg-[#0b1220]/95 p-3 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-4',
+          legal && 'border-oro/60 shadow-[0_-12px_40px_rgba(0,0,0,0.55),0_0_0_1px_rgba(207,174,107,0.35)]',
+        )}
+        data-testid="poker-controls"
+      >
         {heroSeat === null ? (
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-niebla">
             <span>Estás mirando la mesa. Siéntate en un asiento libre para jugar.</span>
@@ -617,6 +619,11 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
           </div>
         )}
       </div>
+
+      {/* Asistente de manos (debajo de las cartas del jugador) */}
+      {heroSeat !== null && vis.handId && (
+        <HandAssistant insight={insight} mode={assistMode} onMode={(m) => void updatePrefs({ pokerAssist: m })} folded={heroFolded} />
+      )}
 
       {/* Historial de manos */}
       <div className="panel mt-4 p-5">
