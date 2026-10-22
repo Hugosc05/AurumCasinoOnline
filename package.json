@@ -1,6 +1,6 @@
 {
   "name": "aurum-casino",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "Casino online con moneda exclusivamente virtual: blackjack, Texas Hold'em con bots, ruleta europea y slots.",
   "license": "MIT",

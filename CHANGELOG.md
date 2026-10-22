@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.5.0] — 2026-10-22
+
+### Añadido
+- **Ruleta 3D** (three.js) con física de la bola: pista, caída, rombos, rebotes en los separadores y asentamiento. Termina siempre en el número del servidor corrigiendo la fase del rotor antes de que la bola lo toque. Se carga aparte; sin WebGL o con animaciones desactivadas, ruleta 2.5D.
+- **Blackjack multijugador** en una mesa de casino real: media luna con baranda de cuero, leyendas impresas, bandeja de fichas, zapato y descartes, casillas de apuesta por asiento.
+- **Tragaperras**: rótulo iluminado, bisel cromado y contador de premio grande que sube y cambia de categoría solo si el premio real la alcanza.
+
+### Cambiado
+- Póker y blackjack: los controles del jugador van justo debajo de la mesa y quedan fijos al borde inferior mientras se juega.
+
 ## [1.4.0] — 2026-10-21
 
 ### Añadido
