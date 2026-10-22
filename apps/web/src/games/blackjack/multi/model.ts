@@ -87,6 +87,8 @@ export interface MultiGeometry {
   rx: number;
   ry: number;
   dealerBox: { left: number; top: number; w: number; h: number };
+  /** Altura del borde recto de la mesa (lado del crupier). */
+  tableTop: number;
   dealerRow: { x: number; y: number };
   shoe: { x: number; y: number };
   discard: { x: number; y: number };
@@ -111,12 +113,13 @@ export const MULTI_LANDSCAPE: MultiGeometry = {
   w: 1100, h: 700,
   cx: 550, cy: 104, rx: 450, ry: 486,
   dealerBox: { left: 420, top: -10, w: 260, h: 210 },
+  tableTop: 150,
   dealerRow: { x: 550, y: 262 },
-  shoe: { x: 940, y: 110 },
-  discard: { x: 160, y: 110 },
+  shoe: { x: 935, y: 206 },
+  discard: { x: 165, y: 206 },
   cardW: 62, dealerCardW: 70,
   cardsAt: 0.645, betAt: 0.815, plateAt: 1.0,
-  arcFrom: 20, arcTo: 160,
+  arcFrom: 27, arcTo: 153,
   plateScale: 1,
   layout: 'radial',
 };
@@ -125,9 +128,10 @@ export const MULTI_PORTRAIT: MultiGeometry = {
   w: 560, h: 840,
   cx: 280, cy: 380, rx: 205, ry: 334,
   dealerBox: { left: 150, top: -16, w: 260, h: 210 },
+  tableTop: 168,
   dealerRow: { x: 280, y: 246 },
-  shoe: { x: 498, y: 92 },
-  discard: { x: 62, y: 92 },
+  shoe: { x: 455, y: 232 },
+  discard: { x: 105, y: 232 },
   cardW: 46, dealerCardW: 54,
   cardsAt: 1, betAt: 1, plateAt: 1.0,
   arcFrom: 5, arcTo: 175,

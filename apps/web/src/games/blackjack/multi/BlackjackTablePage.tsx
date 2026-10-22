@@ -9,6 +9,7 @@ import { ChipRack, OddsNote, SkipButton } from '../../../components/GameKit';
 import { CardBack } from '../../../components/PlayingCard';
 import { ShuffleAnimation } from '../../../components/ShuffleAnimation';
 import { Stage } from '../../../components/Stage';
+import { TableFelt } from './TableFelt';
 import { TableCard } from '../../../components/TableCard';
 import { Badge, Button, Spinner } from '../../../components/ui';
 import { Sequencer, type SequenceStep } from '../../../lib/anim/sequencer';
@@ -364,17 +365,10 @@ export default function BlackjackTablePage({ tableId: tableIdProp, embedded = fa
         </span>
       </div>
 
-      <div className="rail relative rounded-[44px] p-2.5 sm:rounded-[64px] sm:p-3.5">
-        <div className="felt relative overflow-hidden rounded-[36px] shadow-[inset_0_0_80px_rgba(0,0,0,0.55)] sm:rounded-[54px]">
-          <Stage width={g.w} height={g.h} maxHeightVh={74}>
-            {/* Leyendas y casillas del tapete */}
-            <svg className="pointer-events-none absolute inset-0" width={g.w} height={g.h} aria-hidden>
-              {Array.from({ length: n }, (_, i) => {
-                if (!snap.seats[i]) return null;
-                const b = seatSpots(i, n, g).bet;
-                return <circle key={i} cx={b.x} cy={b.y} r="26" fill="none" stroke="#e8d9b0" strokeOpacity={i === yourSeat ? 0.65 : 0.3} strokeWidth="2" strokeDasharray="5 5" />;
-              })}
-            </svg>
+      <div className="relative">
+        <div className="relative">
+          <Stage width={g.w} height={g.h} maxHeightVh={narrow ? 80 : 66}>
+            <TableFelt g={g} n={n} occupied={snap.seats.map((x) => x !== null)} yourSeat={yourSeat} />
 
             {/* Crupier */}
             <div className="absolute" style={{ left: g.dealerBox.left, top: g.dealerBox.top, width: g.dealerBox.w, height: g.dealerBox.h }}>
@@ -524,7 +518,7 @@ export default function BlackjackTablePage({ tableId: tableIdProp, embedded = fa
       </div>
 
       {/* Controles */}
-      <div className="panel mt-5 flex flex-col gap-4 p-4 sm:p-5" aria-live="polite">
+      <div className="panel sticky bottom-2 z-30 mt-3 flex flex-col gap-3 border-white/10 bg-[#0b1220]/95 p-3 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-4" aria-live="polite">
         {yourSeat === null ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-niebla">{user ? 'Elige un asiento libre en la mesa para jugar. Mientras tanto, estás observando.' : 'Inicia sesión para sentarte. Puedes observar la partida.'}</p>
@@ -568,15 +562,17 @@ export default function BlackjackTablePage({ tableId: tableIdProp, embedded = fa
               </div>
             )}
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-niebla">Si se agota tu tiempo de turno, te plantas automáticamente. Atajos: H, S, D, P y Enter para apostar.</span>
+              <span className="hidden text-xs text-niebla sm:inline">Si se agota tu tiempo de turno, te plantas automáticamente. Atajos: H, S, D, P y Enter para apostar.</span>
               <Button variant="ghost" size="sm" onClick={() => socket.send({ t: 'bj.leave', tableId })}><LogOut className="h-4 w-4" /> Levantarse</Button>
             </div>
           </>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-niebla">
-          <span>{mode.text}</span>
-          <OddsNote />
-        </div>
+      </div>
+      {/* Información (fuera de la barra fija, para que no tape la mesa en el móvil) */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-niebla">
+        {yourSeat !== null && <span className="sm:hidden">Si se agota tu tiempo de turno, te plantas automáticamente.</span>}
+        <span>{mode.text}</span>
+        <OddsNote />
       </div>
 
       {snap.history.length > 0 && (
