@@ -172,6 +172,40 @@ const Bulbs = memo(function Bulbs({ count, mode, reverse }: { count: number; mod
   );
 });
 
+/**
+ * Contador del premio grande: sube como en una máquina real y el rótulo crece de categoría
+ * («Gran premio» → «Premio extraordinario») solo si el premio real la alcanza.
+ */
+function BigWinMeter({ amount, multiplier, tier, durationMs }: { amount: number; multiplier: number; tier: WinTier; durationMs: number }) {
+  const numRef = useRef<HTMLParagraphElement>(null);
+  const [label, setLabel] = useState<WinTier>('big');
+  useEffect(() => {
+    const start = performance.now();
+    const megaAt = tier === 'mega' ? 0.55 : 2;
+    let id = 0;
+    const step = (now: number): void => {
+      const u = Math.min(1, (now - start) / Math.max(1, durationMs));
+      const eased = 1 - (1 - u) ** 3;
+      if (numRef.current) numRef.current.textContent = credits(Math.round(amount * eased));
+      if (u >= megaAt) setLabel('mega');
+      if (u < 1) id = requestAnimationFrame(step);
+    };
+    id = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(id);
+  }, [amount, tier, durationMs]);
+  return (
+    <>
+      <AnimatePresence mode="wait">
+        <motion.p key={label} className="font-display text-[clamp(1.8rem,5vw,3.4rem)] leading-none gold-text drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]" initial={{ scale: 1.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
+          {TIER_TEXT[label]}
+        </motion.p>
+      </AnimatePresence>
+      <p ref={numRef} className="mt-2 font-display text-[clamp(2.2rem,6vw,4rem)] leading-none tabular-nums text-marfil drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">0</p>
+      <p className="mt-1 text-sm text-oro-claro">{multiplier.toFixed(0)} veces la apuesta</p>
+    </>
+  );
+}
+
 export default function SlotsPageRoute() {
   const { machineId = 'aurum-royale' } = useParams();
   const machine = SLOT_MACHINES.find((m) => m.id === machineId);
@@ -607,6 +641,13 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
           </AnimatePresence>
           <Celebration ref={machineFx} level={effects} className="pointer-events-none absolute inset-0 z-20 h-full w-full" />
 
+          {/* Rótulo superior iluminado, como el de una máquina de sala */}
+          <div className="slot-topper relative mx-auto mb-3 w-full max-w-[520px] rounded-[18px] px-5 py-1.5 text-center" aria-hidden>
+            <Bulbs count={14} mode={bulbMode === 'off' ? 'off' : bulbMode} />
+            <p className={cx('slot-topper-title my-0.5 font-display text-[clamp(1.35rem,3vw,2.1rem)] leading-none tracking-wide', theme.accent)}>{machine.name}</p>
+            <Bulbs count={14} mode={bulbMode === 'off' ? 'off' : bulbMode} reverse />
+          </div>
+
           {/* Marquesina con luces */}
           {freeMode && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-2xl border border-[#7ff0e4]/40 bg-[#7ff0e4]/10 px-4 py-2 text-sm text-marfil" role="status" data-testid="free-spins">
@@ -641,7 +682,7 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
               {cell >= 80 && <LineMarkers side="left" cell={cell} lines={lines} winning={presenting ? winningSet : NO_LINES} active={current?.line ?? null} />}
               <div className="flex flex-col gap-1.5">
               <Bulbs count={Math.round(winW / 34)} mode={bulbMode} />
-              <div className="relative rounded-2xl border-4 border-[#3a2c12] bg-[#120d05] shadow-[inset_0_6px_20px_rgba(0,0,0,0.8),0_0_0_1px_rgba(235,217,166,0.25)]" style={{ width: winW + 8 }}>
+              <div className="slot-bezel relative rounded-2xl bg-[#120d05] p-1" style={{ width: winW + 8 }}>
                 <div className="flex" style={{ gap: GAP }}>
                   {strips.map((strip, i) => (
                     <Reel
@@ -712,9 +753,7 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
                         />
                       )}
                       <motion.div className="relative text-center" initial={{ scale: 0.6, y: 10 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}>
-                        <p className="font-display text-[clamp(1.8rem,5vw,3.4rem)] leading-none gold-text drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">{TIER_TEXT[bigWin.tier]}</p>
-                        <p className="mt-2 font-display text-[clamp(2.2rem,6vw,4rem)] leading-none text-marfil drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">{credits(bigWin.amount)}</p>
-                        <p className="mt-1 text-sm text-oro-claro">{bigWin.multiplier.toFixed(0)} veces la apuesta</p>
+                        <BigWinMeter amount={bigWin.amount} multiplier={bigWin.multiplier} tier={bigWin.tier} durationMs={(TIER_MS[bigWin.tier] || 2000) * Math.max(speed, 0.2)} />
                       </motion.div>
                     </motion.button>
                   )}

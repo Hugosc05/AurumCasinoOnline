@@ -564,7 +564,7 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
           mientras se juega, para no tener que desplazarse en cada turno. */}
       <div
         className={cx(
-          'panel sticky bottom-2 z-30 mt-3 border-white/10 bg-[#0b1220]/95 p-3 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-4',
+          'panel sticky bottom-2 z-30 mt-3 border-white/10 bg-[#0b1220]/95 p-3 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] sm:p-4',
           legal && 'border-oro/60 shadow-[0_-12px_40px_rgba(0,0,0,0.55),0_0_0_1px_rgba(207,174,107,0.35)]',
         )}
         data-testid="poker-controls"

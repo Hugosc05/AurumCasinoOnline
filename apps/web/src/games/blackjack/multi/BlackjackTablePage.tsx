@@ -518,7 +518,7 @@ export default function BlackjackTablePage({ tableId: tableIdProp, embedded = fa
       </div>
 
       {/* Controles */}
-      <div className="panel sticky bottom-2 z-30 mt-3 flex flex-col gap-3 border-white/10 bg-[#0b1220]/95 p-3 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-4" aria-live="polite">
+      <div className="panel sticky bottom-2 z-30 mt-3 flex flex-col gap-3 border-white/10 bg-[#0b1220]/95 p-3 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] sm:p-4" aria-live="polite">
         {yourSeat === null ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-niebla">{user ? 'Elige un asiento libre en la mesa para jugar. Mientras tanto, estás observando.' : 'Inicia sesión para sentarte. Puedes observar la partida.'}</p>
