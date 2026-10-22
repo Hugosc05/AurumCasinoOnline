@@ -1,7 +1,7 @@
 import { DEFAULT_ROULETTE_LIMITS, ROULETTE_BET_LABELS, ROULETTE_PAYOUTS, WHEEL_ORDER, numberColor, type RouletteBet, type RouletteResult } from '@aurum/engine';
 import { AnimatePresence, motion } from 'motion/react';
 import { Brush, Eraser, Repeat2, RotateCcw, Sparkles, Table2, Trash2, Undo2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChipRack, GameHeader, OddsNote, OutcomeBanner, SkipButton, type Outcome } from '../../components/GameKit';
 import { useFlyingChips } from '../../components/FlyingChips';
 import { Button, Modal } from '../../components/ui';
@@ -16,6 +16,11 @@ import { BettingBoard, ZONES, type PlacedBet } from './BettingBoard';
 import { betKey, type Zone } from './board';
 import { Formations } from './Formations';
 import { RouletteWheel, type WheelHandle } from './RouletteWheel';
+import { webglAvailable } from './webgl';
+
+// La ruleta 3D (three.js) se carga aparte para no pesar en el resto de la aplicación.
+const RouletteWheel3D = lazy(() => import('./RouletteWheel3D').then((m) => ({ default: m.RouletteWheel3D })));
+const HAS_WEBGL = typeof document !== 'undefined' && webglAvailable();
 
 interface SpinResponse {
   roundId: string;
@@ -42,6 +47,8 @@ const NUMBER_BG = { red: 'bg-[#9d1f2e]', black: 'bg-[#131925] border border-whit
 
 export default function RoulettePage() {
   const { user, setBalance, speed, motion: level } = useSession();
+  // 3D con WebGL salvo que las animaciones estén desactivadas; si no, la ruleta 2.5D en SVG.
+  const use3d = HAS_WEBGL && level !== 'off';
   const { notify, celebrate } = useNotify();
   const narrow = useIsNarrow();
   const wheel = useRef<WheelHandle>(null);
@@ -306,10 +313,16 @@ export default function RoulettePage() {
         {/* Rueda */}
         <div className="panel relative overflow-hidden p-4 sm:p-6">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(207,174,107,0.10),transparent_60%)]" />
-          <div className="relative mx-auto max-w-[460px]" style={{ perspective: 1200 }}>
-            <div style={{ transform: 'rotateX(30deg)', transformOrigin: '50% 60%' }}>
-              <RouletteWheel ref={wheel} highlight={phase === 'result' && result ? result.pocketIndex : null} className="w-full drop-shadow-[0_30px_40px_rgba(0,0,0,0.8)]" label="Ruleta europea" />
-            </div>
+          <div className={cx('relative mx-auto', use3d ? 'max-w-[620px]' : 'max-w-[460px]')} style={use3d ? undefined : { perspective: 1200 }}>
+            {use3d ? (
+              <Suspense fallback={<div className="w-full" style={{ aspectRatio: '1 / 0.82' }} />}>
+                <RouletteWheel3D ref={wheel} highlight={phase === 'result' && result ? result.pocketIndex : null} className="w-full" label="Ruleta europea en 3D" />
+              </Suspense>
+            ) : (
+              <div style={{ transform: 'rotateX(30deg)', transformOrigin: '50% 60%' }}>
+                <RouletteWheel ref={wheel} highlight={phase === 'result' && result ? result.pocketIndex : null} className="w-full drop-shadow-[0_30px_40px_rgba(0,0,0,0.8)]" label="Ruleta europea" />
+              </div>
+            )}
             <div className="absolute inset-x-0 bottom-2 flex justify-center">
               <SkipButton visible={phase === 'spinning'} onSkip={() => wheel.current?.skip()} />
             </div>
