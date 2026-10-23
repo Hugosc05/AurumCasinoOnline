@@ -316,6 +316,26 @@ export default function BingoRoomPage({ roomId: forcedId, embedded = false }: { 
             )}
           </AnimatePresence>
         </div>
+          {canBuy && (
+            <div className="panel p-4" data-testid="bingo-buy">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm text-marfil">{haveCards > 0 ? `Tienes ${haveCards} ${haveCards === 1 ? 'cartón' : 'cartones'}` : 'Compra tus cartones'}</p>
+                  <p className="text-xs text-niebla">Hasta {view!.maxCards} por partida · {credits(view!.cardPrice)} cada uno</p>
+                </div>
+                {maxMore > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-full border border-linea">
+                      <button type="button" className="h-9 w-9 text-marfil disabled:opacity-40" disabled={count <= 1} onClick={() => setCount((c) => c - 1)} aria-label="Menos">−</button>
+                      <span className="w-6 text-center font-display text-lg text-marfil" data-testid="bingo-count">{Math.min(count, maxMore)}</span>
+                      <button type="button" className="h-9 w-9 text-marfil disabled:opacity-40" disabled={count >= maxMore} onClick={() => setCount((c) => c + 1)} aria-label="Más">+</button>
+                    </div>
+                    <Button onClick={buy} data-testid="bingo-buy-button">Comprar · {credits(Math.min(count, maxMore) * view!.cardPrice)}</Button>
+                  </div>
+                ) : <p className="text-sm text-niebla">Ya tienes el máximo de cartones.</p>}
+              </div>
+            </div>
+          )}
           <div className="panel p-4 text-sm">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-lg text-marfil"><Users className="h-4 w-4 text-oro" /> Jugadores ({view?.players.length ?? 0}/{view?.maxPlayers ?? 20})</h2>
@@ -340,26 +360,6 @@ export default function BingoRoomPage({ roomId: forcedId, embedded = false }: { 
             <div className="panel px-2 py-2"><p className="text-[11px] text-niebla">Bingo</p><p className="font-display text-xl text-oro-claro">{credits(view?.prizes.bingo ?? 0)}</p></div>
           </div>
           <NumberBoard drawn={drawnSet} last={last} />
-          {canBuy && (
-            <div className="panel p-4" data-testid="bingo-buy">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm text-marfil">{haveCards > 0 ? `Tienes ${haveCards} ${haveCards === 1 ? 'cartón' : 'cartones'}` : 'Compra tus cartones'}</p>
-                  <p className="text-xs text-niebla">Hasta {view!.maxCards} por partida · {credits(view!.cardPrice)} cada uno</p>
-                </div>
-                {maxMore > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center rounded-full border border-linea">
-                      <button type="button" className="h-9 w-9 text-marfil disabled:opacity-40" disabled={count <= 1} onClick={() => setCount((c) => c - 1)} aria-label="Menos">−</button>
-                      <span className="w-6 text-center font-display text-lg text-marfil" data-testid="bingo-count">{Math.min(count, maxMore)}</span>
-                      <button type="button" className="h-9 w-9 text-marfil disabled:opacity-40" disabled={count >= maxMore} onClick={() => setCount((c) => c + 1)} aria-label="Más">+</button>
-                    </div>
-                    <Button onClick={buy} data-testid="bingo-buy-button">Comprar · {credits(Math.min(count, maxMore) * view!.cardPrice)}</Button>
-                  </div>
-                ) : <p className="text-sm text-niebla">Ya tienes el máximo de cartones.</p>}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

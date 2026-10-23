@@ -24,6 +24,9 @@ Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pag
 - **Economía virtual**: saldo inicial configurable, recompensa diaria con cuenta atrás y zona horaria, racha amable, pantalla de recuperación sin saldo y módulo de anuncios recompensados (desactivado por defecto; solo paga con confirmación firmada del proveedor).
 - **Amigos**: búsqueda, solicitudes, presencia real (disponible, jugando, desconectado), modo invisible y notificaciones en tiempo real.
 - **Salas privadas** de póker y blackjack: código de invitación con caducidad, invitar a amigos, privacidad, límites, bots opcionales (siempre marcados), fichas de sala en póker, traspaso de anfitrión y cierre con reembolso.
+- **Bingo de 90 bolas**: bombo en 3D con física, salas públicas de hasta 20 jugadores y salas privadas con código; línea y bingo del bote.
+- **Cohete (crash)**: ronda compartida en tiempo real, cobro manual o automático y punto de choque verificable (99 % de devolución).
+- **Plinko**: 8, 12 o 16 filas, tres niveles de riesgo y la campana de Gauss formándose en directo (≈ 99 % de devolución).
 - **Administración**: métricas, usuarios (ajuste de saldo con motivo, suspensión), partidas, bots, mesas, juegos habilitados, errores, auditoría y comprobación del libro mayor. El administrador tiene saldo ilimitado sin poder obtenerlo desde el cliente.
 
 ## Requisitos

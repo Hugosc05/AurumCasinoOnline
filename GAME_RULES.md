@@ -173,6 +173,39 @@ Vegas Nights añade los minijuegos de sala: Hold & Win (6 o más billetes; 3 re-
 
 Según premio total / apuesta total: pequeño (< 4×), medio (4–15×), grande (15–50×) y extraordinario (≥ 50×). Solo cambian la intensidad visual y sonora; no alteran ningún resultado.
 
+## Bingo (90 bolas)
+
+- Cartón de 3 filas × 9 columnas con 15 números: 5 por fila y al menos uno por columna (columna 1: 1–9; 2: 10–19; … 9: 80–90), ordenados de arriba abajo.
+- Salas públicas Sol (10), Luna (50) y Diamante (200): hasta 20 jugadores y 6 cartones por jugador. La cuenta atrás (25 s) empieza con la primera compra.
+- Al empezar se baraja el orden de las 90 bolas con el CSPRNG del servidor; cada bola se publica al extraerse (cada 2,8 s). Los números se marcan solos y el servidor comprueba los premios.
+- Bote = cartones vendidos × precio. **Línea** (primera fila completa): 20 % del bote. **Bingo** (cartón completo): 70 %. Si cantan varios cartones en la misma bola, el premio se reparte a partes iguales (redondeo hacia abajo). La partida termina con el bingo.
+- En las salas públicas la casa añade entre 12 y 30 cartones para completar la partida. Cuentan para el bote y pueden cantar, pero lo que ganen no se paga a nadie: cada cartón de jugador tiene exactamente la misma probabilidad y la misma devolución esperada, **90 %** del precio.
+- Salas privadas de bingo: hasta 20 plazas, precio del cartón a elección y cartones de la casa opcionales.
+- Si se sale de una sala privada antes de empezar, o el servidor se apaga o se cae a mitad de partida, los cartones se devuelven.
+
+## Cohete (crash)
+
+- Una ronda compartida por todos: 7 s de apuestas, despegue y vuelo hasta el choque.
+- El multiplicador crece como m(t) = e^(0,00008·t) (t en ms): 2× a los 8,7 s, 10× a los 28,8 s; tope de 1.000×.
+- **Punto de choque verificable**: antes de abrir las apuestas el servidor fija una semilla secreta y publica su SHA-256. Con X = primeros 52 bits de HMAC-SHA256(semilla, «aurum-crash:N») / 2^52, el choque es ⌊99 / (1 − X)⌋ / 100 (mínimo 1,00×). Al estrellarse se revela la semilla y la página permite comprobarlo.
+- P(llegar a m) = 0,99 / m, así que cobrar en cualquier multiplicador devuelve el **99 %**. Cerca del 2 % de las rondas se estrellan en 1,00×, antes del primer cobro posible (1,01×).
+- Cobro manual: vale el multiplicador que marca el reloj del servidor al recibir la orden (el del navegador no cuenta). Cobro automático: se paga exactamente a su objetivo si el cohete lo alcanza. La apuesta se puede retirar antes del despegue.
+- Los bots que aparecen en la lista están marcados y no usan créditos de nadie.
+
+## Plinko
+
+- 8, 12 o 16 filas de clavos; en cada fila la bola va a izquierda o derecha con probabilidad 1/2. La casilla es el número de rebotes a la derecha: distribución binomial (la campana de Gauss que dibuja el histograma).
+- El servidor sortea la ruta completa antes de que la bola caiga; de 1 a 10 bolas por lanzamiento, cada una con su ronda.
+- Tablas simétricas por filas y riesgo (bajo, medio, alto); premio = apuesta × multiplicador, redondeado hacia abajo.
+
+| Filas | Riesgo bajo | Riesgo medio | Riesgo alto |
+| --- | --- | --- | --- |
+| 8 | 98,98 % | 98,91 % | 99,06 % |
+| 12 | 98,98 % | 98,99 % | 99,12 % |
+| 16 | 99,00 % | 98,99 % | 98,98 % |
+
+RTP exacto (suma de multiplicador × C(n, k) / 2^n).
+
 ## Logros y rachas
 
 Se calculan exclusivamente a partir de rondas liquidadas: primera victoria, rachas de 3/5/10 victorias, blackjack natural, full o mejor en póker, póker o escalera de color, premio de 15× o más en slots, pleno en ruleta, 50 y 250 partidas y nueva mejor marca. Una victoria es recibir más de lo apostado; un empate no rompe la racha. Las rachas describen el pasado y la interfaz lo recuerda: no predicen la siguiente jugada.

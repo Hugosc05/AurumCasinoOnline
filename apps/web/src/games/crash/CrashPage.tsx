@@ -252,7 +252,7 @@ export default function CrashPage() {
   const [autoOn, setAutoOn] = useState(false);
   const [auto, setAuto] = useState('2.00');
   const [now, setNow] = useState(Date.now());
-  const [verify, setVerify] = useState<Record<number, 'ok' | 'bad' | 'pending'>>({});
+  const [verify, setVerify] = useState<Record<number, 'ok' | 'bad' | 'pending' | 'na'>>({});
   const offset = useRef(0);
   const prevPhase = useRef<CrashState['phase'] | null>(null);
   const engine = useRef<LoopHandle | null>(null);
@@ -353,6 +353,11 @@ export default function CrashPage() {
   }, [act]);
 
   const verifyRound = async (h: CrashState['history'][number]): Promise<void> => {
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+      // El navegador solo ofrece criptografía en conexiones seguras (HTTPS o localhost).
+      setVerify((v) => ({ ...v, [h.roundNo]: 'na' }));
+      return;
+    }
     setVerify((v) => ({ ...v, [h.roundNo]: 'pending' }));
     try {
       const okHash = (await sha256Hex(h.seed)) === h.seedHash;
@@ -475,7 +480,7 @@ export default function CrashPage() {
                 <li key={h.roundNo} className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-niebla">#{h.roundNo} · {formatMultiplier(h.crash)}</span>
                   <button type="button" className="text-oro-claro hover:underline" onClick={() => void verifyRound(h)}>
-                    {verify[h.roundNo] === 'ok' ? '✓ Correcta' : verify[h.roundNo] === 'bad' ? '✗ No cuadra' : verify[h.roundNo] === 'pending' ? 'Comprobando…' : 'Verificar'}
+                    {verify[h.roundNo] === 'ok' ? '✓ Correcta' : verify[h.roundNo] === 'bad' ? '✗ No cuadra' : verify[h.roundNo] === 'na' ? 'Requiere HTTPS' : verify[h.roundNo] === 'pending' ? 'Comprobando…' : 'Verificar'}
                   </button>
                 </li>
               ))}

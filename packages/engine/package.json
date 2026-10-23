@@ -1,6 +1,6 @@
 {
   "name": "@aurum/engine",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "Motores de juego puros (sin UI ni E/S): cartas, blackjack, póker, ruleta, slots y bots.",

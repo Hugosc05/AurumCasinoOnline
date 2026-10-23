@@ -2,6 +2,19 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.7.0] — 2026-10-23
+
+### Añadido
+- **Bingo de 90 bolas** con bombo en 3D (jaula cromada que gira y 90 bolas numeradas con física real), salas públicas de hasta 20 jugadores (Sol, Luna y Diamante), salas privadas con código, hasta 6 cartones por persona, línea (20 % del bote) y bingo (70 %), marcado automático, «falta 1», avisos de premio y voz opcional que canta los números.
+- **Cohete (crash)** multijugador: ronda compartida en tiempo real, cobro manual con el reloj del servidor y cobro automático, punto de choque verificable (SHA-256 publicado antes de apostar y semilla revelada al final, comprobable en el navegador), devolución del 99 %.
+- **Plinko**: 8, 12 o 16 filas, riesgo bajo, medio o alto, de 1 a 10 bolas por lanzamiento e histograma que forma la campana de Gauss; RTP exacto ≈ 99 %.
+- Logo en forma de ruleta que gira y frena al pasar el ratón.
+- La ruleta 3D en la portada, lanzando bolas de exhibición.
+
+### Cambiado
+- Migración 009: amplía los juegos admitidos en rondas y salas reconstruyendo las tablas con sus datos.
+- Las escenas 3D solo se usan con aceleración gráfica por hardware; con WebGL por software se muestra la versión 2D (`localStorage['aurum.3d']` = `force` u `off` para forzarlo).
+
 ## [1.6.1] — 2026-10-23
 
 ### Cambiado

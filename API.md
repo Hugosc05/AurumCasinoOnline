@@ -90,6 +90,10 @@ Respuesta: `{ roundId, result: { number, color, pocketIndex, totalBet, totalPayo
 
 Máquinas: `aurum-royale`, `tesoro-arrecife`, `vegas-nights`. No existe giro automático. En Vegas Nights, `result.cash` lleva el premio de cada billete visible y `result.extrasTriggered` los minijuegos activados; el estado incluye `extra` (minijuego en curso, sin lo no destapado) y `jackpots` (múltiplos y bote Grand acumulado).
 
+### Plinko
+
+`POST /games/plinko/drop` — `{ rows: 8|12|16, risk: 'low'|'medium'|'high', bet, count (1–10), idempotencyKey }` → `{ balls: [{ roundId, path, bucket, multiplier, payout }], balance, achievements }`. Cada bola es una ronda propia; repetir la clave devuelve las mismas bolas con `replayed: true`.
+
 ### Formaciones de ruleta — `/me/formations`
 
 `GET /` lista, `POST /` `{ name, bets }` guarda (validadas con el motor), `PATCH /:id` renombra o reemplaza, `POST /:id/duplicate`, `DELETE /:id`, `GET /:id/check` comprueba legalidad y saldo antes de colocar las fichas.
@@ -185,6 +189,13 @@ Autenticación con la misma cookie. Sin sesión se puede mirar, pero no jugar. M
 | `bj.sit` / `bj.leave` | `tableId, seat?` | Se sienta o se levanta |
 | `bj.bet` | `tableId, roundNo, amount` | Apuesta en la ventana de apuestas (se cobra del monedero) |
 | `bj.act` | `tableId, roundNo, actionCount, action` | `hit, stand, double, split` en tu turno |
+| `crash.watch` / `crash.unwatch` | — | Observa la ronda compartida del cohete (`crash.state`) |
+| `crash.bet` | `roundNo, amount, auto?` | Apuesta durante la cuenta atrás; `auto` = cobro automático en centésimas (101–100000) |
+| `crash.cancel` | `roundNo` | Retira la apuesta antes del despegue (se devuelve) |
+| `crash.cashout` | `roundNo` | Cobra al multiplicador que marca el reloj del servidor al recibirlo |
+| `bingo.lobby` | — | Envía `bingo.lobby` con las salas públicas y suscribe a sus cambios |
+| `bingo.watch` / `bingo.unwatch` | `roomId` | Observa una sala de bingo (pública o privada si eres miembro) |
+| `bingo.buy` | `roomId, gameNo, count` | Compra cartones (hasta 6 por partida) antes de que empiece |
 
 ### Servidor → cliente
 
@@ -198,6 +209,9 @@ Autenticación con la misma cookie. Sin sesión se puede mirar, pero no jugar. M
 | `poker.left` | `cashOut` |
 | `poker.notice` | Aviso (sin fichas, inactividad) |
 | `balance` | Nuevo saldo (entradas, salidas, ajustes del administrador) |
+| `crash.state` | `state`: ronda, fase (`betting`, `running`, `crashed`), hash de la semilla, hora de despegue y del servidor, apuestas, la tuya, historial. El choque y la semilla solo cuando ya se ha estrellado |
+| `bingo.state` | `roomId`, `state`: fase, partida, bolas extraídas (nunca las siguientes), jugadores, cartones de la casa, bote, premios, ganadores y tus cartones |
+| `bingo.lobby` | `rooms` |
 | `achievements` | Logros desbloqueados en póker |
 | `bj.lobby` / `bj.snapshot` / `bj.update` / `bj.left` / `bj.notice` | Equivalentes del blackjack multijugador (la carta tapada del crupier nunca va en los datos) |
 | `friends.changed` | Algo cambió en tu lista de amigos o en su presencia: vuelve a pedir `/social/friends` |
