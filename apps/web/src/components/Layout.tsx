@@ -139,6 +139,8 @@ function ConnectionDot() {
 const NAV = [
   { to: '/', label: 'Salón', end: true },
   { to: '/poker', label: 'Póker' },
+  { to: '/bingo', label: 'Bingo' },
+  { to: '/cohete', label: 'Cohete' },
   { to: '/clasificacion', label: 'Clasificación' },
   { to: '/promociones', label: 'Promociones' },
 ];
@@ -292,7 +294,7 @@ function Footer() {
             Aurum es un casino de demostración. Se juega con créditos virtuales sin valor económico: no se compran, no se venden y no se pueden retirar ni transferir.
           </p>
         </div>
-        <FooterCol title="Juegos" links={[['/blackjack', 'Blackjack'], ['/poker', "Texas Hold'em"], ['/ruleta', 'Ruleta europea'], ['/slots', 'Tragaperras']]} />
+        <FooterCol title="Juegos" links={[['/blackjack', 'Blackjack'], ['/poker', "Texas Hold'em"], ['/ruleta', 'Ruleta europea'], ['/slots', 'Tragaperras'], ['/bingo', 'Bingo'], ['/cohete', 'Cohete'], ['/plinko', 'Plinko']]} />
         <FooterCol title="Información" links={[['/reglas', 'Reglas y pagos'], ['/juego-responsable', 'Juego responsable'], ['/ayuda', 'Ayuda'], ['/bots', 'Bots del casino']]} />
         <FooterCol title="Legal" links={[['/privacidad', 'Privacidad'], ['/terminos', 'Condiciones de uso']]} />
       </div>

@@ -7,6 +7,7 @@ import { PlayingCard } from '../components/PlayingCard';
 import { Button, EmptyState } from '../components/ui';
 import { HeroWheel } from '../games/roulette/HeroWheel';
 import { SlotSymbolArt } from '../games/slots/symbols';
+import { Ball } from '../games/bingo/BingoBall';
 import { api } from '../lib/api';
 import { GAME_NAMES, credits, cx, relativeTime, signed } from '../lib/format';
 import { socket } from '../lib/ws';
@@ -86,7 +87,7 @@ export function HomePage() {
     };
   }, []);
 
-  const g = lobby?.games ?? { blackjack: true, roulette: true, slots: true, poker: true };
+  const g = lobby?.games ?? { blackjack: true, roulette: true, slots: true, poker: true, bingo: true, crash: true, plinko: true };
 
   return (
     <div>
@@ -101,7 +102,7 @@ export function HomePage() {
             <span className="mt-2 block gold-text">Las fichas, en tu mano.</span>
           </h1>
           <p className="mt-6 max-w-[46ch] text-lg leading-relaxed text-niebla">
-            Blackjack con crupier, Texas Hold'em contra bots que piensan cada mano, ruleta europea y slots. Todo con créditos virtuales: aquí no entra ni sale dinero real.
+            Blackjack con crupier, Texas Hold'em contra bots que piensan cada mano, ruleta europea, slots, bingo, cohete y plinko. Todo con créditos virtuales: aquí no entra ni sale dinero real.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-3">
             {user ? (
@@ -143,7 +144,7 @@ export function HomePage() {
 
       {/* Los cuatro juegos */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6" aria-labelledby="juegos">
-        <h2 id="juegos" className="mb-10 text-center text-4xl text-marfil">Elige mesa</h2>
+        <h2 id="juegos" className="mb-10 text-center text-4xl text-marfil">Elige juego</h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <GameArch
             to="/blackjack"
@@ -200,6 +201,49 @@ export function HomePage() {
                   </div>
                 ))}
               </div>
+            }
+          />
+          <GameArch
+            to="/bingo"
+            title="Bingo"
+            line="90 bolas, bombo en 3D, salas de hasta 20 personas y salas privadas."
+            disabled={g.bingo === false}
+            art={
+              <div className="flex -space-x-3">
+                {[7, 42, 68, 90].map((n, i) => <div key={n} style={{ transform: `translateY(${i % 2 ? 10 : 0}px)` }}><Ball n={n} size={52} /></div>)}
+              </div>
+            }
+          />
+          <GameArch
+            to="/cohete"
+            title="Cohete"
+            line="El multiplicador sube hasta que el cohete se estrella. Cobra a tiempo."
+            disabled={g.crash === false}
+            art={
+              <svg width="150" height="120" viewBox="0 0 150 120" aria-hidden>
+                <defs><linearGradient id="home-curve" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#ff4fb8" /><stop offset="1" stopColor="#ffcf5a" /></linearGradient></defs>
+                <path d="M10 110 C 60 105 100 80 128 26" fill="none" stroke="url(#home-curve)" strokeWidth="4" strokeLinecap="round" />
+                <g transform="translate(128 26) rotate(28)">
+                  <path d="M0 -16 C 7 -9 7 4 5 10 H -5 C -7 4 -7 -9 0 -16 Z" fill="#eef1f6" />
+                  <path d="M0 -16 C 4 -12 5 -9 6 -6 H -6 C -5 -9 -4 -12 0 -16 Z" fill="#e23b4e" />
+                  <circle cy="-3" r="2.5" fill="#1d4f8f" />
+                  <path d="M-4 10 Q 0 24 4 10 Z" fill="#ffb347" />
+                </g>
+                <text x="12" y="30" fontSize="22" fontWeight="800" fill="#ffcf5a" fontFamily="Manrope, system-ui">2,47×</text>
+              </svg>
+            }
+          />
+          <GameArch
+            to="/plinko"
+            title="Plinko"
+            line="Bolas que rebotan entre clavos y dibujan la campana de Gauss."
+            disabled={g.plinko === false}
+            art={
+              <svg width="140" height="120" viewBox="0 0 140 120" aria-hidden>
+                {Array.from({ length: 6 }, (_, r) => Array.from({ length: r + 3 }, (_, j) => <circle key={`${r}-${j}`} cx={70 + (j - (r + 2) / 2) * 16} cy={14 + r * 15} r="2.6" fill="#d8dce6" />))}
+                <circle cx="78" cy="52" r="5.5" fill="#ff5fc0" />
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => <rect key={k} x={6 + k * 16} y="104" width="14" height="10" rx="2" fill={`hsl(${48 - Math.abs(k - 3.5) * 13} 85% 55%)`} />)}
+              </svg>
             }
           />
         </div>

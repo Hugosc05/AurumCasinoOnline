@@ -10,7 +10,7 @@ test('móvil: portada, menú y tapete vertical sin desbordamiento horizontal', a
 });
 
 test('móvil: salón de blackjack, mesa multijugador y bots sin desbordamiento horizontal', async ({ page }) => {
-  for (const url of ['/blackjack', '/blackjack/mesa/rubi', '/bots', '/poker']) {
+  for (const url of ['/blackjack', '/blackjack/mesa/rubi', '/bots', '/poker', '/bingo', '/bingo/bingo-sol', '/cohete']) {
     await page.goto(url);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

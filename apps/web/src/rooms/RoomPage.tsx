@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Modal, Spinner } from '../components/ui';
 import BlackjackTablePage from '../games/blackjack/multi/BlackjackTablePage';
 import PokerTablePage from '../games/poker/PokerTablePage';
+import BingoRoomPage from '../games/bingo/BingoRoomPage';
 import { ApiError, api } from '../lib/api';
 import { credits, cx } from '../lib/format';
 import { socket } from '../lib/ws';
@@ -21,7 +22,7 @@ interface Member {
 interface RoomView {
   id: string;
   name: string;
-  game: 'poker' | 'blackjack';
+  game: 'poker' | 'blackjack' | 'bingo';
   status: 'open' | 'closed';
   closeReason: string | null;
   privacy: 'code' | 'friends';
@@ -113,7 +114,7 @@ export default function RoomPage() {
         <Link to="/salas" className="text-sm text-niebla hover:text-marfil">← Salas</Link>
         <h1 className="text-3xl text-marfil sm:text-4xl">{room.name}</h1>
         <Badge tone="gold">Sala privada</Badge>
-        <Badge tone="muted">{room.game === 'poker' ? "Texas Hold'em" : 'Blackjack'}</Badge>
+        <Badge tone="muted">{room.game === 'poker' ? "Texas Hold'em" : room.game === 'bingo' ? 'Bingo' : 'Blackjack'}</Badge>
         {room.allowBots && <Badge tone="muted">Con bots</Badge>}
         {room.chipMode === 'room' && <Badge tone="muted">Fichas de sala</Badge>}
       </div>
@@ -163,7 +164,7 @@ export default function RoomPage() {
 
             <section className="panel p-4 text-sm text-niebla" aria-label="Reglas de la sala">
               <h2 className="mb-1 text-lg text-marfil">Reglas</h2>
-              {room.game === 'poker'
+              {room.game === 'bingo' ? <p>Cartón a {credits(room.settings.cardPrice!)}. Línea 20 % y bingo 70 % del bote; hasta 6 cartones por persona.</p> : room.game === 'poker'
                 ? <p>Ciegas {credits(room.settings.smallBlind!)}/{credits(room.settings.bigBlind!)}. {room.chipMode === 'room' ? `Fichas de sala: ${credits(room.settings.startingChips!)} por persona.` : `Entrada de ${credits(room.settings.minBuyIn!)} a ${credits(room.settings.maxBuyIn!)} de tu saldo.`}</p>
                 : <p>Apuesta de {credits(room.settings.minBet!)} a {credits(room.settings.maxBet!)}. Cada persona juega su mano contra el crupier común.</p>}
               <p className="mt-1 text-xs">Los cambios de límites se aplican desde la siguiente mano: nunca alteran la que está en juego.</p>
@@ -176,7 +177,7 @@ export default function RoomPage() {
           </aside>
 
           <div className="min-w-0">
-            {room.game === 'poker' ? <PokerTablePage tableId={room.tableId} embedded /> : <BlackjackTablePage tableId={room.tableId} embedded />}
+            {room.game === 'poker' ? <PokerTablePage tableId={room.tableId} embedded /> : room.game === 'bingo' ? <BingoRoomPage roomId={room.tableId} embedded /> : <BlackjackTablePage tableId={room.tableId} embedded />}
           </div>
         </div>
       )}

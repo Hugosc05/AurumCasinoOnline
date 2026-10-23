@@ -8,14 +8,15 @@ import { useNotify } from '../state/notify';
 interface MyRoom {
   id: string;
   name: string;
-  game: 'poker' | 'blackjack';
+  game: 'poker' | 'blackjack' | 'bingo';
   isHost: boolean;
   members: number;
   maxSeats: number;
   allowBots: boolean;
 }
 
-const GAME_LABEL = { poker: "Texas Hold'em", blackjack: 'Blackjack' } as const;
+const GAME_LABEL = { poker: "Texas Hold'em", blackjack: 'Blackjack', bingo: 'Bingo' } as const;
+const MAX_SEATS = { poker: 6, blackjack: 7, bingo: 20 } as const;
 
 /** Salas privadas: crear una, entrar con un código o volver a las propias. */
 export default function RoomsPage() {
@@ -27,8 +28,8 @@ export default function RoomsPage() {
   const [joining, setJoining] = useState(false);
   const invite = params.get('invitar');
   const [create, setCreate] = useState<null | {
-    name: string; game: 'poker' | 'blackjack'; maxSeats: number; privacy: 'code' | 'friends'; allowBots: boolean; chipMode: 'wallet' | 'room';
-    smallBlind: number; bigBlind: number; startingChips: number; minBet: number; maxBet: number;
+    name: string; game: 'poker' | 'blackjack' | 'bingo'; maxSeats: number; privacy: 'code' | 'friends'; allowBots: boolean; chipMode: 'wallet' | 'room';
+    smallBlind: number; bigBlind: number; startingChips: number; minBet: number; maxBet: number; cardPrice: number;
   }>(null);
   const [busy, setBusy] = useState(false);
 
@@ -38,12 +39,12 @@ export default function RoomsPage() {
   useEffect(load, [load]);
   useEffect(() => {
     const g = params.get('crear');
-    if (g === 'poker' || g === 'blackjack') openCreate(g);
+    if (g === 'poker' || g === 'blackjack' || g === 'bingo') openCreate(g);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openCreate = (game: 'poker' | 'blackjack'): void =>
-    setCreate({ name: '', game, maxSeats: game === 'poker' ? 6 : 5, privacy: 'code', allowBots: false, chipMode: 'wallet', smallBlind: 10, bigBlind: 20, startingChips: 2000, minBet: 10, maxBet: 1000 });
+  const openCreate = (game: 'poker' | 'blackjack' | 'bingo'): void =>
+    setCreate({ name: '', game, maxSeats: game === 'poker' ? 6 : game === 'bingo' ? 10 : 5, privacy: 'code', allowBots: false, chipMode: 'wallet', smallBlind: 10, bigBlind: 20, startingChips: 2000, minBet: 10, maxBet: 1000, cardPrice: 10 });
 
   const submit = async (): Promise<void> => {
     if (!create) return;
@@ -54,7 +55,9 @@ export default function RoomsPage() {
         chipMode: create.game === 'poker' ? create.chipMode : 'wallet',
         ...(create.game === 'poker'
           ? { poker: { smallBlind: create.smallBlind, bigBlind: create.bigBlind, minBuyIn: create.bigBlind * 20, maxBuyIn: create.bigBlind * 200, startingChips: create.startingChips } }
-          : { blackjack: { minBet: create.minBet, maxBet: create.maxBet } }),
+          : create.game === 'bingo'
+            ? { bingo: { cardPrice: create.cardPrice } }
+            : { blackjack: { minBet: create.minBet, maxBet: create.maxBet } }),
       };
       const room = await api.post<{ id: string }>('/api/rooms', body);
       nav(`/salas/${room.id}`);
@@ -77,12 +80,12 @@ export default function RoomsPage() {
     }
   };
 
-  const num = (k: 'maxSeats' | 'smallBlind' | 'bigBlind' | 'startingChips' | 'minBet' | 'maxBet') => (e: React.ChangeEvent<HTMLInputElement>) => setCreate((c) => (c ? { ...c, [k]: Number(e.target.value) } : c));
+  const num = (k: 'maxSeats' | 'smallBlind' | 'bigBlind' | 'startingChips' | 'minBet' | 'maxBet' | 'cardPrice') => (e: React.ChangeEvent<HTMLInputElement>) => setCreate((c) => (c ? { ...c, [k]: Number(e.target.value) } : c));
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <h1 className="text-4xl text-marfil sm:text-5xl">Salas privadas</h1>
-      <p className="mt-2 max-w-2xl text-niebla">Mesas de póker o blackjack solo para quien tenga el código o una invitación. Usan el mismo motor y las mismas reglas que las mesas públicas.</p>
+      <p className="mt-2 max-w-2xl text-niebla">Mesas de póker, blackjack o bingo solo para quien tenga el código o una invitación. Usan el mismo motor y las mismas reglas que las mesas públicas.</p>
       {invite && <p className="mt-4 rounded-xl border border-oro/40 bg-oro/10 p-3 text-sm text-marfil">Abre una de tus salas para invitar a <strong>{invite}</strong>, o crea una nueva.</p>}
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
@@ -93,6 +96,7 @@ export default function RoomsPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={() => openCreate('poker')} data-testid="create-poker"><Plus className="h-4 w-4" /> Sala de póker</Button>
             <Button variant="outline" onClick={() => openCreate('blackjack')} data-testid="create-blackjack"><Plus className="h-4 w-4" /> Sala de blackjack</Button>
+            <Button variant="outline" onClick={() => openCreate('bingo')} data-testid="create-bingo"><Plus className="h-4 w-4" /> Sala de bingo</Button>
           </div>
         </section>
         <section className="panel p-6" aria-label="Entrar con código">
@@ -127,11 +131,11 @@ export default function RoomsPage() {
         )}
       </section>
 
-      <Modal open={!!create} onClose={() => setCreate(null)} title={create?.game === 'poker' ? 'Nueva sala de póker' : 'Nueva sala de blackjack'} wide>
+      <Modal open={!!create} onClose={() => setCreate(null)} title={create ? `Nueva sala de ${create.game === 'poker' ? 'póker' : create.game === 'bingo' ? 'bingo' : 'blackjack'}` : ''} wide>
         {create && (
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <Field className="sm:col-span-2" label="Nombre de la sala" value={create.name} maxLength={40} onChange={(e) => setCreate({ ...create, name: e.target.value })} autoFocus data-testid="room-name" />
-            <Field label={`Asientos (2–${create.game === 'poker' ? 6 : 7})`} type="number" min={2} max={create.game === 'poker' ? 6 : 7} value={create.maxSeats} onChange={num('maxSeats')} />
+            <Field label={create.game === 'bingo' ? `Jugadores (2–${MAX_SEATS.bingo})` : `Asientos (2–${MAX_SEATS[create.game]})`} type="number" min={2} max={MAX_SEATS[create.game]} value={create.maxSeats} onChange={num('maxSeats')} />
             <div>
               <p className="mb-1.5 text-sm text-niebla">Quién puede entrar</p>
               <Segmented label="Privacidad" value={create.privacy} onChange={(v) => setCreate({ ...create, privacy: v })} options={[{ value: 'code', label: 'Con el código' }, { value: 'friends', label: 'Solo mis amigos' }]} />
@@ -147,6 +151,11 @@ export default function RoomsPage() {
                 </div>
                 {create.chipMode === 'room' && <Field label="Fichas iniciales" type="number" min={create.bigBlind * 10} value={create.startingChips} onChange={num('startingChips')} />}
               </>
+) : create.game === 'bingo' ? (
+              <>
+                <Field label="Precio del cartón" type="number" min={1} max={10000} value={create.cardPrice} onChange={num('cardPrice')} />
+                <p className="self-end text-xs text-niebla">Bote: todos los cartones vendidos. Línea 20 %, bingo 70 %. Hasta 6 cartones por persona.</p>
+              </>
             ) : (
               <>
                 <Field label="Apuesta mínima" type="number" min={1} value={create.minBet} onChange={num('minBet')} />
@@ -155,7 +164,7 @@ export default function RoomsPage() {
             )}
             <label className="flex items-start gap-2 text-sm text-niebla sm:col-span-2">
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#cfae6b]" checked={create.allowBots} onChange={(e) => setCreate({ ...create, allowBots: e.target.checked })} />
-              <span>Permitir bots para completar la mesa. Siempre se muestran como bots: no son tus amigos.</span>
+              <span>{create.game === 'bingo' ? 'Añadir cartones de la casa para que el bote sea mayor. Lo que ganen no se paga a nadie.' : 'Permitir bots para completar la mesa. Siempre se muestran como bots: no son tus amigos.'}</span>
             </label>
             <div className="flex justify-end gap-2 sm:col-span-2">
               <Button type="button" variant="ghost" onClick={() => setCreate(null)}>Cancelar</Button>

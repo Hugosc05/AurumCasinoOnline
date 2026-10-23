@@ -209,3 +209,49 @@ test('administración: solo accesible para administradores', async ({ page }) =>
   await page.getByRole('button', { name: 'Comprobar libro mayor' }).click();
   await expect(page.getByText(/todo cuadra/)).toBeVisible();
 });
+
+test('plinko: lanzar bolas cobra la apuesta y suma los premios al caer', async ({ page }) => {
+  await register(page);
+  await fastMode(page);
+  await page.goto('/plinko');
+  await page.getByTestId('plinko-bet').fill('10');
+  await page.getByRole('radio', { name: '5' }).click();
+  const before = await balance(page);
+  await page.getByTestId('plinko-drop').click();
+  await expect(page.getByLabel('Últimos resultados').locator('span')).toHaveCount(5, { timeout: 10000 });
+  const r = await page.evaluate(() => fetch('/api/me/history?game=plinko').then((x) => x.json()));
+  const paid = (r.items as { payout: number }[]).reduce((a, b) => a + b.payout, 0);
+  expect(await balance(page)).toBe(before - 50 + paid);
+  await expect(page.getByLabel(/Saldo: /)).toContainText(new Intl.NumberFormat('es-ES').format(before - 50 + paid));
+});
+
+test('cohete: apostar en la ronda compartida y ver la apuesta en la lista', async ({ page }) => {
+  await register(page);
+  await page.goto('/cohete');
+  const action = page.getByTestId('crash-action');
+  await expect(action).toHaveText(/^Apostar/, { timeout: 30000 });
+  await page.getByTestId('crash-amount').fill('25');
+  const before = await balance(page);
+  await action.click();
+  await expect(page.getByTestId('crash-bets').getByText('Tú')).toBeVisible();
+  expect(await balance(page)).toBe(before - 25);
+  // Al despegar, el botón pasa a cobrar (o la ronda ya terminó si se estrelló enseguida).
+  await expect(action).toHaveText(/^(Cobrar|Siguiente|Espera)/, { timeout: 15000 });
+});
+
+test('bingo: comprar cartones en una sala pública y verlos con la cuenta atrás', async ({ page }) => {
+  await register(page);
+  await page.goto('/bingo');
+  await page.getByTestId('bingo-room-bingo-luna').getByRole('button', { name: 'Entrar en la sala' }).click();
+  await expect(page).toHaveURL(/\/bingo\/bingo-luna/);
+  await expect(page.getByTestId('bingo-buy-button')).toBeVisible({ timeout: 15000 });
+  const before = await balance(page);
+  await page.getByRole('button', { name: 'Más' }).click();
+  await page.getByTestId('bingo-buy-button').click();
+  await expect(page.getByTestId('bingo-card')).toHaveCount(3);
+  await expect(page.getByTestId('bingo-status')).toContainText('empieza en');
+  expect(await balance(page)).toBe(before - 150);
+  // Cada cartón tiene 15 números.
+  const nums = await page.getByTestId('bingo-card').first().locator('.grid > div').evaluateAll((els) => els.filter((e) => /\d/.test(e.textContent ?? '')).length);
+  expect(nums).toBe(15);
+});

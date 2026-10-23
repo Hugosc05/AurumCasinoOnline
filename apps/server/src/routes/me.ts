@@ -162,6 +162,13 @@ function summarize(game: string, json: string | null): string {
       return hands.map((h) => `${labels[h.outcome ?? ''] ?? '?'} (${h.value?.total ?? '?'})`).join(' · ');
     }
     if (game === 'poker') return String(r.summary ?? '');
+    const mult = (c: number): string => `${(c / 100).toFixed(2).replace('.', ',')}×`;
+    if (game === 'plinko') return `Casilla ${Number(r.bucket) + 1} de ${Number(r.rows) + 1}: ${String(r.multiplier).replace('.', ',')}×`;
+    if (game === 'crash') return r.cashedAt ? `Ronda ${String(r.roundNo)}: cobrado a ${mult(Number(r.cashedAt))}` : `Ronda ${String(r.roundNo)}: se estrelló en ${mult(Number(r.crash))}`;
+    if (game === 'bingo') {
+      const wins = [Number(r.line) > 0 ? 'línea' : '', Number(r.bingo) > 0 ? 'bingo' : ''].filter(Boolean).join(' y ');
+      return `${String(r.cards)} cartón(es), ${String(r.balls)} bolas${wins ? ` · ¡${wins}!` : ''}`;
+    }
   } catch {
     /* ignorar */
   }
