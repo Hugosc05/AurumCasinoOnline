@@ -531,7 +531,7 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
 
           {/* Botón de dealer y ciegas */}
           {vis.button >= 0 && (
-            <motion.div className="absolute grid h-7 w-7 place-items-center rounded-full border border-black/30 bg-gradient-to-b from-white to-[#d8d2c2] text-xs font-extrabold text-noche shadow" style={{ zIndex: 55 }} animate={(() => { const p = towardCenter(posOf(vis.button), 0.3, g); return { left: p.x + 44, top: p.y - 14 }; })()} transition={{ type: 'spring', stiffness: 200, damping: 26 }} aria-label="Botón de dealer">
+            <motion.div className="absolute left-0 top-0 grid h-7 w-7 place-items-center rounded-full border border-black/30 bg-gradient-to-b from-white to-[#d8d2c2] text-xs font-extrabold text-noche shadow" style={{ zIndex: 55 }} initial={false} animate={(() => { const p = towardCenter(posOf(vis.button), 0.3, g); return { x: p.x + 44, y: p.y - 14 }; })()} transition={{ type: 'spring', stiffness: 200, damping: 26 }} aria-label="Botón de dealer">
               D
             </motion.div>
           )}

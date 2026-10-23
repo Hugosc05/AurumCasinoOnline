@@ -45,7 +45,7 @@ test('slots: los rodillos arrancan al pulsar, sin esperar, y se puede volver a g
   await page.waitForTimeout(500);
   // Mide cuánto tarda la primera tira en moverse tras el clic (dentro del navegador).
   await page.evaluate(() => {
-    const el = document.querySelector('.reel [style*="translate3d"]') as HTMLElement;
+    const el = document.querySelector('.reel [style*="translate3d"], .reel [style*="rotateX"]') as HTMLElement; // tira plana o cilindro 3D
     const start = el.style.transform;
     (window as unknown as { __moved: Promise<number> }).__moved = new Promise((res) => {
       const t0 = performance.now();

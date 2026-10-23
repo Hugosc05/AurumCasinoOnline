@@ -2,6 +2,17 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.6.0] — 2026-10-23
+
+### Añadido
+- **Vegas Nights** (solo adultos, con aviso +18): showgirls estilo pin-up, billetes, puros, whisky, dados y fichas, comodín de neón.
+- Minijuegos de sala: **Hold & Win** de billetes (re-giros que se reinician, Grand al llenar la pantalla), **gran rueda** (sector fijado al activarse), **caja fuerte** de tres iguales y **botes** Mini, Menor, Mayor y Grand progresivo compartido. RTP 95,9 % más el Grand.
+- **Rodillos 3D**: cilindros reales con curvatura, sombreado y brillo en las tres máquinas.
+- Migración 008 y `POST /api/games/slots/feature`.
+
+### Cambiado
+- Animaciones pequeñas más fluidas: indicador de turno, anticipación y golpe de los rodillos animan solo transformaciones y opacidad; el botón del crupier y la barra de probabilidad, sin recalcular el diseño.
+
 ## [1.5.0] — 2026-10-22
 
 ### Añadido

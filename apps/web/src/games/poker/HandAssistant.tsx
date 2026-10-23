@@ -141,7 +141,7 @@ export const HandAssistant = memo(function HandAssistant({ insight, mode, onMode
                     <p className="font-display text-xl text-oro-claro" data-testid="improve-odds">{pct(insight.improvement.probability)}</p>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                    <motion.div className="h-full rounded-full bg-gradient-to-r from-oro-oscuro to-oro-claro" initial={false} animate={{ width: `${insight.improvement.probability * 100}%` }} transition={{ duration: 0.5 }} />
+                    <motion.div className="h-full w-full origin-left rounded-full bg-gradient-to-r from-oro-oscuro to-oro-claro" initial={false} animate={{ scaleX: insight.improvement.probability }} transition={{ duration: 0.5 }} />
                   </div>
                   {mode === 'beginner' && insight.improvement.byCategory.length > 0 && (
                     <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-niebla">

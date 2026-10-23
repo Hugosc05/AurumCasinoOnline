@@ -86,7 +86,9 @@ Respuesta: `{ roundId, result: { number, color, pocketIndex, totalBet, totalPayo
 | POST | `/games/slots/spin` | `{ machine, betPerLine, lines, idempotencyKey }` → `{ roundId, result: { stops, grid, lineWins, scatterWin, specialWins, freeSpinsAwarded, bonus, totalWin, totalBet, tier }, feature, balance }`. Durante los giros gratis la apuesta no se cobra y queda fijada por el servidor |
 | POST | `/games/slots/bonus/pick` | `{ machine, index }` abre un cofre del bono; los premios se fijaron al activarlo y los cofres sin abrir nunca se envían |
 
-Máquinas: `aurum-royale`, `reef-treasure`. No existe giro automático.
+| POST | `/games/slots/feature` | `{ machine, action: 'spin'\|'pick'\|'respin', index? }`: paso del minijuego de sala en curso (Vegas Nights). Devuelve lo destapado, la vista pública y, al terminar, el premio (con botes) ya liquidado |
+
+Máquinas: `aurum-royale`, `tesoro-arrecife`, `vegas-nights`. No existe giro automático. En Vegas Nights, `result.cash` lleva el premio de cada billete visible y `result.extrasTriggered` los minijuegos activados; el estado incluye `extra` (minijuego en curso, sin lo no destapado) y `jackpots` (múltiplos y bote Grand acumulado).
 
 ### Formaciones de ruleta — `/me/formations`
 

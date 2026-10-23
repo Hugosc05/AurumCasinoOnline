@@ -16,6 +16,7 @@ import { useSession } from '../../state/session';
 import type { Achievement, Balance } from '../../state/types';
 import { planSlotPresentation, lineColor, type SlotPresentation } from './presentation';
 import { Reel, type ReelHandle } from './Reel';
+import { ReelCylinder, SymbolSprites, symbolsReady } from './ReelCylinder';
 import { ChestBonus, type BonusView } from './ChestBonus';
 import { JackpotBar, TIER_LABEL, VegasFeature, cashLabel, jackpotsFor, type ExtraView, type JackpotInfo } from './VegasFeatures';
 import { SlotPaytable, machineFeatures } from './SlotPaytable';
@@ -133,7 +134,7 @@ const LineMarkers = memo(function LineMarkers({ side, cell, lines, winning, acti
           return (
             <span
               key={id}
-              className={cx('absolute left-0 grid h-[13px] w-5 -translate-y-1/2 place-items-center rounded-[3px] text-[9px] font-bold leading-none transition-all duration-300', side === 'left' ? 'rounded-r-none' : 'rounded-l-none', !on && 'opacity-20')}
+              className={cx('absolute left-0 grid h-[13px] w-5 -translate-y-1/2 place-items-center rounded-[3px] text-[9px] font-bold leading-none transition-[opacity,background-color,color] duration-300', side === 'left' ? 'rounded-r-none' : 'rounded-l-none', !on && 'opacity-20')}
               style={{
                 top: y,
                 background: win ? lineColor(id) : on ? 'rgba(235,217,166,0.18)' : 'rgba(255,255,255,0.05)',
@@ -260,6 +261,8 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
   const [announce, setAnnounce] = useState<{ title: string; text: string; amount?: number } | null>(null);
   const [bonusOpen, setBonusOpen] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
+  const symbolIds = useMemo(() => machine.symbols.map((x) => x.id), [machine]);
+  const [spritesReady, setSpritesReady] = useState(() => symbolsReady(symbolIds));
   const [adultOk, setAdultOk] = useState<boolean>(() => {
     if (!machine.adult) return true;
     try {
@@ -634,6 +637,9 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
   const presenting = phase === 'presenting' && plan && plan.total > 0;
   const shownLines = presenting ? (lineStage === 'overview' ? plan.lines : current ? [current] : []) : [];
   const bulbMode: 'off' | 'chase' | 'win' = level === 'off' ? 'off' : phase === 'spinning' ? 'chase' : tier ? 'win' : 'off';
+  // Rodillos en 3D (cilindros) salvo con las animaciones desactivadas; mientras se preparan
+  // las imágenes de los símbolos se usan los rodillos planos.
+  const ReelView = level === 'off' || !spritesReady ? Reel : ReelCylinder;
   const balanceAfter = user && !user.unlimited && user.balance !== null ? user.balance - totalBet : null;
 
   return (
@@ -659,6 +665,7 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
             tier === 'mega' ? 'shadow-[0_0_0_2px_rgba(235,217,166,0.8),0_0_120px_-10px_rgba(235,217,166,0.75)]' : tier === 'big' ? 'shadow-[0_0_0_1px_rgba(235,217,166,0.6),0_0_80px_-10px_rgba(235,217,166,0.55)]' : tier === 'medium' ? 'shadow-[0_0_50px_-15px_rgba(235,217,166,0.45)]' : '',
           )}
         >
+          {!spritesReady && <SymbolSprites symbols={symbolIds} onReady={() => setSpritesReady(true)} />}
           {/* Brillo ambiental proporcional al premio */}
           <AnimatePresence>
             {tier && tier !== 'small' && (
@@ -721,7 +728,7 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
               <div className="slot-bezel relative rounded-2xl bg-[#120d05] p-1" style={{ width: winW + 8 }}>
                 <div className="flex" style={{ gap: GAP }}>
                   {strips.map((strip, i) => (
-                    <Reel
+                    <ReelView
                       key={i}
                       ref={reelRefs[i]}
                       strip={strip}
