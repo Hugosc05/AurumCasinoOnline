@@ -9,6 +9,7 @@ import { SlotSymbolArt } from './symbols';
 const CARD_THEME: Record<string, string> = {
   'aurum-royale': 'from-[#1c2747] to-[#070b16] border-oro/40',
   'tesoro-arrecife': 'from-[#0b4a5e] to-[#03141e] border-[#7ff0e4]/40',
+  'vegas-nights': 'from-[#3a0f3f] to-[#08030c] border-[#ff8be6]/40',
 };
 
 /** Selección de máquina: cada una con su temática, símbolos y funciones. */

@@ -1,4 +1,5 @@
 import { memo, type ReactElement } from 'react';
+import { VEGAS_SYMBOLS } from './symbolsVegas';
 
 /** Símbolos originales dibujados en SVG (Aurum Royale y Tesoro del Arrecife). */
 
@@ -245,7 +246,7 @@ const REEF: Record<string, () => ReactElement> = {
     </g>
   ),
 };
-Object.assign(SYMBOLS, REEF);
+Object.assign(SYMBOLS, REEF, VEGAS_SYMBOLS);
 
 export const SlotSymbolArt = memo(function SlotSymbolArt({ symbol, size = 100 }: { symbol: string; size?: number }) {
   const Art = SYMBOLS[symbol] ?? SYMBOLS.jack!;

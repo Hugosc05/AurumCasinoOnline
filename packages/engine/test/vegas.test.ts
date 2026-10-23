@@ -17,6 +17,7 @@ import {
   seededRng,
   sequenceRng,
   spinMachine,
+  holdWinEvTable,
   wheelEv,
   type CashValue,
 } from '../src';
@@ -51,6 +52,10 @@ describe('Vegas Nights: máquina', () => {
     expect(1 / r.wheelChance).toBeGreaterThan(60);
     expect(1 / r.safeChance).toBeGreaterThan(150);
     expect(r.grandChance).toBeGreaterThan(0);
+  });
+
+  it('la tabla precalculada del Hold & Win coincide con la simulación de referencia', () => {
+    expect(holdWinEvTable(x, 20000, 20261023, seededRng)).toEqual(Object.fromEntries(Object.entries(x.holdWin.evTable!).map(([k, v]) => [k, [...v]])));
   });
 
   it('la simulación de partidas completas converge al RTP calculado', () => {

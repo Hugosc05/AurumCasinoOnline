@@ -45,6 +45,12 @@ export interface SlotExtras {
     /** Probabilidad de que en un re-giro aparezca un billete en cada celda vacía. */
     landChance: number;
     values: readonly { value: CashValue; weight: number }[];
+    /**
+     * Valor esperado (× apuesta, sin Grand) y probabilidad de llenar la pantalla según los billetes
+     * iniciales, precalculados con `holdWinEvTable` (semilla fija). Evita simular en el navegador; una
+     * prueba comprueba que coincide con la simulación.
+     */
+    evTable?: Readonly<Record<number, readonly [number, number]>>;
   };
   wheel: { symbol: string; minCount: number; segments: readonly WheelSegment[] };
   safe: { symbol: string; reels: readonly number[]; minCount: number; tiles: Readonly<Record<JackpotTier, number>> };
@@ -268,4 +274,15 @@ export function holdWinEv(x: SlotExtras, startCount: number, runs: number, rng: 
     if (holdWinFull(s)) full += 1;
   }
   return { ev: sum / runs, fullChance: full / runs };
+}
+
+/** Tabla de valores esperados del Hold & Win (6..15 billetes), con la semilla de referencia. */
+export function holdWinEvTable(x: SlotExtras, runs = 20000, seed = 20261023, makeRng: (seed: number) => Rng): Record<number, [number, number]> {
+  const rng = makeRng(seed);
+  const out: Record<number, [number, number]> = {};
+  for (let k = x.holdWin.trigger; k <= CELLS; k += 1) {
+    const e = holdWinEv(x, k, runs, rng);
+    out[k] = [Number(e.ev.toFixed(4)), Number(e.fullChance.toFixed(6))];
+  }
+  return out;
 }

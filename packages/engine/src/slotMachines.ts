@@ -214,6 +214,10 @@ export const VEGAS_NIGHTS: SlotMachineDef = {
       trigger: 6,
       respins: 3,
       landChance: 0.035,
+      evTable: {
+        6: [27.496, 0.0003], 7: [30.3212, 0.00025], 8: [33.1342, 0.00055], 9: [36.2737, 0.00065], 10: [39.2351, 0.00145],
+        11: [42.566, 0.00285], 12: [45.5037, 0.00725], 13: [48.8507, 0.0234], 14: [52.0744, 0.10185], 15: [55.2024, 1],
+      },
       values: [
         { value: { kind: 'credit', mult: 1 }, weight: 300 },
         { value: { kind: 'credit', mult: 2 }, weight: 250 },
@@ -603,7 +607,8 @@ function extrasRtp(m: SlotMachineDef) {
     for (let k = x.holdWin.trigger; k < cash.length; k += 1) {
       const p = cash[k] ?? 0;
       if (p <= 0) continue;
-      const ev = holdWinEv(x, k, 20000, rng);
+      const row = x.holdWin.evTable?.[k];
+      const ev = row ? { ev: row[0], fullChance: row[1] } : holdWinEv(x, k, 20000, rng);
       out.holdWinChance += p;
       out.holdWinRtp += p * ev.ev;
       out.grandChance += p * ev.fullChance;

@@ -17,6 +17,7 @@ import type { Achievement, Balance } from '../../state/types';
 import { planSlotPresentation, lineColor, type SlotPresentation } from './presentation';
 import { Reel, type ReelHandle } from './Reel';
 import { ChestBonus, type BonusView } from './ChestBonus';
+import { JackpotBar, TIER_LABEL, VegasFeature, cashLabel, jackpotsFor, type ExtraView, type JackpotInfo } from './VegasFeatures';
 import { SlotPaytable, machineFeatures } from './SlotPaytable';
 import { SlotSymbolArt } from './symbols';
 import { NotFound } from '../../pages/NotFound';
@@ -26,6 +27,10 @@ interface FeatureState {
   machine: string;
   freeSpins: { left: number; total: number; multiplier: number; betPerLine: number; lines: number; won: number } | null;
   bonus: BonusView | null;
+  /** Minijuego de sala en curso (Vegas Nights) y botes. */
+  extra?: ExtraView | null;
+  pending?: string[];
+  jackpots?: JackpotInfo | null;
 }
 
 interface SpinResponse {
@@ -72,6 +77,12 @@ const THEMES: Record<string, { frame: string; reel: string; marquee: string; acc
     reel: 'from-[#f0fbff] via-[#d9f2f7] to-[#b5dde6]',
     marquee: 'border-[#7ff0e4]/30 bg-[#03141e]/80',
     accent: 'text-[#9ff5ec]',
+  },
+  'vegas-nights': {
+    frame: 'from-[#3a0f3f] via-[#1a0820] to-[#08030c] border-[#ff8be6]/40',
+    reel: 'from-[#fff8f0] via-[#f6e6dc] to-[#e2c7bf]',
+    marquee: 'border-[#ff8be6]/30 bg-[#12051a]/85',
+    accent: 'text-[#ffb3ef]',
   },
 };
 
@@ -248,6 +259,15 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
   /** Aviso de función especial (giros gratis concedidos o terminados, bono activado). */
   const [announce, setAnnounce] = useState<{ title: string; text: string; amount?: number } | null>(null);
   const [bonusOpen, setBonusOpen] = useState(false);
+  const [extraOpen, setExtraOpen] = useState(false);
+  const [adultOk, setAdultOk] = useState<boolean>(() => {
+    if (!machine.adult) return true;
+    try {
+      return localStorage.getItem('aurum.adult-ok') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [paytable, setPaytable] = useState(false);
   const historyId = useRef(0);
   const loop = useRef<LoopHandle | null>(null);
@@ -255,13 +275,14 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
   const freeMode = !!feature.freeSpins;
   const totalBet = freeMode ? feature.freeSpins!.betPerLine * feature.freeSpins!.lines : betPerLine * lines;
   const canAfford = freeMode || user?.unlimited || (user?.balance ?? 0) >= totalBet;
-  const bonusPending = !!feature.bonus && !feature.bonus.done;
+  const bonusPending = (!!feature.bonus && !feature.bonus.done) || !!feature.extra;
 
   // Recupera giros gratis o un bono pendientes (recarga de página, otro dispositivo).
   useEffect(() => {
     api.get<FeatureState>(`/api/games/slots/state?machine=${machine.id}`).then((f) => {
       setFeature(f);
       if (f.bonus && !f.bonus.done) setBonusOpen(true);
+      if (f.extra) setExtraOpen(true);
     }).catch(() => undefined);
   }, [machine.id]);
 
@@ -409,7 +430,8 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
       return;
     }
     if (bonusPending) {
-      setBonusOpen(true);
+      if (feature.extra) setExtraOpen(true);
+      else setBonusOpen(true);
       return;
     }
     if (!canAfford) {
@@ -570,6 +592,18 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
         setBonusOpen(true);
       }, after + 400);
     }
+    if (r.extrasTriggered.length > 0 && res.feature.extra) {
+      const names = { holdwin: '¡Hold & Win!', wheel: '¡La gran rueda!', safe: '¡Caja fuerte!' } as const;
+      window.setTimeout(() => {
+        audio.play('winBig');
+        machineFx.current?.play('fireworks', [{ x: 0.5, y: 0.4 }]);
+        setAnnounce({ title: names[r.extrasTriggered[0]!], text: r.extrasTriggered.length > 1 ? `Y después: ${r.extrasTriggered.slice(1).map((k) => names[k]).join(', ')}` : 'Minijuego activado' });
+        window.setTimeout(() => {
+          setAnnounce(null);
+          setExtraOpen(true);
+        }, speed === 0 ? 0 : 1800);
+      }, after);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAfford, notify, user, setBalance, totalBet, betPerLine, lines, speed, celebrate, cell, kick, machine, freeMode, bonusPending, feature, labels, scatterId]);
 
@@ -676,6 +710,8 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
             </div>
           </div>
 
+          {feature.jackpots && <JackpotBar jackpots={jackpotsFor(feature.jackpots, totalBet)} />}
+
           {/* Ventana de rodillos */}
           <div ref={windowRef} className="relative mx-auto w-full">
             <div className="mx-auto flex items-center justify-center gap-0.5">
@@ -700,6 +736,20 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
                     />
                   ))}
                 </div>
+                {/* Premio de cada billete visible (Vegas Nights) */}
+                {phase !== 'spinning' && result && result.cash.length > 0 && (
+                  <div className="pointer-events-none absolute left-1 top-1" style={{ width: winW, height: winH }} aria-hidden>
+                    {result.cash.map((c) => {
+                      const reel = Math.floor(c.cell / 3);
+                      const row = c.cell % 3;
+                      return (
+                        <span key={c.cell} className={cx('absolute -translate-x-1/2 rounded-md px-1.5 text-xs font-extrabold tabular-nums shadow', c.value.kind === 'jackpot' ? 'bg-gradient-to-b from-[#f4d27a] to-[#8a5f18] text-[#2a1a05]' : 'bg-black/75 text-oro-claro')} style={{ left: reel * (cell + GAP) + cell / 2, top: row * cell + cell * 0.74 }}>
+                          {c.value.kind === 'credit' ? cashLabel(c.value, result.totalBet) : TIER_LABEL[c.value.tier]}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
                 {/* Cristal de la ventana: reflejo diagonal */}
                 <div className="pointer-events-none absolute inset-1 rounded-xl bg-[linear-gradient(115deg,rgba(255,255,255,0.10),rgba(255,255,255,0)_32%,rgba(255,255,255,0)_70%,rgba(255,255,255,0.06))]" />
                 {/* Líneas de pago: siguen exactamente las celdas de cada línea del motor */}
@@ -810,6 +860,32 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
               </motion.button>
             )}
           </AnimatePresence>
+          {extraOpen && feature.extra && (
+            <VegasFeature
+              machine={machine.id}
+              extra={feature.extra}
+              onUpdate={(st) => setFeature((f) => ({ ...f, extra: st.extra, pending: st.pending, jackpots: st.jackpots }))}
+              onFinished={(won, kind) => {
+                const label = { holdwin: 'Hold & Win', wheel: 'La gran rueda', safe: 'Caja fuerte' }[kind];
+                setStats((st) => ({ ...st, won: st.won + won, biggest: Math.max(st.biggest, won), bonuses: st.bonuses + 1 }));
+                setHistory((h) => [{ id: ++historyId.current, kind: 'bonus' as const, symbols: [kind === 'holdwin' ? 'cash' : kind === 'wheel' ? 'wheel' : 'safe'], text: label, win: won, bet: 0 }, ...h].slice(0, 12));
+              }}
+              onClose={() => setExtraOpen(false)}
+            />
+          )}
+          {!adultOk && (
+            <div className="absolute inset-0 z-50 grid place-items-center rounded-[36px] bg-black/90 p-6 text-center" role="dialog" aria-label="Aviso para mayores de edad" data-testid="adult-gate">
+              <div className="max-w-sm">
+                <p className="font-display text-5xl text-[#ffb3ef]">+18</p>
+                <h2 className="mt-2 text-2xl text-marfil">Máquina para adultos</h2>
+                <p className="mt-2 text-sm text-niebla">Vegas Nights tiene temática de sala de juego adulta: alcohol, tabaco y showgirls. Se juega con créditos virtuales sin valor real.</p>
+                <div className="mt-5 flex justify-center gap-2">
+                  <Button variant="ghost" onClick={() => window.history.back()}>Volver</Button>
+                  <Button onClick={() => { try { localStorage.setItem('aurum.adult-ok', '1'); } catch { /* sin almacenamiento */ } setAdultOk(true); }} data-testid="adult-ok">Soy mayor de 18</Button>
+                </div>
+              </div>
+            </div>
+          )}
           {bonusOpen && feature.bonus && (
             <ChestBonus
               machine={machine.id}
