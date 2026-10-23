@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import {
   BlackjackError,
+  PLINKO_LIMITS,
+  PlinkoError,
+  dropPlinko,
+  validatePlinko,
+  type PlinkoRisk,
+  type PlinkoRows,
   DEFAULT_BLACKJACK_RULES,
   DEFAULT_ROULETTE_LIMITS,
   DEFAULT_SLOT_LIMITS,
@@ -58,6 +64,14 @@ const slotsSchema = z.object({ machine: machineId, betPerLine: intAmount, lines:
 const bonusPickSchema = z.object({ machine: machineId, index: z.number().int().min(0).max(30) });
 const featureSchema = z.object({ machine: machineId, action: z.enum(['spin', 'pick', 'respin']), index: z.number().int().min(0).max(30).optional() }).strict();
 const bjStartSchema = z.object({ bet: intAmount, idempotencyKey });
+const plinkoSchema = z.object({
+  rows: z.union([z.literal(8), z.literal(12), z.literal(16)]),
+  risk: z.enum(['low', 'medium', 'high']),
+  bet: intAmount,
+  /** Varias bolas en una petición (cada una es una ronda propia). */
+  count: z.number().int().min(1).max(10).default(1),
+  idempotencyKey,
+}).strict();
 const bjActionSchema = z.object({
   roundId: z.string().uuid(),
   action: z.enum(['hit', 'stand', 'double', 'split']),
@@ -69,7 +83,7 @@ function engineGuard<T>(fn: () => T): T {
   try {
     return fn();
   } catch (err) {
-    if (err instanceof BlackjackError || err instanceof RouletteError || err instanceof SlotError) {
+    if (err instanceof BlackjackError || err instanceof RouletteError || err instanceof SlotError || err instanceof PlinkoError) {
       throw new AppError(400, err.code, err.message);
     }
     throw err;
@@ -90,7 +104,38 @@ export function gameRoutes(ctx: AppContext): Router {
       blackjack: DEFAULT_BLACKJACK_RULES,
       roulette: DEFAULT_ROULETTE_LIMITS,
       slots: DEFAULT_SLOT_LIMITS,
+      plinko: PLINKO_LIMITS,
     });
+  });
+
+  /* -------------------------------- Plinko -------------------------------- */
+  r.post('/plinko/drop', (req, res) => {
+    assertGameEnabled(db, 'plinko');
+    const body = parse(plinkoSchema, req.body);
+    const user = req.user!;
+    engineGuard(() => validatePlinko(body.rows, body.risk, body.bet));
+    const keyOf = (i: number): string => (i === 0 ? body.idempotencyKey : `${body.idempotencyKey.slice(0, 60)}-${i}`);
+    const first = findRoundByKey(db, user.id, keyOf(0));
+    if (first) {
+      const balls = Array.from({ length: body.count }, (_, i) => findRoundByKey(db, user.id, keyOf(i))).filter(Boolean) as RoundRow[];
+      res.json({ balls: balls.map((b) => ({ roundId: b.id, ...JSON.parse(b.result_json ?? 'null') })), balance: getBalance(db, user.id), achievements: [], replayed: true });
+      return;
+    }
+    const out = db.tx(() => {
+      const balls = [];
+      let last = null as null | ReturnType<typeof settleRound>;
+      const achievements = [];
+      for (let i = 0; i < body.count; i += 1) {
+        const round = openRound(db, user.id, 'plinko', body.bet, keyOf(i));
+        // Ruta decidida aquí con un CSPRNG; la bola del cliente solo la recorre.
+        const result = dropPlinko(body.rows as PlinkoRows, body.risk as PlinkoRisk, body.bet, cryptoRng);
+        last = settleRound(db, round.id, result.payout, result);
+        achievements.push(...last.achievements);
+        balls.push({ roundId: round.id, ...result });
+      }
+      return { balls, balance: last!.balance, achievements };
+    });
+    res.json(out);
   });
 
   /* -------------------------------- Ruleta -------------------------------- */

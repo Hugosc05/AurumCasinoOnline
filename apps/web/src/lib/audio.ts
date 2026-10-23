@@ -35,7 +35,12 @@ type SoundName =
   | 'lineWin'
   | 'firework'
   | 'coins'
-  | 'anticipation';
+  | 'anticipation'
+  | 'peg'
+  | 'bucket'
+  | 'cashout'
+  | 'crash'
+  | 'bingoBall';
 
 export interface PlayOptions {
   /** Panorama estéreo (−1 izquierda … 1 derecha). */
@@ -54,7 +59,7 @@ const NOOP_LOOP: LoopHandle = { setIntensity: () => {}, stop: () => {} };
 /** Separación mínima (s) entre dos instancias del mismo sonido: evita saturación y efectos "metralleta". */
 const MIN_GAP: Partial<Record<SoundName, number>> = {
   chip: 0.04, chips: 0.08, cardSlide: 0.05, cardLand: 0.05, cardFlip: 0.06, ballTick: 0.03, reelStop: 0.05,
-  lineWin: 0.12, winSmall: 0.4, winMedium: 0.6, winBig: 1.5, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03, anticipation: 0.8,
+  lineWin: 0.12, winSmall: 0.4, winMedium: 0.6, winBig: 1.5, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03, anticipation: 0.8, peg: 0.012, bucket: 0.03, cashout: 0.15, crash: 0.5, bingoBall: 0.3,
 };
 
 class AudioEngine {
@@ -336,6 +341,32 @@ class AudioEngine {
       case 'coins':
         for (let i = 0; i < 12; i += 1) this.clink(t + i * 0.045 + Math.random() * 0.02, 2400 + Math.random() * 1600, 0.045, (Math.random() - 0.5) * 0.8);
         break;
+      case 'peg':
+        // Clavo de plinko: golpecito seco, más agudo cuanto más abajo (opts.rate).
+        this.burst(t, 0.008, 4200 * (opts.rate ?? 1), 4, 0.05, 'bandpass', { pan });
+        this.tone(1900 * (opts.rate ?? 1), t, 0.025, 'sine', 0.018, { pan });
+        break;
+      case 'bucket':
+        this.tone(660 * (opts.rate ?? 1), t, 0.12, 'triangle', 0.05, { pan, glideTo: 520 * (opts.rate ?? 1) });
+        this.burst(t, 0.02, 1800, 2, 0.06, 'bandpass', { pan });
+        break;
+      case 'cashout':
+        this.clink(t, 2900, 0.07, pan);
+        this.bell(1318.5, t + 0.04, 0.8, 0.05, pan);
+        this.bell(1760, t + 0.12, 0.9, 0.045, pan);
+        break;
+      case 'crash':
+        // Explosión: golpe grave + ruido que se apaga.
+        this.tone(90, t, 0.6, 'sine', 0.22, { glideTo: 35, send: 0.4 });
+        this.burst(t, 0.9, 2200, 0.4, 0.16, 'lowpass', { sweepTo: 180, send: 0.4 });
+        this.burst(t, 0.05, 5000, 1, 0.1, 'highpass');
+        break;
+      case 'bingoBall':
+        // La bola sale del bombo y rueda por el tubo.
+        [0, 0.07, 0.13, 0.18].forEach((dt, i) => this.burst(t + dt, 0.015, 2600 - i * 300, 3, 0.08 / (i + 1), 'bandpass', { pan }));
+        this.burst(t + 0.2, 0.35, 900, 0.8, 0.05, 'bandpass', { sweepTo: 600, pan });
+        this.tone(880, t + 0.55, 0.3, 'sine', 0.03);
+        break;
       case 'anticipation':
         // Tensión ascendente con trémolo (dura lo que la espera extra del rodillo).
         this.tremolo(t, 0.9, 440, 880, 0.05, pan);
@@ -431,13 +462,13 @@ class AudioEngine {
    * Bucle continuo: rodadura de la bola o rodillos girando. La intensidad
    * (0..1) modula volumen y brillo; siempre termina con `stop()`.
    */
-  loop(kind: 'roll' | 'reels'): LoopHandle {
+  loop(kind: 'roll' | 'reels' | 'rocket'): LoopHandle {
     const ctx = this.ready();
     if (!ctx || !this.noise) return NOOP_LOOP;
     const now = ctx.currentTime;
     const g = ctx.createGain();
     g.gain.value = 0;
-    this.out(g, 0, kind === 'roll' ? 0.15 : 0.08);
+    this.out(g, 0, kind === 'roll' ? 0.15 : kind === 'rocket' ? 0.05 : 0.08);
     const nodes: AudioScheduledSourceNode[] = [];
 
     const src = ctx.createBufferSource();
@@ -445,7 +476,7 @@ class AudioEngine {
     src.loop = true;
     const f = ctx.createBiquadFilter();
     f.type = kind === 'roll' ? 'bandpass' : 'lowpass';
-    f.frequency.value = kind === 'roll' ? 1200 : 520;
+    f.frequency.value = kind === 'roll' ? 1200 : kind === 'rocket' ? 340 : 520;
     f.Q.value = kind === 'roll' ? 0.8 : 0.9;
     src.connect(f).connect(g);
     nodes.push(src);

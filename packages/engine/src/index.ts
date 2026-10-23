@@ -13,3 +13,4 @@ export * from './poker/bot';
 export * from './achievements';
 export * from './slotMachines';
 export * from './slotExtras';
+export * from './plinko';
