@@ -12,3 +12,4 @@ export * from './poker/holdem';
 export * from './poker/bot';
 export * from './achievements';
 export * from './slotMachines';
+export * from './slotExtras';

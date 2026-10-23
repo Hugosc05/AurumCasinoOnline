@@ -167,7 +167,8 @@ describe('apuestas, consistencia y RTP', () => {
   });
 
   it('la simulación converge al RTP calculado (giros gratis y bono incluidos)', () => {
-    for (const m of SLOT_MACHINES) {
+    // Las máquinas con minijuegos de sala (Vegas Nights) tienen su propia simulación en vegas.test.ts.
+    for (const m of SLOT_MACHINES.filter((mm) => !mm.extras)) {
       const rng = seededRng(m === A ? 7 : 11);
       let bet = 0;
       let won = 0;

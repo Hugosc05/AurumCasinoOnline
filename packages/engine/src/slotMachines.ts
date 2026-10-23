@@ -1,5 +1,7 @@
 import type { Rng } from './rng';
 import { DEFAULT_SLOT_LIMITS, PAYLINES, REELS, ROWS, SlotError, validateSlotBet, winTier, type SlotLimits, type WinTier } from './slots';
+import { cellIndex, holdWinEv, rollCash, safeEv, wheelEv, type CashValue, type SlotExtras } from './slotExtras';
+import { seededRng } from './rng';
 
 /**
  * Máquinas tragaperras configurables.
@@ -12,7 +14,7 @@ import { DEFAULT_SLOT_LIMITS, PAYLINES, REELS, ROWS, SlotError, validateSlotBet,
  * exacta a partir de la propia definición.
  */
 
-export type SymbolKind = 'regular' | 'wild' | 'scatter' | 'bonus';
+export type SymbolKind = 'regular' | 'wild' | 'scatter' | 'bonus' | 'cash';
 
 export interface SlotSymbolDef {
   id: string;
@@ -61,6 +63,12 @@ export interface SlotMachineDef {
     prizes: readonly number[];
   };
   limits: SlotLimits;
+  /** Símbolos que aparecen en grupos consecutivos en la tira (p. ej. billetes de dos en dos). */
+  stacks?: Readonly<Record<string, number>>;
+  /** Minijuegos de sala: Hold & Win, rueda, caja fuerte y botes (Vegas Nights). */
+  extras?: SlotExtras;
+  /** Contenido solo para adultos (aviso al entrar). */
+  adult?: boolean;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -155,7 +163,92 @@ export const REEF_TREASURE: SlotMachineDef = {
   limits: DEFAULT_SLOT_LIMITS,
 };
 
-export const SLOT_MACHINES: readonly SlotMachineDef[] = [AURUM_ROYALE, REEF_TREASURE];
+export const VEGAS_NIGHTS: SlotMachineDef = {
+  id: 'vegas-nights',
+  name: 'Vegas Nights',
+  theme: 'Noche en Las Vegas',
+  tagline: 'Billetes que se quedan pegados, la gran rueda, la caja fuerte y cuatro botes.',
+  adult: true,
+  symbols: [
+    { id: 'chip', label: 'Ficha', kind: 'regular' },
+    { id: 'dice', label: 'Dados', kind: 'regular' },
+    { id: 'cards', label: 'Cartas', kind: 'regular' },
+    { id: 'whisky', label: 'Whisky', kind: 'regular' },
+    { id: 'cigar', label: 'Puro', kind: 'regular' },
+    { id: 'bills', label: 'Fajo de billetes', kind: 'regular' },
+    { id: 'showgirl', label: 'Showgirl', kind: 'regular' },
+    { id: 'neon', label: 'Neón VEGAS (comodín)', kind: 'wild' },
+    { id: 'wheel', label: 'Rueda (3 abren la gran rueda)', kind: 'scatter' },
+    { id: 'safe', label: 'Caja fuerte (bono)', kind: 'bonus' },
+    { id: 'cash', label: 'Billete con premio (Hold & Win)', kind: 'cash' },
+  ],
+  composition: [
+    { chip: 7, dice: 6, cards: 6, whisky: 5, cigar: 4, bills: 3, showgirl: 2, neon: 1, wheel: 1, safe: 2, cash: 3 },
+    { chip: 7, dice: 6, cards: 6, whisky: 5, cigar: 4, bills: 3, showgirl: 2, neon: 2, wheel: 2, safe: 0, cash: 4 },
+    { chip: 6, dice: 6, cards: 6, whisky: 5, cigar: 4, bills: 3, showgirl: 3, neon: 2, wheel: 1, safe: 2, cash: 4 },
+    { chip: 7, dice: 6, cards: 6, whisky: 5, cigar: 4, bills: 3, showgirl: 2, neon: 2, wheel: 2, safe: 0, cash: 4 },
+    { chip: 7, dice: 6, cards: 6, whisky: 5, cigar: 4, bills: 3, showgirl: 2, neon: 1, wheel: 1, safe: 2, cash: 3 },
+  ],
+  stacks: { cash: 2 },
+  stripOffsets: [2, 4, 6, 8, 10],
+  linePays: {
+    chip: [8, 19, 72],
+    dice: [10, 25, 96],
+    cards: [10, 29, 110],
+    whisky: [14, 44, 173],
+    cigar: [19, 61, 245],
+    bills: [35, 110, 440],
+    showgirl: [61, 220, 960],
+    neon: [125, 490, 2400],
+  },
+  groups: [],
+  wildMultiplier: 1,
+  scatterPays: {},
+  freeSpins: null,
+  bonus: null,
+  limits: DEFAULT_SLOT_LIMITS,
+  extras: {
+    jackpots: { mini: 10, minor: 25, major: 100, grandSeed: 250_000, grandContribution: 0.005, grandRefBet: 2000 },
+    holdWin: {
+      symbol: 'cash',
+      trigger: 6,
+      respins: 3,
+      landChance: 0.035,
+      values: [
+        { value: { kind: 'credit', mult: 1 }, weight: 300 },
+        { value: { kind: 'credit', mult: 2 }, weight: 250 },
+        { value: { kind: 'credit', mult: 3 }, weight: 160 },
+        { value: { kind: 'credit', mult: 5 }, weight: 110 },
+        { value: { kind: 'credit', mult: 8 }, weight: 60 },
+        { value: { kind: 'credit', mult: 10 }, weight: 40 },
+        { value: { kind: 'jackpot', tier: 'mini' }, weight: 22 },
+        { value: { kind: 'jackpot', tier: 'minor' }, weight: 12 },
+        { value: { kind: 'jackpot', tier: 'major' }, weight: 3 },
+      ],
+    },
+    wheel: {
+      symbol: 'wheel',
+      minCount: 3,
+      segments: [
+        { prize: { kind: 'credit', mult: 5 }, weight: 18 },
+        { prize: { kind: 'jackpot', tier: 'mini' }, weight: 8 },
+        { prize: { kind: 'credit', mult: 8 }, weight: 16 },
+        { prize: { kind: 'credit', mult: 15 }, weight: 10 },
+        { prize: { kind: 'jackpot', tier: 'minor' }, weight: 5 },
+        { prize: { kind: 'credit', mult: 6 }, weight: 18 },
+        { prize: { kind: 'credit', mult: 20 }, weight: 7 },
+        { prize: { kind: 'jackpot', tier: 'major' }, weight: 1 },
+        { prize: { kind: 'credit', mult: 10 }, weight: 14 },
+        { prize: { kind: 'credit', mult: 30 }, weight: 4 },
+        { prize: { kind: 'jackpot', tier: 'grand' }, weight: 0.2 },
+        { prize: { kind: 'credit', mult: 12 }, weight: 12 },
+      ].map((s) => ({ ...s, weight: Math.round(s.weight * 10) })) as SlotExtras['wheel']['segments'],
+    },
+    safe: { symbol: 'safe', reels: [0, 2, 4], minCount: 3, tiles: { mini: 5, minor: 4, major: 3, grand: 3 } },
+  },
+};
+
+export const SLOT_MACHINES: readonly SlotMachineDef[] = [AURUM_ROYALE, REEF_TREASURE, VEGAS_NIGHTS];
 
 export function getMachine(id: string): SlotMachineDef {
   const m = SLOT_MACHINES.find((x) => x.id === id);
@@ -172,17 +265,32 @@ export function getMachine(id: string): SlotMachineDef {
  * con menos apariciones se colocan primero, separados al máximo, de modo que
  * nunca hay dos scatters (ni dos cofres) en la misma ventana visible.
  */
-export function buildMachineStrip(symbols: readonly string[], composition: Readonly<Record<string, number>>, offset = 0): string[] {
+export function buildMachineStrip(symbols: readonly string[], composition: Readonly<Record<string, number>>, offset = 0, stacks: Readonly<Record<string, number>> = {}): string[] {
   const length = symbols.reduce((acc, s) => acc + (composition[s] ?? 0), 0);
   const strip: (string | null)[] = Array.from({ length }, () => null);
-  const order = symbols.slice().sort((a, b) => (composition[a] ?? 0) - (composition[b] ?? 0) || symbols.indexOf(b) - symbols.indexOf(a));
+  // Primero los apilados (necesitan huecos consecutivos), después del más escaso al más común.
+  const order = symbols.slice().sort((a, b) => Number(!!stacks[b]) - Number(!!stacks[a]) || (composition[a] ?? 0) - (composition[b] ?? 0) || symbols.indexOf(b) - symbols.indexOf(a));
   let shift = offset;
   for (const sym of order) {
     const count = composition[sym] ?? 0;
-    for (let k = 0; k < count; k += 1) {
-      let pos = (Math.floor((k * length) / count) + shift) % length;
-      while (strip[pos] !== null) pos = (pos + 1) % length;
-      strip[pos] = sym;
+    const stack = Math.max(1, stacks[sym] ?? 1);
+    const groups = Math.ceil(count / stack);
+    let placed = 0;
+    for (let k = 0; k < groups; k += 1) {
+      const size = Math.min(stack, count - placed);
+      let pos = (Math.floor((k * length) / groups) + shift) % length;
+      const free = (p: number): boolean => Array.from({ length: size }, (_, j) => strip[(p + j) % length] === null).every(Boolean);
+      let guard = 0;
+      while (!free(pos) && guard < length) {
+        pos = (pos + 1) % length;
+        guard += 1;
+      }
+      for (let j = 0; j < size; j += 1) {
+        let q = (pos + j) % length;
+        while (strip[q] !== null) q = (q + 1) % length;
+        strip[q] = sym;
+      }
+      placed += size;
     }
     shift += 3;
   }
@@ -194,7 +302,7 @@ export function machineStrips(m: SlotMachineDef): string[][] {
   let s = stripCache.get(m.id);
   if (!s) {
     const ids = m.symbols.map((x) => x.id);
-    s = m.composition.map((c, i) => buildMachineStrip(ids, c, m.stripOffsets[i] ?? 0));
+    s = m.composition.map((c, i) => buildMachineStrip(ids, c, m.stripOffsets[i] ?? 0, m.stacks));
     stripCache.set(m.id, s);
   }
   return s;
@@ -304,6 +412,10 @@ export interface MachineSpinResult {
   freeSpinsAwarded: number;
   /** Celdas de los símbolos de bono si se activa el bono. */
   bonusTriggered: { cells: [number, number][] } | null;
+  /** Billetes visibles con su premio (máquinas con Hold & Win). */
+  cash: { cell: number; value: CashValue }[];
+  /** Minijuegos activados en esta tirada, en el orden en que se jugarán. */
+  extrasTriggered: ('holdwin' | 'wheel' | 'safe')[];
 }
 
 export function evaluateMachineGrid(
@@ -349,7 +461,21 @@ export function evaluateMachineGrid(
   return {
     machine: m.id, mode, grid, lines, betPerLine, totalBet, charged: mode === 'paid' ? totalBet : 0, spinMultiplier,
     lineWins, scatterWin, totalWin, tier: winTier(totalWin, totalBet), freeSpinsAwarded, bonusTriggered,
+    cash: [], extrasTriggered: extrasTriggers(m, grid, mode),
   };
+}
+
+/** Minijuegos de sala que activa una cuadrícula (solo en tiradas pagadas). */
+export function extrasTriggers(m: SlotMachineDef, grid: MachineGrid, mode: 'paid' | 'free'): ('holdwin' | 'wheel' | 'safe')[] {
+  const x = m.extras;
+  if (!x || mode !== 'paid') return [];
+  const count = (sym: string, reels?: readonly number[]): number =>
+    grid.reduce((a, col, reel) => a + (reels && !reels.includes(reel) ? 0 : col.filter((s) => s === sym).length), 0);
+  const out: ('holdwin' | 'wheel' | 'safe')[] = [];
+  if (count(x.holdWin.symbol) >= x.holdWin.trigger) out.push('holdwin');
+  if (count(x.wheel.symbol) >= x.wheel.minCount) out.push('wheel');
+  if (count(x.safe.symbol, x.safe.reels) >= x.safe.minCount) out.push('safe');
+  return out;
 }
 
 /** Tirada: paradas uniformes e independientes elegidas por el RNG inyectado. */
@@ -357,7 +483,14 @@ export function spinMachine(m: SlotMachineDef, rng: Rng, betPerLine: number, lin
   validateSlotBet(betPerLine, lines, m.limits);
   const stops = machineStrips(m).map((strip) => rng.int(strip.length));
   const grid = machineGridFromStops(m, stops);
-  return { stops, ...evaluateMachineGrid(m, grid, betPerLine, lines, mode) };
+  const out: MachineSpinResult = { stops, ...evaluateMachineGrid(m, grid, betPerLine, lines, mode) };
+  // Cada billete visible lleva su premio, sorteado ahora (se muestra aunque no se active el Hold & Win).
+  if (m.extras) {
+    grid.forEach((col, reel) => col.forEach((s, row) => {
+      if (s === m.extras!.holdWin.symbol) out.cash.push({ cell: cellIndex(reel, row), value: rollCash(m.extras!, rng) });
+    }));
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -423,6 +556,71 @@ export interface MachineRtp {
   hitFrequencyPerLine: number;
   freeSpinsChance: number;
   bonusChance: number;
+  /** Minijuegos de sala (0 si la máquina no los tiene). */
+  holdWinRtp: number;
+  wheelRtp: number;
+  safeRtp: number;
+  holdWinChance: number;
+  wheelChance: number;
+  safeChance: number;
+  /** Probabilidad por tirada de ganar el Grand (se paga del bote progresivo, aparte del RTP). */
+  grandChance: number;
+}
+
+/** Distribución exacta del número de un símbolo visible en la ventana de cada rodillo (enumerando paradas). */
+function windowCountDist(strips: readonly (readonly string[])[], sym: string): number[] {
+  let dist = [1];
+  for (const s of strips) {
+    const per = Array.from({ length: ROWS + 1 }, () => 0);
+    for (let i = 0; i < s.length; i += 1) {
+      let c = 0;
+      for (let r = 0; r < ROWS; r += 1) if (s[(i + r) % s.length] === sym) c += 1;
+      per[c]! += 1 / s.length;
+    }
+    const next = Array.from({ length: dist.length + ROWS }, () => 0);
+    dist.forEach((q, k) => per.forEach((pp, c) => (next[k + c]! += q * pp)));
+    dist = next;
+  }
+  return dist;
+}
+
+const extrasCache = new Map<string, Pick<MachineRtp, 'holdWinRtp' | 'wheelRtp' | 'safeRtp' | 'holdWinChance' | 'wheelChance' | 'safeChance' | 'grandChance'>>();
+
+/**
+ * RTP de los minijuegos de sala. Rueda y caja fuerte: exacto. Hold & Win:
+ * probabilidad de activación exacta y valor esperado por simulación con
+ * semilla fija (20 000 partidas por cada número inicial de billetes).
+ */
+function extrasRtp(m: SlotMachineDef) {
+  const hit = extrasCache.get(m.id);
+  if (hit) return hit;
+  const x = m.extras;
+  const out = { holdWinRtp: 0, wheelRtp: 0, safeRtp: 0, holdWinChance: 0, wheelChance: 0, safeChance: 0, grandChance: 0 };
+  if (x) {
+    const strips = machineStrips(m);
+    const cash = windowCountDist(strips, x.holdWin.symbol);
+    const rng = seededRng(20261023);
+    for (let k = x.holdWin.trigger; k < cash.length; k += 1) {
+      const p = cash[k] ?? 0;
+      if (p <= 0) continue;
+      const ev = holdWinEv(x, k, 20000, rng);
+      out.holdWinChance += p;
+      out.holdWinRtp += p * ev.ev;
+      out.grandChance += p * ev.fullChance;
+    }
+    const wheelDist = visibleCountDist(strips, x.wheel.symbol, [0, 1, 2, 3, 4]);
+    for (let k = x.wheel.minCount; k < wheelDist.length; k += 1) out.wheelChance += wheelDist[k]!;
+    const w = wheelEv(x);
+    out.wheelRtp = out.wheelChance * w.ev;
+    out.grandChance += out.wheelChance * w.grandChance;
+    const safeDist = visibleCountDist(strips, x.safe.symbol, x.safe.reels);
+    for (let k = x.safe.minCount; k < safeDist.length; k += 1) out.safeChance += safeDist[k]!;
+    const sf = safeEv(x);
+    out.safeRtp = out.safeChance * sf.ev;
+    out.grandChance += out.safeChance * sf.grandChance;
+  }
+  extrasCache.set(m.id, out);
+  return out;
 }
 
 /** Distribución del número de rodillos (de una lista) que muestran un símbolo de separación ≥ 3. */
@@ -500,9 +698,11 @@ export function computeMachineRtp(m: SlotMachineDef): MachineRtp {
     const mean = m.bonus.prizes.reduce((a, b) => a + b, 0) / m.bonus.prizes.length;
     bonusRtp = bonusChance * m.bonus.picks * mean;
   }
+  const ex = extrasRtp(m);
   return {
-    lineRtp, scatterRtp, baseRtp, freeSpinsRtp, bonusRtp, totalRtp: baseRtp + freeSpinsRtp + bonusRtp,
-    hitFrequencyPerLine: hit, freeSpinsChance: fsChance, bonusChance,
+    lineRtp, scatterRtp, baseRtp, freeSpinsRtp, bonusRtp,
+    totalRtp: baseRtp + freeSpinsRtp + bonusRtp + ex.holdWinRtp + ex.wheelRtp + ex.safeRtp,
+    hitFrequencyPerLine: hit, freeSpinsChance: fsChance, bonusChance, ...ex,
   };
 }
 
@@ -530,6 +730,11 @@ export function machineInfo(m: SlotMachineDef) {
     scatterPays: m.scatterPays, freeSpins: m.freeSpins,
     bonus: m.bonus ? { symbol: m.bonus.symbol, reels: m.bonus.reels, minCount: m.bonus.minCount, picks: m.bonus.picks, chests: m.bonus.prizes.length, prizes: m.bonus.prizes.slice().sort((a, b) => a - b) } : null,
     strips: machineStrips(m), paylines: PAYLINES, limits: m.limits,
-    rtp: { total: rtp.totalRtp, base: rtp.baseRtp, freeSpins: rtp.freeSpinsRtp, bonus: rtp.bonusRtp, freeSpinsChance: rtp.freeSpinsChance, bonusChance: rtp.bonusChance, hitFrequencyPerLine: rtp.hitFrequencyPerLine },
+    rtp: {
+      total: rtp.totalRtp, base: rtp.baseRtp, freeSpins: rtp.freeSpinsRtp, bonus: rtp.bonusRtp, freeSpinsChance: rtp.freeSpinsChance, bonusChance: rtp.bonusChance, hitFrequencyPerLine: rtp.hitFrequencyPerLine,
+      holdWin: rtp.holdWinRtp, wheel: rtp.wheelRtp, safe: rtp.safeRtp, holdWinChance: rtp.holdWinChance, wheelChance: rtp.wheelChance, safeChance: rtp.safeChance, grandChance: rtp.grandChance,
+    },
+    extras: m.extras ?? null,
+    adult: !!m.adult,
   };
 }
