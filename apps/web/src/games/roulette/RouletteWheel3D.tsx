@@ -431,13 +431,17 @@ interface Props {
   highlight?: number | null;
   className?: string;
   label?: string;
+  /** Sin sonido (ruleta decorativa de la portada). */
+  muted?: boolean;
 }
 
 /**
  * Componente: misma interfaz que la ruleta 2.5D (`WheelHandle`), así la página
  * no cambia. Solo dibuja mientras hay movimiento y la ruleta está a la vista.
  */
-export const RouletteWheel3D = forwardRef<WheelHandle, Props>(function RouletteWheel3D({ highlight = null, className, label }, ref) {
+export const RouletteWheel3D = forwardRef<WheelHandle, Props>(function RouletteWheel3D({ highlight = null, className, label, muted = false }, ref) {
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene3D | null>(null);
@@ -517,7 +521,7 @@ export const RouletteWheel3D = forwardRef<WheelHandle, Props>(function RouletteW
         const evs = run.run.events;
         while (run.nextEvent < evs.length && evs[run.nextEvent]!.t <= t) {
           const e = evs[run.nextEvent]!;
-          if (!run.skip) {
+          if (!run.skip && !mutedRef.current) {
             if (e.kind === 'drop') audio.play('ballDrop');
             else if (e.kind === 'deflector' || e.kind === 'fret') audio.play('ballTick');
             else if (e.kind === 'seat') audio.play('wheelStop');
@@ -580,8 +584,9 @@ export const RouletteWheel3D = forwardRef<WheelHandle, Props>(function RouletteW
           resolve();
           return;
         }
-        audio.play('spinStart');
-        running.current = { run, start: performance.now(), resolve, skip: false, loop: audio.loop('roll'), nextEvent: 0, last: new THREE.Vector3().copy(sceneRef.current?.ball.position ?? new THREE.Vector3()) };
+        if (!mutedRef.current) audio.play('spinStart');
+        const silentLoop: LoopHandle = { setIntensity: () => undefined, stop: () => undefined };
+        running.current = { run, start: performance.now(), resolve, skip: false, loop: mutedRef.current ? silentLoop : audio.loop('roll'), nextEvent: 0, last: new THREE.Vector3().copy(sceneRef.current?.ball.position ?? new THREE.Vector3()) };
       });
     },
     skip() {

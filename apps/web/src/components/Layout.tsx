@@ -1,4 +1,4 @@
-import { AnimatePresence, animate, motion } from 'motion/react';
+import { AnimatePresence, animate, motion, useMotionValue } from 'motion/react';
 import { Coins, DoorOpen, LogOut, Menu, Settings2, Shield, User as UserIcon, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -9,15 +9,47 @@ import { NotificationBell } from '../social/NotificationBell';
 import { useSession } from '../state/session';
 import { Button } from './ui';
 
+/** Rueda del logo: una ruleta europea en miniatura (37 casillas) con la A en el cubo. */
+const LOGO_POCKETS = Array.from({ length: 37 }, (_, i) => {
+  const a0 = ((i * 360) / 37 - 90 - 360 / 74) * (Math.PI / 180);
+  const a1 = (((i + 1) * 360) / 37 - 90 - 360 / 74) * (Math.PI / 180);
+  const r1 = 27.5;
+  const r0 = 19;
+  const p = (r: number, a: number) => `${(32 + r * Math.cos(a)).toFixed(2)} ${(32 + r * Math.sin(a)).toFixed(2)}`;
+  return { d: `M${p(r0, a0)} L${p(r1, a0)} A${r1} ${r1} 0 0 1 ${p(r1, a1)} L${p(r0, a1)} A${r0} ${r0} 0 0 0 ${p(r0, a0)} Z`, fill: i === 0 ? '#0f7a4f' : i % 2 ? '#b0202f' : '#12161f' };
+});
+
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const { motion: level } = useSession();
+  const rot = useMotionValue(0);
+  const spinning = useRef(false);
+  const wheelRef = useRef<SVGGElement>(null);
+  // El giro se aplica como atributo SVG (rotate con centro explícito): sin dependencias del origen CSS.
+  useEffect(() => rot.on('change', (v) => wheelRef.current?.setAttribute('transform', `rotate(${v.toFixed(2)} 32 32)`)), [rot]);
+  // Al pasar el ratón la rueda gira y frena como una ruleta de verdad (la A del cubo queda siempre derecha).
+  const spin = (): void => {
+    if (level === 'off' || spinning.current) return;
+    spinning.current = true;
+    const turns = level === 'reduced' ? 1 : 2 + Math.random();
+    void animate(rot, rot.get() + turns * 360, { duration: level === 'reduced' ? 0.9 : 2.4, ease: [0.15, 0.85, 0.25, 1] }).then(() => {
+      spinning.current = false;
+    });
+  };
   return (
-    <Link to="/" className="group flex items-center gap-2.5" aria-label="Aurum, ir al inicio">
-      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden className="transition-transform duration-500 ease-casino group-hover:rotate-[8deg]">
-        <circle cx="32" cy="32" r="30" fill="#0D1526" stroke="#CFAE6B" strokeWidth="1.5" />
-        {Array.from({ length: 12 }, (_, i) => (
-          <line key={i} x1="32" y1="5" x2="32" y2="10" stroke="#CFAE6B" strokeOpacity="0.5" strokeWidth="1.2" transform={`rotate(${i * 30} 32 32)`} />
-        ))}
-        <path d="M32 15 L45 47 H39.5 L36.6 39.5 H27.4 L24.5 47 H19 Z M29.2 34.8 H34.8 L32 27.4 Z" fill="#E2C78C" />
+    <Link to="/" className="group flex items-center gap-2.5" aria-label="Aurum, ir al inicio" onMouseEnter={spin} onFocus={spin} data-testid="logo">
+      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+        <defs>
+          <radialGradient id="logo-wood" cx="50%" cy="40%" r="60%"><stop offset="0" stopColor="#5a3418" /><stop offset="1" stopColor="#2a160a" /></radialGradient>
+          <linearGradient id="logo-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#fff1c4" /><stop offset="0.5" stopColor="#d9b25e" /><stop offset="1" stopColor="#8c6421" /></linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="31" fill="url(#logo-wood)" stroke="#CFAE6B" strokeWidth="1.5" />
+        <g ref={wheelRef}>
+          {LOGO_POCKETS.map((p, i) => <path key={i} d={p.d} fill={p.fill} stroke="#CFAE6B" strokeOpacity="0.55" strokeWidth="0.35" />)}
+          <circle cx="32" cy="32" r="19" fill="url(#logo-wood)" stroke="url(#logo-gold)" strokeWidth="1.2" />
+          {Array.from({ length: 4 }, (_, i) => <line key={i} x1="32" y1="14.5" x2="32" y2="20.5" stroke="url(#logo-gold)" strokeWidth="1.6" strokeLinecap="round" transform={`rotate(${i * 90 + 45} 32 32)`} />)}
+        </g>
+        <circle cx="32" cy="32" r="13.5" fill="#0D1526" stroke="url(#logo-gold)" strokeWidth="1" />
+        <path d="M32 20.5 L40.6 42 H36.9 L35 37.1 H29 L27.1 42 H23.4 Z M30.2 34 H33.8 L32 29.2 Z" fill="url(#logo-gold)" />
       </svg>
       {!compact && (
         <span className="font-display text-2xl leading-none tracking-wide text-marfil">

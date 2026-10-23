@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChipStack } from '../components/Chip';
 import { PlayingCard } from '../components/PlayingCard';
 import { Button, EmptyState } from '../components/ui';
-import { RouletteWheel } from '../games/roulette/RouletteWheel';
+import { HeroWheel } from '../games/roulette/HeroWheel';
 import { SlotSymbolArt } from '../games/slots/symbols';
 import { api } from '../lib/api';
 import { GAME_NAMES, credits, cx, relativeTime, signed } from '../lib/format';
@@ -133,13 +133,8 @@ export function HomePage() {
         </div>
         <div className="relative mx-auto w-full max-w-[560px]">
           <div className="absolute inset-[8%] rounded-full bg-oro/10 blur-3xl" aria-hidden />
-          <motion.div
-            initial={level === 'off' ? false : { opacity: 0, rotateX: 55, y: 30 }}
-            animate={{ opacity: 1, rotateX: 34, y: 0 }}
-            transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
-            style={{ transformPerspective: 1400 }}
-          >
-            <RouletteWheel idle={level === 'full'} initialPocket={17} className="w-full drop-shadow-[0_40px_50px_rgba(0,0,0,0.75)]" label="Ruleta europea decorativa en reposo" />
+          <motion.div initial={level === 'off' ? false : { opacity: 0, y: 30, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}>
+            <HeroWheel className="w-full drop-shadow-[0_40px_50px_rgba(0,0,0,0.75)]" />
           </motion.div>
         </div>
       </section>
