@@ -1,5 +1,6 @@
 import { memo, type ReactElement } from 'react';
 import { VEGAS_SYMBOLS } from './symbolsVegas';
+import { CLASSIC_SYMBOLS } from './symbolsClassic';
 
 /** Símbolos originales dibujados en SVG (Aurum Royale y Tesoro del Arrecife). */
 
@@ -246,13 +247,54 @@ const REEF: Record<string, () => ReactElement> = {
     </g>
   ),
 };
-Object.assign(SYMBOLS, REEF, VEGAS_SYMBOLS);
+Object.assign(SYMBOLS, REEF, VEGAS_SYMBOLS, CLASSIC_SYMBOLS);
 
-export const SlotSymbolArt = memo(function SlotSymbolArt({ symbol, size = 100 }: { symbol: string; size?: number }) {
+/**
+ * Relieve de sala: la silueta del símbolo se usa como mapa de alturas para una
+ * luz especular y una luz difusa (bisel, brillo y sombras propias) y una
+ * sombra proyectada. En los rodillos 3D se calcula una sola vez al crear la
+ * imagen del símbolo, así que no cuesta nada al girar.
+ */
+function Relief({ id }: { id: string }) {
+  return (
+    <filter id={id} x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.4" result="bump" />
+      <feDiffuseLighting in="bump" surfaceScale="3" diffuseConstant="1.3" lightingColor="#ffffff" result="diffuse">
+        <feDistantLight azimuth="235" elevation="62" />
+      </feDiffuseLighting>
+      <feComposite in="diffuse" in2="SourceAlpha" operator="in" result="diffuseIn" />
+      <feColorMatrix in="SourceGraphic" type="saturate" values="1.2" result="vivid" />
+      <feBlend in="vivid" in2="diffuseIn" mode="multiply" result="shaded" />
+      <feSpecularLighting in="bump" surfaceScale="4" specularConstant="0.95" specularExponent="24" lightingColor="#ffffff" result="spec">
+        <fePointLight x="20" y="-10" z="90" />
+      </feSpecularLighting>
+      <feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn" />
+      <feComposite in="shaded" in2="specIn" operator="arithmetic" k1="0" k2="1.12" k3="0.6" k4="0" result="lit" />
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.2" result="shadowBlur" />
+      <feOffset in="shadowBlur" dx="1.5" dy="3.5" result="shadowOff" />
+      <feFlood floodColor="#000000" floodOpacity="0.42" />
+      <feComposite in2="shadowOff" operator="in" result="shadow" />
+      <feMerge>
+        <feMergeNode in="shadow" />
+        <feMergeNode in="lit" />
+      </feMerge>
+    </filter>
+  );
+}
+
+export const SlotSymbolArt = memo(function SlotSymbolArt({ symbol, size = 100, flat = false }: { symbol: string; size?: number; flat?: boolean }) {
   const Art = SYMBOLS[symbol] ?? SYMBOLS.jack!;
+  const fid = `relief-${symbol}`;
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden>
-      <Art />
+      {flat ? (
+        <Art />
+      ) : (
+        <>
+          <defs><Relief id={fid} /></defs>
+          <g filter={`url(#${fid})`}><Art /></g>
+        </>
+      )}
     </svg>
   );
 });

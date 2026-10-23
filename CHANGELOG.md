@@ -2,6 +2,14 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.6.1] — 2026-10-23
+
+### Cambiado
+- Tragaperras con aspecto de mueble de sala: pantalla superior con arte de la temática (showgirls, billetes y monedas en Vegas Nights), botes y contador de premio; marco de neón del color de la máquina; rodillos oscuros y profundos.
+- Símbolos con relieve real (luz difusa y especular sobre la silueta y sombra propia), calculado una sola vez al crear la imagen del símbolo.
+- Aurum Royale pasa a ser la clásica de frutas: cerezas, limón, naranja, uvas, sandía, campana, diamante, BAR y siete (mismas tiras y pagos).
+- «Big win» y «Mega win» con letras doradas en relieve y lluvia de billetes, solo para premios reales de 15× y 50× la apuesta o más.
+
 ## [1.6.0] — 2026-10-23
 
 ### Añadido

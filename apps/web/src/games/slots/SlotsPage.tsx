@@ -18,6 +18,7 @@ import { planSlotPresentation, lineColor, type SlotPresentation } from './presen
 import { Reel, type ReelHandle } from './Reel';
 import { ReelCylinder, SymbolSprites, symbolsReady } from './ReelCylinder';
 import { ChestBonus, type BonusView } from './ChestBonus';
+import { TopScreen } from './CabinetArt';
 import { JackpotBar, TIER_LABEL, VegasFeature, cashLabel, jackpotsFor, type ExtraView, type JackpotInfo } from './VegasFeatures';
 import { SlotPaytable, machineFeatures } from './SlotPaytable';
 import { SlotSymbolArt } from './symbols';
@@ -66,29 +67,32 @@ interface HistoryEntry {
 }
 
 /** Ambientación visual de cada máquina. */
-const THEMES: Record<string, { frame: string; reel: string; marquee: string; accent: string }> = {
+const THEMES: Record<string, { frame: string; reel: string; marquee: string; accent: string; neon: string }> = {
   'aurum-royale': {
     frame: 'from-[#1c2747] via-abismo to-[#070b16] border-oro/40',
-    reel: 'from-[#fdfaf3] via-[#f3ecdc] to-[#e2d6bc]',
+    reel: 'from-[#22337a] via-[#101a4a] to-[#070b26]',
     marquee: 'border-oro/30 bg-noche/80',
     accent: 'text-oro-claro',
+    neon: '#ffcf5a',
   },
   'tesoro-arrecife': {
     frame: 'from-[#0b4a5e] via-[#062a3a] to-[#03141e] border-[#7ff0e4]/40',
-    reel: 'from-[#f0fbff] via-[#d9f2f7] to-[#b5dde6]',
+    reel: 'from-[#0f5874] via-[#073550] to-[#031a2a]',
     marquee: 'border-[#7ff0e4]/30 bg-[#03141e]/80',
     accent: 'text-[#9ff5ec]',
+    neon: '#5ff2ff',
   },
   'vegas-nights': {
     frame: 'from-[#3a0f3f] via-[#1a0820] to-[#08030c] border-[#ff8be6]/40',
-    reel: 'from-[#fff8f0] via-[#f6e6dc] to-[#e2c7bf]',
+    reel: 'from-[#2c2196] via-[#17105e] to-[#0a0732]',
     marquee: 'border-[#ff8be6]/30 bg-[#12051a]/85',
     accent: 'text-[#ffb3ef]',
+    neon: '#ff4fd8',
   },
 };
 
 const BET_STEPS = [1, 2, 5, 10, 20, 50, 100];
-const TIER_TEXT: Record<WinTier, string> = { none: '', small: 'Premio', medium: 'Buen premio', big: 'Gran premio', mega: 'Premio extraordinario' };
+const TIER_TEXT: Record<WinTier, string> = { none: '', small: 'Premio', medium: 'Buen premio', big: 'Big win', mega: 'Mega win' };
 const TIER_MS: Record<WinTier, number> = { none: 0, small: DURATION.winSmall, medium: DURATION.winMedium, big: DURATION.winBig, mega: DURATION.winBig + 1200 };
 const GAP = 8;
 const LEVER_W = 56;
@@ -208,11 +212,15 @@ function BigWinMeter({ amount, multiplier, tier, durationMs }: { amount: number;
   return (
     <>
       <AnimatePresence mode="wait">
-        <motion.p key={label} className="font-display text-[clamp(1.8rem,5vw,3.4rem)] leading-none gold-text drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]" initial={{ scale: 1.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
+        <motion.p key={label} className="mega-text font-display text-[clamp(2.2rem,7vw,4.6rem)] uppercase leading-none" initial={{ scale: 1.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
           {TIER_TEXT[label]}
         </motion.p>
       </AnimatePresence>
-      <p ref={numRef} className="mt-2 font-display text-[clamp(2.2rem,6vw,4rem)] leading-none tabular-nums text-marfil drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">0</p>
+      <p ref={numRef} className="mega-number mt-3 font-display text-[clamp(2.4rem,7vw,4.4rem)] leading-none tabular-nums">0</p>
+      {/* Lluvia de billetes (solo decoración del premio real) */}
+      <div className="money-rain pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        {Array.from({ length: 14 }, (_, i) => <span key={i} style={{ left: `${(i * 37) % 100}%`, animationDelay: `${(i % 7) * 0.22}s`, animationDuration: `${1.8 + (i % 4) * 0.35}s` }} />)}
+      </div>
       <p className="mt-1 text-sm text-oro-claro">{multiplier.toFixed(0)} veces la apuesta</p>
     </>
   );
@@ -659,11 +667,11 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
         <div
           className={cx(
             level === 'off' && 'motion-off',
-            'relative overflow-hidden rounded-[36px] border bg-gradient-to-b p-4 shadow-hondo transition-shadow duration-700 sm:p-6',
+            'slot-cabinet relative overflow-hidden rounded-[36px] border bg-gradient-to-b p-4 shadow-hondo transition-shadow duration-700 sm:p-6',
             theme.frame,
             freeMode && 'shadow-[0_0_0_2px_rgba(127,240,228,0.5),0_0_60px_-10px_rgba(127,240,228,0.5)]',
-            tier === 'mega' ? 'shadow-[0_0_0_2px_rgba(235,217,166,0.8),0_0_120px_-10px_rgba(235,217,166,0.75)]' : tier === 'big' ? 'shadow-[0_0_0_1px_rgba(235,217,166,0.6),0_0_80px_-10px_rgba(235,217,166,0.55)]' : tier === 'medium' ? 'shadow-[0_0_50px_-15px_rgba(235,217,166,0.45)]' : '',
           )}
+          style={{ ['--neon' as string]: theme.neon }}
         >
           {!spritesReady && <SymbolSprites symbols={symbolIds} onReady={() => setSpritesReady(true)} />}
           {/* Brillo ambiental proporcional al premio */}
@@ -682,13 +690,6 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
           </AnimatePresence>
           <Celebration ref={machineFx} level={effects} className="pointer-events-none absolute inset-0 z-20 h-full w-full" />
 
-          {/* Rótulo superior iluminado, como el de una máquina de sala */}
-          <div className="slot-topper relative mx-auto mb-3 w-full max-w-[520px] rounded-[18px] px-5 py-1.5 text-center" aria-hidden>
-            <Bulbs count={14} mode={bulbMode === 'off' ? 'off' : bulbMode} />
-            <p className={cx('slot-topper-title my-0.5 font-display text-[clamp(1.35rem,3vw,2.1rem)] leading-none tracking-wide', theme.accent)}>{machine.name}</p>
-            <Bulbs count={14} mode={bulbMode === 'off' ? 'off' : bulbMode} reverse />
-          </div>
-
           {/* Marquesina con luces */}
           {freeMode && (
             <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="mb-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-2xl border border-[#7ff0e4]/40 bg-[#7ff0e4]/10 px-4 py-2 text-sm text-marfil" role="status" data-testid="free-spins">
@@ -698,26 +699,17 @@ function SlotsPage({ machine }: { machine: SlotMachineDef }) {
               <span>Ganado: <span className="text-oro-claro">{credits(feature.freeSpins!.won)}</span></span>
             </motion.div>
           )}
-          <div className={cx('relative mb-4 flex items-center justify-between rounded-2xl border px-4 py-3', theme.marquee)}>
-            <div className="flex gap-1.5" aria-hidden>
-              {Array.from({ length: 6 }, (_, i) => (
-                <span key={i} className={cx('h-2 w-2 rounded-full bg-oro-claro', tier ? 'animate-[marquee-glow_0.8s_ease-in-out_infinite]' : 'opacity-40')} style={{ animationDelay: `${i * 0.12}s` }} />
-              ))}
+          <TopScreen machine={machine.id} title={machine.name} accent={theme.accent}>
+            {feature.jackpots && <JackpotBar jackpots={jackpotsFor(feature.jackpots, totalBet)} />}
+            <div className="mx-auto flex w-fit items-center gap-3 rounded-xl border border-white/15 bg-black/80 px-4 py-1.5" aria-live="polite">
+              <Bulbs count={5} mode={bulbMode} />
+              <div className="text-center">
+                <p className="text-[10px] uppercase tracking-[0.25em] text-niebla">{tier ? TIER_TEXT[tier] : phase === 'spinning' ? 'Girando…' : 'Premio'}</p>
+                <p className={cx('font-display text-3xl leading-none tabular-nums', theme.accent)}><span ref={counterRef}>0</span></p>
+              </div>
+              <Bulbs count={5} mode={bulbMode} reverse />
             </div>
-            <div className="text-center" aria-live="polite">
-              <p className="text-xs text-niebla">{tier ? TIER_TEXT[tier] : phase === 'spinning' ? 'Girando…' : 'Premio'}</p>
-              <p className={cx('font-display text-3xl tabular-nums', theme.accent)}>
-                <span ref={counterRef}>0</span>
-              </p>
-            </div>
-            <div className="flex gap-1.5" aria-hidden>
-              {Array.from({ length: 6 }, (_, i) => (
-                <span key={i} className={cx('h-2 w-2 rounded-full bg-oro-claro', tier ? 'animate-[marquee-glow_0.8s_ease-in-out_infinite]' : 'opacity-40')} style={{ animationDelay: `${(5 - i) * 0.12}s` }} />
-              ))}
-            </div>
-          </div>
-
-          {feature.jackpots && <JackpotBar jackpots={jackpotsFor(feature.jackpots, totalBet)} />}
+          </TopScreen>
 
           {/* Ventana de rodillos */}
           <div ref={windowRef} className="relative mx-auto w-full">

@@ -89,23 +89,23 @@ No hay giro automático: cada tirada se pide expresamente. La interfaz no muestr
 
 ### Aurum Royale
 
-Sietes, coronas y estrellas que abren giros gratis.
+La clásica de frutas: sietes, BAR y estrellas que abren giros gratis.
 
 5 × 3, 1, 5, 10, 15, 20 líneas activables. Apuesta por línea: 1 a 100.
 
 | Símbolo | ×3 | ×4 | ×5 |
 | --- | ---: | ---: | ---: |
-| J | 5 | 14 | 63 |
-| Q | 5 | 18 | 72 |
-| K | 7 | 27 | 99 |
-| A | 9 | 32 | 126 |
-| Trébol | 14 | 50 | 198 |
+| Cerezas | 5 | 14 | 63 |
+| Limón | 5 | 18 | 72 |
+| Naranja | 7 | 27 | 99 |
+| Ciruela | 9 | 32 | 126 |
+| Sandía | 14 | 50 | 198 |
 | Campana | 18 | 68 | 297 |
 | Diamante | 27 | 99 | 495 |
-| Corona | 41 | 153 | 675 |
+| BAR | 41 | 153 | 675 |
 | Siete | 63 | 270 | 1350 |
 | Comodín | 99 | 495 | 3600 |
-| Joyas mezcladas (diamante, corona, siete) | 5 | 15 | 50 |
+| Mezcla de oro (diamante, BAR, siete) | 5 | 15 | 50 |
 
 - Scatter en cualquier posición: 3 pagan 2×, 4 pagan 8×, 5 pagan 40× la apuesta total.
 - Giros gratis: 3 scatters dan 5, 4 scatters dan 8, 5 scatters dan 12, con premios ×2. Se juegan con la apuesta de la tirada que los activó, sin cobrar, y no se reactivan.
@@ -141,6 +141,31 @@ La ola dobla los premios y tres cofres abren el bono de tesoros.
 | Juego base (líneas) | 82,56 % |
 | Bono (prob. 0,52 % por tirada) | 13,49 % |
 | **Total** | **96,05 %** |
+
+### Vegas Nights
+
+Billetes que se quedan pegados, la gran rueda, la caja fuerte y cuatro botes.
+
+5 × 3, 1, 5, 10, 15, 20 líneas activables. Apuesta por línea: 1 a 100.
+
+| Símbolo | ×3 | ×4 | ×5 |
+| --- | ---: | ---: | ---: |
+| Ficha | 8 | 19 | 72 |
+| Dados | 10 | 25 | 96 |
+| Cartas | 10 | 29 | 110 |
+| Whisky | 14 | 44 | 173 |
+| Puro | 19 | 61 | 245 |
+| Fajo de billetes | 35 | 110 | 440 |
+| Showgirl | 61 | 220 | 960 |
+| Neón VEGAS (comodín) | 125 | 490 | 2400 |
+
+
+| RTP | Valor |
+| --- | ---: |
+| Juego base (líneas) | 62,12 % |
+| **Total** | **95,86 %** |
+
+Vegas Nights añade los minijuegos de sala: Hold & Win (6 o más billetes; 3 re-giros que vuelven a 3 con cada billete nuevo; llenar las 15 casillas da el Grand), la gran rueda (3 ruedas), la caja fuerte (3 cajas en los rodillos 1, 3 y 5; gana el primer bote con tres cajas iguales) y los botes Mini 10×, Menor 25×, Mayor 100× y Grand progresivo compartido (0,5 % de cada apuesta; se paga entero con apuesta total de 2.000 o más). RTP de Vegas Nights ≈ 95,9 % más el Grand; el valor del Hold & Win se estima por simulación con semilla fija y una prueba comprueba la tabla.
 
 **Método del RTP** (`computeMachineRtp` en `packages/engine/src/slotMachines.ts`; `npm run rtp` lo recalcula y `npm run rules:md -w packages/engine` regenera estas tablas): se enumeran las combinaciones de símbolos de una línea ponderadas por la frecuencia de cada tira (rodillos independientes y parada uniforme); scatter y cofres se calculan con su distribución exacta gracias a la separación garantizada en las tiras; los giros gratis se valoran como su número esperado × RTP del juego base × multiplicador; el bono, como la media de elegir 3 de los 9 premios. Una prueba compara cada valor con una simulación. El RTP es un promedio a muy largo plazo; en sesiones cortas la variación es enorme.
 

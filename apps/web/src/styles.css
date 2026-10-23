@@ -262,3 +262,59 @@ html[data-motion='off'] *::after {
     box-shadow: inset 0 6px 20px rgba(0, 0, 0, 0.85);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Mueble de tragaperras: neón, pantalla superior y premios grandes
+--------------------------------------------------------------------------- */
+@layer components {
+  .slot-cabinet {
+    /* Tubos de neón del color de la máquina y canto cromado. */
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.18),
+      inset 0 0 0 4px color-mix(in srgb, var(--neon, #ffcf5a) 85%, transparent),
+      inset 0 0 26px color-mix(in srgb, var(--neon, #ffcf5a) 45%, transparent),
+      0 0 34px -6px color-mix(in srgb, var(--neon, #ffcf5a) 55%, transparent),
+      0 30px 60px -24px rgba(0, 0, 0, 0.95);
+  }
+  .slot-screen {
+    box-shadow:
+      0 0 0 3px #0c0a10,
+      0 0 0 5px rgba(255, 255, 255, 0.28),
+      0 0 22px color-mix(in srgb, var(--neon, #ffcf5a) 50%, transparent);
+  }
+  .mega-text {
+    background: linear-gradient(180deg, #fffbe6 0%, #ffe07a 30%, #f0a91e 55%, #b86a07 75%, #ffe9a6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 2px #6b2d00;
+    /* Extrusión dorada: varias sombras escalonadas simulan el volumen de las letras. */
+    filter: drop-shadow(0 1px 0 #c9851a) drop-shadow(0 2px 0 #a86a10) drop-shadow(0 3px 0 #85500a) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.75));
+    letter-spacing: 0.04em;
+  }
+  .mega-number {
+    color: #ffffff;
+    -webkit-text-stroke: 1.5px #5b2a00;
+    text-shadow: 0 2px 0 #e0a52a, 0 4px 0 #8a5a12, 0 8px 18px rgba(0, 0, 0, 0.8);
+  }
+}
+@keyframes money-fall {
+  0% { transform: translate3d(0, -20%, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate3d(0, 520%, 0) rotate(260deg); opacity: 0.9; }
+}
+.money-rain span {
+  position: absolute;
+  top: -12%;
+  width: 34px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #d7f2c8, #5f9e57);
+  box-shadow: inset 0 0 0 1.5px #23482a, inset 0 0 0 5px rgba(255, 255, 255, 0.25);
+  will-change: transform, opacity;
+  animation: money-fall 2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .money-rain { display: none; }
+}
+.motion-off .money-rain { display: none; }
