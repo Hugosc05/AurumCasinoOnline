@@ -15,3 +15,4 @@ export * from './slotMachines';
 export * from './slotExtras';
 export * from './plinko';
 export * from './crash';
+export * from './bingo';

@@ -8,6 +8,7 @@ import type { BlackjackManager } from '../blackjack/manager';
 import type { PokerManager } from '../poker/manager';
 import type { RealtimeHub } from '../realtime/hub';
 import type { SocialService } from '../social/social';
+import type { BingoManager } from '../bingo/bingo';
 
 /** Alfabeto Crockford base32 (sin I, L, O ni U para evitar confusiones). */
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -45,16 +46,20 @@ export interface BlackjackRoomSettings {
   minBet: number;
   maxBet: number;
 }
+export interface BingoRoomSettings {
+  cardPrice: number;
+}
 
 export interface CreateRoomInput {
   name: string;
-  game: 'poker' | 'blackjack';
+  game: 'poker' | 'blackjack' | 'bingo';
   maxSeats: number;
   privacy: 'code' | 'friends';
   allowBots: boolean;
   chipMode: 'wallet' | 'room';
   poker?: Partial<PokerRoomSettings>;
   blackjack?: Partial<BlackjackRoomSettings>;
+  bingo?: Partial<BingoRoomSettings>;
 }
 
 interface RoomRow {
@@ -62,7 +67,7 @@ interface RoomRow {
   code: string;
   code_expires_at: string;
   name: string;
-  game: 'poker' | 'blackjack';
+  game: 'poker' | 'blackjack' | 'bingo';
   host_id: string;
   privacy: 'code' | 'friends';
   max_seats: number;
@@ -101,6 +106,7 @@ export class RoomService {
     private readonly poker: PokerManager,
     private readonly blackjack: BlackjackManager,
     private readonly social: SocialService,
+    private readonly bingo: BingoManager,
     private readonly clock: () => number = Date.now,
   ) {
     const access = (tableId: string, userId: string | null): boolean => {
@@ -109,6 +115,7 @@ export class RoomService {
     };
     poker.setAccess(access);
     blackjack.setAccess(access);
+    bingo.setAccess(access);
   }
 
   /** Arranque: recrea las mesas de las salas abiertas (vacías: las fichas se devolvieron al reiniciar). */
@@ -137,12 +144,16 @@ export class RoomService {
 
   /* -------------------------------- Mesas -------------------------------- */
 
-  private settings(r: RoomRow): PokerRoomSettings | BlackjackRoomSettings {
-    return JSON.parse(r.settings_json) as PokerRoomSettings | BlackjackRoomSettings;
+  private settings(r: RoomRow): PokerRoomSettings | BlackjackRoomSettings | BingoRoomSettings {
+    return JSON.parse(r.settings_json) as PokerRoomSettings | BlackjackRoomSettings | BingoRoomSettings;
   }
 
   private tableConfig(r: RoomRow) {
     const bots = r.allow_bots === 1;
+    if (r.game === 'bingo') {
+      const st = this.settings(r) as BingoRoomSettings;
+      return { id: tableIdOf(r.id), name: r.name, cardPrice: st.cardPrice, maxSeats: r.max_seats, allowBots: bots, roomId: r.id };
+    }
     if (r.game === 'poker') {
       const st = this.settings(r) as PokerRoomSettings;
       const room = r.chip_mode === 'room';
@@ -162,12 +173,14 @@ export class RoomService {
 
   private createTable(r: RoomRow): void {
     const cfg = this.tableConfig(r);
-    if (r.game === 'poker') this.poker.addRoomTable(cfg as Parameters<PokerManager['addRoomTable']>[0]);
+    if (r.game === 'bingo') this.bingo.addRoomTable(cfg as Parameters<BingoManager['addRoomTable']>[0]);
+    else if (r.game === 'poker') this.poker.addRoomTable(cfg as Parameters<PokerManager['addRoomTable']>[0]);
     else this.blackjack.addRoomTable(cfg as Parameters<BlackjackManager['addRoomTable']>[0]);
   }
 
   private table(r: RoomRow) {
     const id = tableIdOf(r.id);
+    if (r.game === 'bingo') return this.bingo.rooms.get(id) ?? null;
     return r.game === 'poker' ? this.poker.tables.get(id) ?? null : this.blackjack.tables.get(id) ?? null;
   }
 
@@ -203,7 +216,10 @@ export class RoomService {
   view(roomId: string, userId: string) {
     const r = this.requireMember(roomId, userId);
     const t = this.table(r);
-    const seatedIds = new Set<string>(t ? t.seats.filter((s) => s?.kind === 'human').map((s) => s!.id) : []);
+    const seatedIds = new Set<string>(
+      t && 'seats' in t ? t.seats.filter((s) => s?.kind === 'human').map((s) => s!.id) : [],
+    );
+    if (t && !('seats' in t)) for (const m of this.memberIds(r.id)) if (t.hasUser(m)) seatedIds.add(m);
     const members = this.db
       .all<{ id: string; username: string; joined_at: string; prefs_json: string }>(
         'SELECT u.id, u.username, m.joined_at, u.prefs_json FROM room_members m JOIN users u ON u.id = m.user_id WHERE m.room_id = ? ORDER BY m.joined_at',
@@ -255,8 +271,13 @@ export class RoomService {
   create(userId: string, input: CreateRoomInput) {
     const open = this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM rooms WHERE host_id = ? AND status = 'open'`, userId)!.n;
     if (open >= MAX_OPEN_ROOMS_PER_HOST) throw new AppError(400, 'TOO_MANY_ROOMS', `Puedes tener hasta ${MAX_OPEN_ROOMS_PER_HOST} salas abiertas`);
-    let settings: PokerRoomSettings | BlackjackRoomSettings;
-    if (input.game === 'poker') {
+    let settings: PokerRoomSettings | BlackjackRoomSettings | BingoRoomSettings;
+    if (input.game === 'bingo') {
+      if (input.chipMode === 'room') throw new AppError(400, 'UNSUPPORTED', 'El bingo privado se juega con tu saldo virtual');
+      const cardPrice = input.bingo?.cardPrice ?? 10;
+      if (cardPrice < 1 || cardPrice > 10_000) throw new AppError(400, 'INVALID_PRICE', 'Precio del cartón no válido');
+      settings = { cardPrice };
+    } else if (input.game === 'poker') {
       const p = input.poker ?? {};
       const bb = p.bigBlind ?? 20;
       const sb = p.smallBlind ?? Math.max(1, Math.floor(bb / 2));
@@ -378,10 +399,15 @@ export class RoomService {
    * modo de fichas; los límites nuevos se aplican desde la siguiente mano o
    * ronda (la mano en curso no se altera).
    */
-  update(userId: string, roomId: string, patch: { name?: string; allowBots?: boolean; poker?: Partial<PokerRoomSettings>; blackjack?: Partial<BlackjackRoomSettings>; privacy?: 'code' | 'friends' }) {
+  update(userId: string, roomId: string, patch: { name?: string; allowBots?: boolean; poker?: Partial<PokerRoomSettings>; blackjack?: Partial<BlackjackRoomSettings>; bingo?: Partial<BingoRoomSettings>; privacy?: 'code' | 'friends' }) {
     const r = this.requireHost(roomId, userId);
     const st = this.settings(r);
-    let next: PokerRoomSettings | BlackjackRoomSettings = st;
+    let next: PokerRoomSettings | BlackjackRoomSettings | BingoRoomSettings = st;
+    if (r.game === 'bingo' && patch.bingo) {
+      const n = { ...(st as BingoRoomSettings), ...patch.bingo };
+      if (n.cardPrice < 1 || n.cardPrice > 10_000) throw new AppError(400, 'INVALID_SETTINGS', 'Precio del cartón no válido');
+      next = n;
+    }
     if (r.game === 'poker' && patch.poker) {
       const cur = st as PokerRoomSettings;
       if (patch.poker.startingChips !== undefined && patch.poker.startingChips !== cur.startingChips) {
@@ -443,6 +469,7 @@ export class RoomService {
     if (r.status !== 'open') return;
     const members = this.memberIds(roomId);
     if (r.game === 'poker') this.poker.removeRoomTable(tableIdOf(roomId));
+    else if (r.game === 'bingo') this.bingo.removeRoomTable(tableIdOf(roomId));
     else this.blackjack.removeRoomTable(tableIdOf(roomId));
     this.db.run(`UPDATE rooms SET status = 'closed', closed_at = ?, close_reason = ? WHERE id = ?`, nowIso(), reason, roomId);
     this.db.run('DELETE FROM room_invites WHERE room_id = ?', roomId);

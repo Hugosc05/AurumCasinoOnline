@@ -27,6 +27,7 @@ import { socialRoutes } from './routes/social';
 import { SocialService } from './social/social';
 import { RoomService } from './rooms/rooms';
 import { CrashGame } from './crash/crash';
+import { BingoManager } from './bingo/bingo';
 import { roomRoutes } from './routes/rooms';
 import { AdsService, createAdProvider } from './ads/ads';
 
@@ -67,11 +68,13 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     for (const t of poker.tables.values()) if (t.hasUser(userId)) return 'poker';
     return blackjack.seatedTable(userId) ? 'blackjack' : null;
   });
-  const rooms = new RoomService(database, realtime, poker, blackjack, social);
+  const bingo = new BingoManager(database, realtime, fast ? { countdownMs: 600, drawMs: 25, finishedMs: 150 } : { countdownMs: 25_000, drawMs: 2800, finishedMs: 9000 }, fast);
+  const rooms = new RoomService(database, realtime, poker, blackjack, social, bingo);
   const crash = new CrashGame(database, realtime, fast ? { bettingMs: 1500, crashedMs: 300, tickMs: 20 } : { bettingMs: 7000, crashedMs: 3500, tickMs: 50 });
-  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, rooms, crash, startedAt: Date.now() };
+  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, rooms, crash, bingo, startedAt: Date.now() };
   poker.init();
   blackjack.init();
+  bingo.init();
   rooms.init();
   crash.init();
 
@@ -150,6 +153,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
       clearInterval(sessionSweep);
       rooms.shutdown();
       crash.shutdown();
+      bingo.shutdown();
       poker.shutdown();
       blackjack.shutdown();
       realtime.close();

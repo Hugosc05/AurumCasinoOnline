@@ -17,16 +17,21 @@ const bjSettings = z.object({
   maxBet: z.number().int().min(1).max(1_000_000),
 }).partial().strict();
 
+const bingoSettings = z.object({ cardPrice: z.number().int().min(1).max(10_000) }).partial().strict();
+
 const createSchema = z.object({
   name,
-  game: z.enum(['poker', 'blackjack']),
-  maxSeats: z.number().int().min(2).max(7),
+  game: z.enum(['poker', 'blackjack', 'bingo']),
+  maxSeats: z.number().int().min(2).max(20),
   privacy: z.enum(['code', 'friends']).default('code'),
   allowBots: z.boolean().default(false),
   chipMode: z.enum(['wallet', 'room']).default('wallet'),
   poker: pokerSettings.optional(),
   blackjack: bjSettings.optional(),
-}).strict().refine((v) => v.game !== 'poker' || v.maxSeats <= 6, { message: 'El póker admite hasta 6 asientos', path: ['maxSeats'] });
+  bingo: bingoSettings.optional(),
+}).strict()
+  .refine((v) => v.game !== 'poker' || v.maxSeats <= 6, { message: 'El póker admite hasta 6 asientos', path: ['maxSeats'] })
+  .refine((v) => v.game !== 'blackjack' || v.maxSeats <= 7, { message: 'El blackjack admite hasta 7 asientos', path: ['maxSeats'] });
 
 /** Salas privadas. Todas las comprobaciones de pertenencia y de anfitrión se hacen en el servicio. */
 export function roomRoutes(ctx: AppContext): Router {
@@ -65,7 +70,7 @@ export function roomRoutes(ctx: AppContext): Router {
   });
   r.post('/:id/code', (req, res) => res.json(rooms.regenerateCode(req.user!.id, id.parse(req.params.id))));
   r.patch('/:id', (req, res) => {
-    const body = parse(z.object({ name: name.optional(), allowBots: z.boolean().optional(), privacy: z.enum(['code', 'friends']).optional(), poker: pokerSettings.optional(), blackjack: bjSettings.optional() }).strict(), req.body);
+    const body = parse(z.object({ name: name.optional(), allowBots: z.boolean().optional(), privacy: z.enum(['code', 'friends']).optional(), poker: pokerSettings.optional(), blackjack: bjSettings.optional(), bingo: bingoSettings.optional() }).strict(), req.body);
     res.json(rooms.update(req.user!.id, id.parse(req.params.id), body));
   });
   r.post('/:id/leave', (req, res) => {
