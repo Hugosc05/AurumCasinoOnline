@@ -327,3 +327,25 @@ html[data-motion='off'] *::after {
     linear-gradient(180deg, #120a24 0%, #0a0716 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 30px 60px -30px rgba(0, 0, 0, 0.8), 0 30px 60px -30px rgba(0, 0, 0, 0.9);
 }
+
+/* Cohete: espacio profundo con nebulosa y llama que parpadea. */
+.crash-stage {
+  background:
+    radial-gradient(ellipse at 80% 10%, rgba(255, 79, 184, 0.22), transparent 50%),
+    radial-gradient(ellipse at 15% 90%, rgba(70, 120, 255, 0.18), transparent 55%),
+    linear-gradient(180deg, #0b0a1f 0%, #05040d 100%);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.7), 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+}
+.crash-mult { text-shadow: 0 6px 24px rgba(0, 0, 0, 0.7), 0 0 30px rgba(255, 180, 70, 0.25); }
+.rocket .rocket-flame { transform-box: fill-box; transform-origin: 50% 0%; opacity: 0.35; transform: translate(28px, 44px) scaleY(0.4); }
+.rocket[data-flying='1'] .rocket-flame { opacity: 1; animation: rocket-flame 0.09s ease-in-out infinite alternate; }
+@keyframes rocket-flame {
+  from { transform: translate(28px, 44px) scaleY(0.85) scaleX(0.95); }
+  to { transform: translate(28px, 44px) scaleY(1.2) scaleX(1.05); }
+}
+.cash-button { background: linear-gradient(180deg, #4ee39a, #13995a) !important; color: #04150c !important; animation: cash-pulse 0.9s ease-in-out infinite; }
+@keyframes cash-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(78, 227, 154, 0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(78, 227, 154, 0); }
+}
+.motion-off .rocket-flame, .motion-off .cash-button { animation: none !important; }

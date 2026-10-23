@@ -7,6 +7,7 @@ import type { AdsService } from './ads/ads';
 import type { SocialService } from './social/social';
 import type { RoomService } from './rooms/rooms';
 import type { RealtimeHub } from './realtime/hub';
+import type { CrashGame } from './crash/crash';
 
 export interface AppContext {
   config: AppConfig;
@@ -18,5 +19,6 @@ export interface AppContext {
   ads: AdsService;
   social: SocialService;
   rooms: RoomService;
+  crash: CrashGame;
   startedAt: number;
 }
