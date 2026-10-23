@@ -18,7 +18,7 @@ describe('máquinas y funciones especiales', () => {
   it('lista las máquinas con su RTP y funciones', async () => {
     const r = (await fetch(`${s.base}/api/rules`).then((x) => x.json())) as any;
     const ids = r.slots.machines.map((m: { id: string }) => m.id);
-    expect(ids).toEqual(['aurum-royale', 'tesoro-arrecife']);
+    expect(ids).toEqual(['aurum-royale', 'tesoro-arrecife', 'vegas-nights']);
     for (const m of r.slots.machines) expect(m.rtp.total).toBeGreaterThan(0.95);
     expect(r.slots.machines[0].freeSpins.multiplier).toBe(2);
     expect(r.slots.machines[1].bonus.picks).toBe(3);

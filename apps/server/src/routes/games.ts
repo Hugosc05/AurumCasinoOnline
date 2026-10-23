@@ -29,7 +29,7 @@ import { parse, requireAuth } from '../lib/http';
 import { RateLimiter, rateLimit } from '../lib/rateLimit';
 import { cryptoRng } from '../lib/rng';
 import { getBalance } from '../wallet/wallet';
-import { slotBonusPick, slotFeatureState, slotSpin } from '../games/slots';
+import { slotBonusPick, slotFeatureAct, slotFeatureState, slotSpin } from '../games/slots';
 import {
   type RoundRow,
   addToRoundBet,
@@ -56,6 +56,7 @@ const rouletteSchema = z.object({
 const machineId = z.string().min(1).max(40).default('aurum-royale');
 const slotsSchema = z.object({ machine: machineId, betPerLine: intAmount, lines: z.number().int(), idempotencyKey });
 const bonusPickSchema = z.object({ machine: machineId, index: z.number().int().min(0).max(30) });
+const featureSchema = z.object({ machine: machineId, action: z.enum(['spin', 'pick', 'respin']), index: z.number().int().min(0).max(30).optional() }).strict();
 const bjStartSchema = z.object({ bet: intAmount, idempotencyKey });
 const bjActionSchema = z.object({
   roundId: z.string().uuid(),
@@ -138,6 +139,12 @@ export function gameRoutes(ctx: AppContext): Router {
     assertGameEnabled(db, 'slots');
     const body = parse(bonusPickSchema, req.body);
     res.json(engineGuard(() => slotBonusPick(db, req.user!.id, body.machine, body.index)));
+  });
+
+  r.post('/slots/feature', (req, res) => {
+    assertGameEnabled(db, 'slots');
+    const body = parse(featureSchema, req.body);
+    res.json(engineGuard(() => slotFeatureAct(db, req.user!.id, body.machine, body.action, body.index)));
   });
 
   /* ------------------------------- Blackjack ------------------------------- */
