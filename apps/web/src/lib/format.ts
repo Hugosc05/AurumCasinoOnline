@@ -20,6 +20,9 @@ export const GAME_NAMES: Record<string, string> = {
   roulette: 'Ruleta',
   slots: 'Slots',
   poker: 'Póker',
+  bingo: 'Bingo',
+  crash: 'Cohete',
+  plinko: 'Plinko',
 };
 
 export function cx(...parts: (string | false | null | undefined)[]): string {

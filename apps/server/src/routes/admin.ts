@@ -14,7 +14,7 @@ const pageQuery = z.object({
   page: z.coerce.number().int().min(1).max(100_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(25),
   q: z.string().trim().max(100).optional(),
-  game: z.enum(['blackjack', 'roulette', 'slots', 'poker']).optional(),
+  game: z.enum(['blackjack', 'roulette', 'slots', 'poker', 'bingo', 'crash', 'plinko']).optional(),
   userId: z.string().uuid().optional(),
 });
 
@@ -296,7 +296,7 @@ export function adminRoutes(ctx: AppContext): Router {
   });
 
   const settingsSchema = z.object({
-    gamesEnabled: z.object({ blackjack: z.boolean(), roulette: z.boolean(), slots: z.boolean(), poker: z.boolean() }).optional(),
+    gamesEnabled: z.object({ blackjack: z.boolean(), roulette: z.boolean(), slots: z.boolean(), poker: z.boolean(), bingo: z.boolean(), crash: z.boolean(), plinko: z.boolean() }).partial().optional(),
     dailyBonus: z.number().int().min(0).max(1_000_000).optional(),
     demoRefillAmount: z.number().int().min(0).max(1_000_000).optional(),
     demoRefillThreshold: z.number().int().min(0).max(1_000_000).optional(),
@@ -312,7 +312,11 @@ export function adminRoutes(ctx: AppContext): Router {
   }).strict();
   r.patch('/settings', (req, res) => {
     const body = parse(settingsSchema, req.body);
-    for (const [k, v] of Object.entries(body)) setSetting(db, k as keyof typeof DEFAULT_SETTINGS, v as never);
+    for (const [k, v] of Object.entries(body)) {
+      // gamesEnabled se fusiona: se pueden activar o desactivar juegos sueltos.
+      const value = k === 'gamesEnabled' ? { ...getSetting(db, 'gamesEnabled'), ...(v as object) } : v;
+      setSetting(db, k as keyof typeof DEFAULT_SETTINGS, value as never);
+    }
     audit(req, 'settings.update', null, body);
     res.json({ ok: true });
   });

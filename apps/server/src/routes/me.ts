@@ -14,7 +14,7 @@ import { preferencesSchema, readPrefs, toPublicUser } from '../auth/users';
 const pageSchema = z.object({
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  game: z.enum(['blackjack', 'roulette', 'slots', 'poker']).optional(),
+  game: z.enum(['blackjack', 'roulette', 'slots', 'poker', 'bingo', 'crash', 'plinko']).optional(),
 });
 
 

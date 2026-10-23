@@ -2,7 +2,7 @@ import { ACHIEVEMENT_BY_ID, type AchievementDef, type AchievementId } from '@aur
 import type { Database } from '../db/database';
 import { nowIso } from '../db/database';
 
-export type GameId = 'blackjack' | 'roulette' | 'slots' | 'poker';
+export type GameId = 'blackjack' | 'roulette' | 'slots' | 'poker' | 'bingo' | 'crash' | 'plinko';
 
 export interface OutcomeFlags {
   natural?: boolean;

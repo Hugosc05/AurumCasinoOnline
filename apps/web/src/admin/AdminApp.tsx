@@ -524,7 +524,7 @@ function BlackjackTablesCard() {
 
 /* --------------------------------- Ajustes --------------------------------- */
 interface SettingsShape {
-  gamesEnabled: Record<'blackjack' | 'roulette' | 'slots' | 'poker', boolean>;
+  gamesEnabled: Record<'blackjack' | 'roulette' | 'slots' | 'poker' | 'bingo' | 'crash' | 'plinko', boolean>;
   dailyBonus: number;
   demoRefillAmount: number;
   demoRefillThreshold: number;

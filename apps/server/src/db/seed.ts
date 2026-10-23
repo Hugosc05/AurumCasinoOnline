@@ -8,10 +8,13 @@ export interface GameSettings {
   roulette: boolean;
   slots: boolean;
   poker: boolean;
+  bingo: boolean;
+  crash: boolean;
+  plinko: boolean;
 }
 
 export const DEFAULT_SETTINGS = {
-  gamesEnabled: { blackjack: true, roulette: true, slots: true, poker: true } as GameSettings,
+  gamesEnabled: { blackjack: true, roulette: true, slots: true, poker: true, bingo: true, crash: true, plinko: true } as GameSettings,
   /** Saldo inicial de las cuentas nuevas (se concede una sola vez, al registrarse). null = valor de STARTING_BALANCE. */
   startingBalance: null as number | null,
   dailyBonus: 1000,
@@ -115,7 +118,10 @@ export function getSetting<K extends keyof SettingsShape>(db: Database, key: K):
   const row = db.get<{ value_json: string }>('SELECT value_json FROM settings WHERE key = ?', key);
   if (!row) return DEFAULT_SETTINGS[key];
   try {
-    return JSON.parse(row.value_json) as SettingsShape[K];
+    const v = JSON.parse(row.value_json) as SettingsShape[K];
+    // Juegos añadidos después de guardar los ajustes: activados por defecto.
+    if (key === 'gamesEnabled') return { ...DEFAULT_SETTINGS.gamesEnabled, ...(v as object) } as SettingsShape[K];
+    return v;
   } catch {
     return DEFAULT_SETTINGS[key];
   }
