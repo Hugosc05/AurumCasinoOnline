@@ -86,7 +86,7 @@ export function meRoutes(ctx: AppContext): Router {
       req.user!.id,
     );
     const map = new Map(rows.map((x) => [x.achievement_id, x.unlocked_at]));
-    res.json({ achievements: ACHIEVEMENTS.map((a) => ({ ...a, unlockedAt: map.get(a.id) ?? null })) });
+    res.json({ achievements: ACHIEVEMENTS.filter((a) => a.id !== 'mission_done').map((a) => ({ ...a, unlockedAt: map.get(a.id) ?? null })) });
   });
 
   /* ------------------------- Promociones virtuales ------------------------- */

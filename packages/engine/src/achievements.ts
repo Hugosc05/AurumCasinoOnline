@@ -14,7 +14,8 @@ export type AchievementId =
   | 'roulette_straight'
   | 'rounds_50'
   | 'rounds_250'
-  | 'personal_best';
+  | 'personal_best'
+  | 'mission_done';
 
 export interface AchievementDef {
   id: AchievementId;
@@ -37,6 +38,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'rounds_50', title: 'Habitual', description: 'Juega 50 partidas.', icon: 'Medal', tier: 'bronze' },
   { id: 'rounds_250', title: 'Veterano', description: 'Juega 250 partidas.', icon: 'Trophy', tier: 'gold' },
   { id: 'personal_best', title: 'Nueva mejor marca', description: 'Supera tu mayor premio individual.', icon: 'TrendingUp', tier: 'bronze' },
+  { id: 'mission_done', title: 'Misión completada', description: 'Reclama tu caja en Misiones.', icon: 'Gift', tier: 'silver' },
 ];
 
 export const ACHIEVEMENT_BY_ID: Readonly<Record<AchievementId, AchievementDef>> = Object.fromEntries(

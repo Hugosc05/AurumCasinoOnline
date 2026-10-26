@@ -1,6 +1,7 @@
 import { ACHIEVEMENT_BY_ID, type AchievementDef, type AchievementId } from '@aurum/engine';
 import type { Database } from '../db/database';
 import { nowIso } from '../db/database';
+import { advanceMissions } from '../rewards/rewards';
 
 export type GameId = 'blackjack' | 'roulette' | 'slots' | 'poker' | 'bingo' | 'crash' | 'plinko';
 
@@ -89,6 +90,10 @@ export function recordOutcome(db: Database, input: OutcomeInput): { unlocked: Un
          ON CONFLICT(user_id, achievement_id) DO UPDATE SET round_id = excluded.round_id, unlocked_at = excluded.unlocked_at`,
         input.userId, input.roundId, now,
       );
+    }
+    // Misiones del día y de la semana.
+    for (const m of advanceMissions(db, input.userId, input.game, input.bet, input.payout)) {
+      unlocked.push({ ...ACHIEVEMENT_BY_ID.mission_done, description: `${m.text}. Reclama tu caja en Misiones.`, unlockedAt: now });
     }
     return { unlocked, streak };
   });

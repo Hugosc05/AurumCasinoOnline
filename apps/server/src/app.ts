@@ -28,6 +28,8 @@ import { SocialService } from './social/social';
 import { RoomService } from './rooms/rooms';
 import { CrashGame } from './crash/crash';
 import { BingoManager } from './bingo/bingo';
+import { LookService } from './profile/profile';
+import { avatarRoutes, profileRoutes } from './routes/profile';
 import { roomRoutes } from './routes/rooms';
 import { AdsService, createAdProvider } from './ads/ads';
 
@@ -71,7 +73,7 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   const bingo = new BingoManager(database, realtime, fast ? { countdownMs: 600, drawMs: 25, finishedMs: 150 } : { countdownMs: 25_000, drawMs: 2800, finishedMs: 9000 }, fast);
   const rooms = new RoomService(database, realtime, poker, blackjack, social, bingo);
   const crash = new CrashGame(database, realtime, fast ? { bettingMs: 1500, crashedMs: 300, tickMs: 20 } : { bettingMs: 7000, crashedMs: 3500, tickMs: 50 });
-  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, rooms, crash, bingo, startedAt: Date.now() };
+  const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, rooms, crash, bingo, looks: new LookService(database), startedAt: Date.now() };
   poker.init();
   blackjack.init();
   bingo.init();
@@ -101,7 +103,10 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
     }),
   );
   app.use(cors(config.allowedOrigins));
-  app.use(express.json({ limit: '32kb' }));
+  // JSON pequeño en general; la subida de la foto de perfil admite un poco más.
+  const smallJson = express.json({ limit: '32kb' });
+  const avatarJson = express.json({ limit: '160kb' });
+  app.use((req, res, next) => (req.path === '/api/profile/avatar' ? avatarJson : smallJson)(req, res, next));
   app.use(cookieParser());
   app.use((req, _res, next) => {
     req.sessionToken = req.cookies?.[SESSION_COOKIE];
@@ -125,6 +130,8 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   app.use('/api/ads', adsRoutes(ctx));
   app.use('/api/social', socialRoutes(ctx));
   app.use('/api/rooms', roomRoutes(ctx));
+  app.use('/api/avatars', avatarRoutes(ctx));
+  app.use('/api', profileRoutes(ctx));
   app.use('/api', (_req, _res, next) => next(notFound('Ruta de API no encontrada')));
 
   // Producción: el servidor entrega también el frontend compilado (un único proceso, un único puerto).

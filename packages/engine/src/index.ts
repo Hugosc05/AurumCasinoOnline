@@ -16,3 +16,6 @@ export * from './slotExtras';
 export * from './plinko';
 export * from './crash';
 export * from './bingo';
+export * from './cosmetics';
+export * from './cases';
+export * from './missions';

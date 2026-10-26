@@ -9,6 +9,7 @@ import type { RoomService } from './rooms/rooms';
 import type { RealtimeHub } from './realtime/hub';
 import type { CrashGame } from './crash/crash';
 import type { BingoManager } from './bingo/bingo';
+import type { LookService } from './profile/profile';
 
 export interface AppContext {
   config: AppConfig;
@@ -22,5 +23,6 @@ export interface AppContext {
   rooms: RoomService;
   crash: CrashGame;
   bingo: BingoManager;
+  looks: LookService;
   startedAt: number;
 }
