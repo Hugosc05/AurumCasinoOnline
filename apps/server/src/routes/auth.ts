@@ -13,6 +13,8 @@ import { SESSION_COOKIE, createSession, destroySession, type UserRow } from '../
 import { RESERVED_BOT_NAMES } from '../bots/catalog';
 import { getSetting } from '../db/seed';
 import { emailSchema, passwordSchema, toPublicUser, usernameSchema } from '../auth/users';
+import { EMAIL_MESSAGES, domainAcceptsMail, emailShapeProblem } from '../moderation/email';
+import { isOffensive } from '../moderation/words';
 
 const registerSchema = z.object({
   username: usernameSchema,
@@ -49,6 +51,14 @@ export function authRoutes(ctx: AppContext): Router {
     rateLimit(registerLimiter, (req) => clientIp(req), 'Demasiados registros desde esta conexión. Inténtalo más tarde.'),
     async (req, res) => {
       const body = parse(registerSchema, req.body);
+      if (isOffensive(body.username)) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Nombre no permitido', { fields: { username: 'Ese nombre no está permitido. Elige otro sin insultos ni contenido ofensivo.' } });
+      }
+      if (config.EMAIL_STRICT) {
+        const shape = emailShapeProblem(body.email);
+        const problem = shape ?? ((await domainAcceptsMail(body.email.split('@')[1]!)) === false ? 'domain' : null);
+        if (problem) throw new AppError(400, 'VALIDATION_ERROR', 'Correo no válido', { fields: { email: EMAIL_MESSAGES[problem] } });
+      }
       const taken = db.get<{ username: string; email: string }>(
         'SELECT username, email FROM users WHERE username = ? OR email = ?',
         body.username, body.email,

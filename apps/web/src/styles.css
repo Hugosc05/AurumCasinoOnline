@@ -370,3 +370,10 @@ html[data-motion='off'] *::after {
   background: radial-gradient(circle at 40% 35%, rgba(255, 90, 140, 0.75), rgba(214, 28, 86, 0.62) 60%, rgba(160, 10, 60, 0.55));
   mix-blend-mode: multiply;
 }
+
+/* Barra de importes: pista gruesa y pulgar grande (cómodo con el dedo). */
+.bet-slider { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; touch-action: pan-y; }
+.bet-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, #cfae6b, #3a3f4d); }
+.bet-slider::-moz-range-track { height: 6px; border-radius: 999px; background: linear-gradient(90deg, #cfae6b, #3a3f4d); }
+.bet-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3c8, #cfae6b 60%, #8a6421); border: 2px solid #0b1220; box-shadow: 0 3px 8px rgba(0,0,0,0.6); }
+.bet-slider::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3c8, #cfae6b 60%, #8a6421); border: 2px solid #0b1220; }

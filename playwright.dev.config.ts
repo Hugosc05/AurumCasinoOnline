@@ -32,6 +32,7 @@ export default defineConfig({
         DATABASE_PATH: 'data/e2e.db',
         CLIENT_ORIGINS: `http://127.0.0.1:${WEB},http://localhost:${WEB}`,
         LOG_LEVEL: 'warn',
+        EMAIL_STRICT: 'false',
         REGISTER_LIMIT_PER_HOUR: '1000',
         LOGIN_LIMIT_PER_15MIN: '1000',
       },

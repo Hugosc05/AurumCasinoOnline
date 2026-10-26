@@ -1,5 +1,5 @@
 import { RED_NUMBERS, type RouletteBetSpec } from '@aurum/engine';
-import { memo, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { denomFor } from '../../components/Chip';
 import { cx } from '../../lib/format';
 import { BOARD_H, BOARD_W, CELL_H, CELL_W, OUT_H, ZERO_W, advanceStroke, beginStroke, buildZones, cellX, cellY, numberAt, zoneAt, type Stroke, type Zone } from './board';
@@ -53,6 +53,24 @@ export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove
   const groupRef = useRef<SVGGElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const stroke = useRef<Stroke | null>(null);
+  /**
+   * En pantallas táctiles el dedo desplaza la página: un toque corto pone una
+   * ficha y para pintar varias casillas hay que mantener pulsado un instante
+   * (sin esa espera, al deslizar para bajar se ponían fichas solas).
+   */
+  const touch = useRef<{ id: number; x: number; y: number; timer: number; painting: boolean } | null>(null);
+  const [painting, setPainting] = useState(false);
+
+  // Mientras se pinta con el dedo, la página no se desplaza (escucha no pasiva).
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const block = (ev: TouchEvent): void => {
+      if (touch.current?.painting) ev.preventDefault();
+    };
+    el.addEventListener('touchmove', block, { passive: false });
+    return () => el.removeEventListener('touchmove', block);
+  }, []);
 
   /** Punto del puntero en coordenadas del tapete horizontal (sirve también con el tapete girado en móvil). */
   const toBoard = (e: React.PointerEvent): { x: number; y: number } | null => {
@@ -69,7 +87,26 @@ export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove
     const p = toBoard(e);
     if (!p) return;
     stroke.current = beginStroke(ZONES, p);
-    if (stroke.current) e.currentTarget.setPointerCapture(e.pointerId);
+    if (!stroke.current) return;
+    if (e.pointerType === 'touch') {
+      const target = e.currentTarget;
+      const id = e.pointerId;
+      const t = { id, x: e.clientX, y: e.clientY, painting: false, timer: 0 };
+      t.timer = window.setTimeout(() => {
+        if (touch.current !== t || !stroke.current) return;
+        t.painting = true;
+        setPainting(true);
+        navigator.vibrate?.(12);
+        try {
+          target.setPointerCapture(id);
+        } catch {
+          /* el puntero ya no existe */
+        }
+      }, 280);
+      touch.current = t;
+      return;
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>): void => {
     const p = toBoard(e);
@@ -77,12 +114,28 @@ export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove
     if (e.pointerType !== 'mouse' || stroke.current) onHover(zoneAt(ZONES, p.x, p.y)?.key ?? null);
     const s = stroke.current;
     if (!s || locked) return;
+    const t = touch.current;
+    if (e.pointerType === 'touch' && t && !t.painting) {
+      // Antes de la pulsación larga, moverse es desplazar la página: se anula el toque.
+      if (Math.hypot(e.clientX - t.x, e.clientY - t.y) > 8) {
+        window.clearTimeout(t.timer);
+        touch.current = null;
+        stroke.current = null;
+        onHover(null);
+      }
+      return;
+    }
     const hits = advanceStroke(s, ZONES, p);
     if (hits.length > 0) onPaint(hits, elFor);
   };
   const finish = (e: React.PointerEvent<SVGSVGElement>, cancelled: boolean): void => {
     const s = stroke.current;
     stroke.current = null;
+    if (touch.current) {
+      window.clearTimeout(touch.current.timer);
+      touch.current = null;
+      setPainting(false);
+    }
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
     if (!s) return;
     if (!s.dragging && !cancelled) {
@@ -123,9 +176,9 @@ export const BettingBoard = memo(function BettingBoard({ bets, onPlace, onRemove
     <svg
       ref={svgRef}
       viewBox={vertical ? `-6 -6 ${BOARD_H + 12} ${BOARD_W + 12}` : `-6 -6 ${BOARD_W + 12} ${BOARD_H + 12}`}
-      className="w-full select-none"
-      // Con el tapete activo, el gesto pinta en lugar de desplazar la página (ratón, táctil y lápiz).
-      style={{ touchAction: locked ? 'auto' : 'none' }}
+      className={cx('w-full select-none transition-[filter] duration-200', painting && 'drop-shadow-[0_0_14px_rgba(235,217,166,0.55)]')}
+      // El dedo desplaza la página; la pulsación larga activa el pintado (y entonces se bloquea el desplazamiento).
+      style={{ touchAction: locked || !painting ? 'manipulation' : 'none' }}
       role="group"
       aria-label="Tapete de apuestas de la ruleta"
       data-testid="roulette-board"

@@ -63,6 +63,8 @@ const schema = z.object({
   /** Desactiva la temporización de los bots de póker (solo pruebas). */
   POKER_FAST_MODE: bool.default(false),
   /** Límites anti-abuso (por IP). */
+  /** Comprobación estricta de correos (dominios reservados, desechables y DNS). En pruebas se desactiva. */
+  EMAIL_STRICT: bool.default(true),
   REGISTER_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(10),
   LOGIN_LIMIT_PER_15MIN: z.coerce.number().int().min(1).default(30),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

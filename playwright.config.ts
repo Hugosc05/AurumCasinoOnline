@@ -24,6 +24,7 @@ const appServer = {
     DATABASE_URL: PG ? E2E_DATABASE_URL : '',
     CLIENT_ORIGINS: `http://127.0.0.1:${PORT},http://localhost:${PORT}`,
     LOG_LEVEL: 'warn',
+    EMAIL_STRICT: 'false',
     REGISTER_LIMIT_PER_HOUR: '1000',
     LOGIN_LIMIT_PER_15MIN: '1000',
   },

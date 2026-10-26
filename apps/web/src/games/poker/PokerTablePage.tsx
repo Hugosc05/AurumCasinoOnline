@@ -11,6 +11,7 @@ import { ShuffleAnimation } from '../../components/ShuffleAnimation';
 import { Celebration, type CelebrationHandle } from '../../components/Celebration';
 import { Stage } from '../../components/Stage';
 import { TableCard } from '../../components/TableCard';
+import { BetSlider } from '../../components/BetSlider';
 import { Button, Modal, Spinner } from '../../components/ui';
 import { Sequencer, type SequenceStep } from '../../lib/anim/sequencer';
 import { audio } from '../../lib/audio';
@@ -589,15 +590,14 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
                     {raiseTo >= legal.maxRaiseTo ? 'All-in' : legal.isBet ? `Apostar ${credits(raiseTo)}` : `Subir a ${credits(raiseTo)}`}
                   </Button>
                   <div className="flex flex-1 items-center gap-3">
-                    <input
-                      type="range"
+                    <BetSlider
                       min={legal.minRaiseTo}
                       max={legal.maxRaiseTo}
-                      step={Math.max(1, Math.round(snap.table.bigBlind / 2))}
+                      step={snap.table.bigBlind}
                       value={raiseTo}
-                      onChange={(e) => setRaiseTo(Number(e.target.value))}
-                      className="min-w-[140px] flex-1 accent-[#cfae6b]"
-                      aria-label="Importe de la apuesta"
+                      onChange={setRaiseTo}
+                      label="importe de la apuesta"
+                      className="min-w-[200px] flex-1"
                     />
                     <div className="flex gap-1">
                       {preset.map((p) => (
@@ -647,15 +647,14 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
       <Modal open={sitOpen} onClose={() => setSitOpen(false)} title={`Sentarse en ${snap.table.name}`}>
         <p className="text-sm text-niebla">Elige con cuántos créditos entras. Al levantarte, las fichas que tengas vuelven a tu saldo.</p>
         <div className="mt-6 text-center font-display text-4xl text-oro-claro">{credits(buyIn)}</div>
-        <input
-          type="range"
-          className="mt-4 w-full accent-[#cfae6b]"
+        <BetSlider
+          className="mt-4"
           min={snap.table.minBuyIn}
           max={user?.unlimited ? snap.table.maxBuyIn : Math.min(snap.table.maxBuyIn, user?.balance ?? 0)}
           step={snap.table.bigBlind}
           value={buyIn}
-          onChange={(e) => setBuyIn(Number(e.target.value))}
-          aria-label="Entrada"
+          onChange={setBuyIn}
+          label="entrada"
         />
         <div className="mt-1 flex justify-between text-xs text-niebla"><span>{credits(snap.table.minBuyIn)}</span><span>{credits(snap.table.maxBuyIn)}</span></div>
         <div className="mt-6 flex justify-end gap-2">
