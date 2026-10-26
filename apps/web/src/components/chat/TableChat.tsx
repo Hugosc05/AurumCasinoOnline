@@ -108,7 +108,7 @@ export const ChatBubble = memo(function ChatBubble({ name, className }: { name: 
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ type: 'spring', stiffness: 420, damping: 24 }}
-          className={cx('chat-bubble pointer-events-none absolute z-[80] max-w-[180px] rounded-2xl px-3 py-1.5 text-center text-sm shadow-hondo', msg.kind === 'emoji' ? 'text-3xl leading-none' : '', className)}
+          className={cx('chat-bubble pointer-events-none absolute z-[80] w-max max-w-[220px] rounded-2xl px-3 py-1.5 text-center text-sm shadow-hondo', msg.kind === 'emoji' ? 'text-3xl leading-none' : '', className)}
         >
           {msg.text}
         </motion.div>
@@ -190,7 +190,7 @@ export function TableChat({ inline = false }: { inline?: boolean }) {
   if (inline) return panel;
   // En un portal: las transiciones de página usan transform y romperían el `position: fixed`.
   return createPortal(
-    <div className="fixed bottom-3 right-3 z-[70] flex flex-col items-end gap-2 sm:bottom-5 sm:right-5">
+    <div className="fixed bottom-3 right-3 z-[45] flex flex-col items-end gap-2 sm:bottom-5 sm:right-5">
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: 16, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.96 }} transition={{ duration: 0.18 }}>

@@ -65,6 +65,13 @@ export function profileRoutes(ctx: AppContext): Router {
   rewards.use(requireAuth);
   const openLimiter = new RateLimiter(60, 60_000);
   rewards.get('/missions', (req, res) => res.json(missionsView(db, req.user!.id)));
+  /** Contadores para el aviso del menú: misiones por reclamar y cajas sin abrir. */
+  rewards.get('/summary', (req, res) => {
+    const m = missionsView(db, req.user!.id);
+    const claimable = [...m.daily, ...m.weekly].filter((x) => x.done && !x.claimed).length;
+    const unopened = Number(db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM user_cases WHERE user_id = ? AND status = 'unopened'`, req.user!.id)!.n);
+    res.json({ claimable, unopened });
+  });
   rewards.post('/missions/claim', (req, res) => {
     const body = parse(z.object({ missionId: z.string().min(1).max(40), period: z.string().min(3).max(20) }).strict(), req.body);
     res.json(claimMission(db, req.user!.id, body.missionId, body.period));

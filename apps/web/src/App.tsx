@@ -16,6 +16,7 @@ const SlotsPage = lazy(() => import('./games/slots/SlotsPage'));
 const SlotsLobby = lazy(() => import('./games/slots/SlotsLobby'));
 const PlinkoPage = lazy(() => import('./games/plinko/PlinkoPage'));
 const CrashPage = lazy(() => import('./games/crash/CrashPage'));
+const RewardsPage = lazy(() => import('./pages/rewards/RewardsPage'));
 const BingoLobby = lazy(() => import('./games/bingo/BingoLobby'));
 const BingoRoomPage = lazy(() => import('./games/bingo/BingoRoomPage'));
 const PokerLobby = lazy(() => import('./games/poker/PokerLobby'));
@@ -61,6 +62,7 @@ export function App() {
           <Route path="slots/:machineId" element={<RequireAuth><SlotsPage /></RequireAuth>} />
           <Route path="plinko" element={<RequireAuth><PlinkoPage /></RequireAuth>} />
           <Route path="cohete" element={<CrashPage />} />
+          <Route path="recompensas" element={<RequireAuth><RewardsPage /></RequireAuth>} />
           <Route path="bingo" element={<BingoLobby />} />
           <Route path="bingo/:roomId" element={<BingoRoomPage />} />
           <Route path="poker" element={<PokerLobby />} />

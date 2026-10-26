@@ -1,5 +1,5 @@
 import { AnimatePresence, animate, motion, useMotionValue } from 'motion/react';
-import { Coins, DoorOpen, LogOut, Menu, Settings2, Shield, User as UserIcon, Users, Volume2, VolumeX, X } from 'lucide-react';
+import { Coins, DoorOpen, Gift, LogOut, Menu, Settings2, Shield, User as UserIcon, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { credits, cx } from '../lib/format';
@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 import { setCardBack } from '../lib/cosmetics';
 import { PlayerCardProvider } from './social/PlayerCard';
 import { PlayerAvatar } from './social/PlayerAvatar';
+import { useRewardsSummary } from '../pages/rewards/summary';
 import { useSession } from '../state/session';
 import { Button } from './ui';
 
@@ -174,6 +175,7 @@ function Header() {
               {n.label}
             </NavLink>
           ))}
+          {user && <RewardsNavLink />}
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ConnectionDot />
@@ -253,7 +255,8 @@ function Header() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              {[...NAV, { to: '/blackjack', label: 'Blackjack' }, { to: '/ruleta', label: 'Ruleta' }, { to: '/slots', label: 'Slots' }, ...(user ? [{ to: '/amigos', label: 'Amigos' }, { to: '/salas', label: 'Salas privadas' }] : [])].map((n) => (
+              {user && <RewardsNavLink mobile />}
+              {[...NAV, { to: '/blackjack', label: 'Blackjack' }, { to: '/ruleta', label: 'Ruleta' }, { to: '/slots', label: 'Slots' }, { to: '/plinko', label: 'Plinko' }, ...(user ? [{ to: '/amigos', label: 'Amigos' }, { to: '/salas', label: 'Salas privadas' }] : [])].map((n) => (
                 <NavLink key={n.to} to={n.to} end={'end' in n} className={({ isActive }) => cx('rounded-lg px-3 py-2.5', isActive ? 'bg-white/5 text-oro-claro' : 'text-marfil')}>
                   {n.label}
                 </NavLink>
@@ -325,6 +328,22 @@ function FooterCol({ title, links }: { title: string; links: [string, string][] 
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Enlace a Recompensas con el número de misiones por reclamar y cajas sin abrir. */
+function RewardsNavLink({ mobile = false }: { mobile?: boolean }) {
+  const { claimable, unopened } = useRewardsSummary(true);
+  const n = claimable + unopened;
+  return (
+    <NavLink
+      to="/recompensas"
+      className={({ isActive }) => cx(mobile ? 'rounded-lg px-3 py-2.5' : 'rounded-full px-3.5 py-2 text-sm transition-colors', isActive ? 'text-oro-claro' : mobile ? 'text-marfil' : 'text-niebla hover:text-marfil', 'relative inline-flex items-center gap-1.5')}
+      data-testid="nav-rewards"
+    >
+      <Gift className="h-4 w-4" /> Recompensas
+      {n > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-rubi px-1 text-[11px] font-bold text-marfil">{n}</span>}
+    </NavLink>
   );
 }
 
