@@ -31,5 +31,6 @@ export function useMutes(): number {
       return () => listeners.delete(fn);
     },
     () => version,
+    () => 0,
   );
 }

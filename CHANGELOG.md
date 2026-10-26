@@ -2,6 +2,22 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.8.0] — 2026-10-26
+
+### Añadido
+- **Foto de perfil**: se encuadra y se reduce a 256 × 256 en el navegador; el servidor comprueba que es una imagen real (WebP, JPEG o PNG, máximo 96 KB) y la guarda en la base de datos.
+- **Tarjeta de jugador**: al tocar a cualquier persona en una mesa (póker, blackjack, bingo, cohete o chat) se ve su perfil y se le puede **añadir como amigo**, aceptar su solicitud o silenciarla.
+- **Chat de mesa** en póker, blackjack, bingo y cohete: mensajes rápidos (con piques al estilo parchís), emojis, bocadillos sobre el asiento, límite de mensajes, palabrotas tapadas y silenciados.
+- **Misiones**: 3 diarias y 5 semanales que avanzan solas al jugar y dan cajas.
+- **Cajas** con apertura al estilo CS:GO (cinta que frena en el premio que ya sorteó el servidor): créditos (de 50 a 1.000.000), dorsos de cartas, marcos animados para la foto y colores para el nombre. Tienda (Bronce, Plata y Oro) con todas las probabilidades y la devolución media publicadas; los repetidos se convierten en créditos.
+- **Inventario** para equipar dorsos, marcos y colores (los marcos y colores los ven todos).
+- Registro: filtro de **nombres ofensivos** y de **correos falsos** (dominios de ejemplo, temporales, inventados o sin servidor de correo).
+
+### Cambiado
+- Ruleta en el móvil: deslizar ya no pone fichas; un toque pone una y para pintar hay que mantener pulsado.
+- Póker: barra de importe con escala progresiva, saltos de ciega grande y botones − y +.
+- Rendimiento: el código de la aplicación inicial pasa de 549 KB a 141 KB (librerías en trozos propios reutilizables y páginas de información bajo demanda); cabecera sin desenfoque en el móvil; toques sin retardo.
+
 ## [1.7.0] — 2026-10-23
 
 ### Añadido

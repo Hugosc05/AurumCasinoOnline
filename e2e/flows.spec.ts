@@ -255,3 +255,43 @@ test('bingo: comprar cartones en una sala pública y verlos con la cuenta atrás
   const nums = await page.getByTestId('bingo-card').first().locator('.grid > div').evaluateAll((els) => els.filter((e) => /\d/.test(e.textContent ?? '')).length);
   expect(nums).toBe(15);
 });
+
+test('recompensas: misiones, compra y apertura de una caja con su animación, y equipar un objeto', async ({ page }) => {
+  await register(page);
+  await page.goto('/recompensas');
+  await expect(page.getByRole('region', { name: 'Misiones diarias' }).locator('li')).toHaveCount(3);
+  await expect(page.getByRole('region', { name: 'Misiones semanales' }).locator('li')).toHaveCount(5);
+  await page.goto('/recompensas?tab=tienda');
+  const before = await balance(page);
+  await page.getByTestId('buy-bronce').click();
+  await expect(page.getByTestId('case-opener')).toBeVisible();
+  await expect(page.getByTestId('case-result')).toBeVisible({ timeout: 15000 });
+  await page.getByTestId('case-close').click();
+  const inv = await page.evaluate(() => fetch('/api/rewards/inventory').then((r) => r.json()));
+  const tx = await page.evaluate(() => fetch('/api/me/transactions').then((r) => r.json()));
+  const reward = (tx.items as { reason: string; amount: number }[]).filter((t) => t.reason === 'case_reward').reduce((a, t) => a + t.amount, 0);
+  expect(await balance(page)).toBe(before - 500 + reward);
+  if (inv.items.length > 0) {
+    const item = inv.items[0];
+    await page.goto('/recompensas?tab=inventario');
+    await page.getByTestId(`item-${item.id}`).click();
+    await expect(page.getByTestId(`item-${item.id}`)).toContainText('EQUIPADO');
+  }
+});
+
+test('chat de mesa y tarjeta de jugador desde la partida', async ({ browser }) => {
+  const a = await browser.newPage();
+  const b = await browser.newPage();
+  const nameA = await register(a);
+  await register(b);
+  for (const p of [a, b]) await p.goto('/cohete');
+  await a.getByTestId('chat-open').click();
+  await a.getByTestId('chat-input').fill('¡Hola desde el cohete!');
+  await a.getByTestId('chat-input').press('Enter');
+  await b.getByTestId('chat-open').click();
+  await expect(b.getByTestId('table-chat')).toContainText('¡Hola desde el cohete!');
+  await b.getByTestId('table-chat').getByRole('button', { name: new RegExp(nameA) }).click();
+  await expect(b.getByTestId('player-card')).toContainText(nameA);
+  await b.getByTestId('player-add-friend').click();
+  await expect(b.getByTestId('player-card')).toContainText('Solicitud enviada');
+});

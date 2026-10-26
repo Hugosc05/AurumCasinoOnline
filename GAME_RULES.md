@@ -206,6 +206,13 @@ Según premio total / apuesta total: pequeño (< 4×), medio (4–15×), grande 
 
 RTP exacto (suma de multiplicador × C(n, k) / 2^n).
 
+## Misiones y cajas
+
+- **Misiones**: 3 diarias (se renuevan a las 00:00, hora de Madrid) y 5 semanales (los lunes), elegidas al azar para cada jugador. Avanzan con cada partida liquidada. Cada diaria da una caja diaria y cada semanal una caja semanal.
+- **Cajas**: el premio se sortea en el servidor al abrirla, con las probabilidades publicadas en la tienda (peso de cada premio / suma de pesos). Los cosméticos no dan ninguna ventaja en el juego. Un cosmético repetido se convierte en créditos (de 40 a 10.000 según su rareza).
+- **Tienda**: Bronce (500), Plata (2.500) y Oro (10.000). Devolución media en créditos: ≈ 73–76 % del precio, más la probabilidad de cosméticos (≈ 16 %). Las cajas diaria y semanal solo se consiguen con misiones.
+- Rarezas: Común, Poco común, Rara, Épica, Legendaria, Mítica y Excepcional.
+
 ## Logros y rachas
 
 Se calculan exclusivamente a partir de rondas liquidadas: primera victoria, rachas de 3/5/10 victorias, blackjack natural, full o mejor en póker, póker o escalera de color, premio de 15× o más en slots, pleno en ruleta, 50 y 250 partidas y nueva mejor marca. Una victoria es recibir más de lo apostado; un empate no rompe la racha. Las rachas describen el pasado y la interfaz lo recuerda: no predicen la siguiente jugada.

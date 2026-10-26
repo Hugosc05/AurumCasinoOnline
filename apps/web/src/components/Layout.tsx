@@ -161,7 +161,7 @@ function Header() {
     setMenu(false);
   }, [loc.pathname]);
   return (
-    <header className="sticky top-0 z-40 border-b border-linea/60 bg-noche/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-linea/60 bg-noche/95 md:bg-noche/80 md:backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Logo />
         <nav className="ml-6 hidden items-center gap-1 md:flex" aria-label="Principal">

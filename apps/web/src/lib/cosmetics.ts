@@ -44,6 +44,7 @@ export function useCardBack(): BackPalette {
       return () => listeners.delete(fn);
     },
     () => currentBack,
+    () => 'default',
   );
   return CARD_BACKS[id] ?? CARD_BACKS.default!;
 }

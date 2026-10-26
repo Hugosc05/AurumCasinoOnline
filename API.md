@@ -150,6 +150,24 @@ Respuesta: `{ roundId, seq, state, events, balance, achievements }`. `state.deal
 
 El código solo da acceso: no concede permisos de anfitrión. La mesa de la sala (`room-<id>`) usa los mismos mensajes WebSocket que las públicas, pero el servidor rechaza `watch` y `sit` de quien no es miembro (`ROOM_FORBIDDEN`) y nunca aparece en el salón.
 
+## Perfil, recompensas y jugadores
+
+| Método | Ruta | Descripción |
+| --- | --- | --- |
+| GET | `/avatars/:userId` | Foto de perfil (pública, caché inmutable por versión) |
+| POST / DELETE | `/profile/avatar` | `{ image: "data:image/webp;base64,…" }` (máx. 96 KB) / quitarla |
+| GET | `/profile/look` | Aspecto propio y objetos equipados |
+| GET | `/players/:username` | Tarjeta de jugador: aspecto, estadísticas y relación de amistad |
+| GET | `/looks?names=a,b` | Foto, marco y color del nombre de varios jugadores |
+| GET | `/rewards/missions` | Misiones del día y de la semana con su progreso y reinicios |
+| POST | `/rewards/missions/claim` | `{ missionId, period }` → caja |
+| GET | `/rewards/summary` | `{ claimable, unopened }` |
+| GET | `/rewards/cases` | Catálogo con premios, pesos, probabilidades por rareza y devolución media |
+| POST | `/rewards/cases/buy` | `{ caseId, count }` (Bronce, Plata, Oro) |
+| POST | `/rewards/cases/open` | `{ id }` → `{ index, drop, credited, duplicate, balance }` |
+| GET | `/rewards/inventory` | Cajas sin abrir, objetos y equipados |
+| POST | `/rewards/equip` | `{ kind: 'frame'\|'nameColor'\|'cardBack', itemId \| null }` |
+
 ## Administración — `/admin` (rol admin)
 
 | Método | Ruta | Descripción |
@@ -196,6 +214,8 @@ Autenticación con la misma cookie. Sin sesión se puede mirar, pero no jugar. M
 | `bingo.lobby` | — | Envía `bingo.lobby` con las salas públicas y suscribe a sus cambios |
 | `bingo.watch` / `bingo.unwatch` | `roomId` | Observa una sala de bingo (pública o privada si eres miembro) |
 | `bingo.buy` | `roomId, gameNo, count` | Compra cartones (hasta 6 por partida) antes de que empiece |
+| `chat.join` / `chat.leave` | `channel` (`poker:<id>`, `bj:<id>`, `bingo:<id>`, `crash`) | Entra en el chat de la mesa y recibe `chat.history` |
+| `chat.send` | `channel` y `text` (≤ 160), `quick` o `emoji` | Envía un mensaje (5 cada 8 s) |
 
 ### Servidor → cliente
 
@@ -212,6 +232,8 @@ Autenticación con la misma cookie. Sin sesión se puede mirar, pero no jugar. M
 | `crash.state` | `state`: ronda, fase (`betting`, `running`, `crashed`), hash de la semilla, hora de despegue y del servidor, apuestas, la tuya, historial. El choque y la semilla solo cuando ya se ha estrellado |
 | `bingo.state` | `roomId`, `state`: fase, partida, bolas extraídas (nunca las siguientes), jugadores, cartones de la casa, bote, premios, ganadores y tus cartones |
 | `bingo.lobby` | `rooms` |
+| `chat.history` | `channel`, `messages`, `quick`, `emojis` |
+| `chat.message` | `message`: `{ id, channel, from, text, kind, at }` |
 | `achievements` | Logros desbloqueados en póker |
 | `bj.lobby` / `bj.snapshot` / `bj.update` / `bj.left` / `bj.notice` | Equivalentes del blackjack multijugador (la carta tapada del crupier nunca va en los datos) |
 | `friends.changed` | Algo cambió en tu lista de amigos o en su presencia: vuelve a pedir `/social/friends` |

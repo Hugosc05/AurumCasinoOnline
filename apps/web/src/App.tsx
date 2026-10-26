@@ -5,7 +5,6 @@ import { Spinner } from './components/ui';
 import { useSession } from './state/session';
 import { HomePage } from './pages/Home';
 import { LoginPage, RegisterPage } from './pages/Auth';
-import { InfoPage } from './pages/Info';
 import { NotFound } from './pages/NotFound';
 
 const BlackjackPage = lazy(() => import('./games/blackjack/BlackjackPage'));
@@ -16,6 +15,7 @@ const SlotsPage = lazy(() => import('./games/slots/SlotsPage'));
 const SlotsLobby = lazy(() => import('./games/slots/SlotsLobby'));
 const PlinkoPage = lazy(() => import('./games/plinko/PlinkoPage'));
 const CrashPage = lazy(() => import('./games/crash/CrashPage'));
+const InfoPage = lazy(() => import('./pages/Info').then((m) => ({ default: m.InfoPage })));
 const RewardsPage = lazy(() => import('./pages/rewards/RewardsPage'));
 const BingoLobby = lazy(() => import('./games/bingo/BingoLobby'));
 const BingoRoomPage = lazy(() => import('./games/bingo/BingoRoomPage'));

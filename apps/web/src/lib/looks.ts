@@ -64,7 +64,7 @@ const subscribe = (fn: () => void): (() => void) => {
 
 /** Aspecto de un jugador (null mientras llega o si es un bot). */
 export function useLook(name: string | null | undefined, enabled = true): Look | null {
-  useSyncExternalStore(subscribe, () => version);
+  useSyncExternalStore(subscribe, () => version, () => 0);
   useEffect(() => {
     if (name && enabled) request(name);
   }, [name, enabled]);

@@ -6,7 +6,7 @@ import { ChipStack } from '../components/Chip';
 import { PlayingCard } from '../components/PlayingCard';
 import { Button, EmptyState } from '../components/ui';
 import { HeroWheel } from '../games/roulette/HeroWheel';
-import { SlotSymbolArt } from '../games/slots/symbols';
+import { CLASSIC_SYMBOLS } from '../games/slots/symbolsClassic';
 import { Ball } from '../games/bingo/BingoBall';
 import { api } from '../lib/api';
 import { GAME_NAMES, credits, cx, relativeTime, signed } from '../lib/format';
@@ -197,7 +197,7 @@ export function HomePage() {
               <div className="flex gap-1.5 rounded-xl border border-oro/30 bg-noche/80 p-2">
                 {(['seven', 'crown', 'seven'] as const).map((s, i) => (
                   <div key={i} className="rounded-md bg-gradient-to-b from-[#fbf8f1] to-[#e2d8c2] p-1">
-                    <SlotSymbolArt symbol={s} size={40} />
+                    <svg viewBox="0 0 100 100" width={40} height={40} aria-hidden>{CLASSIC_SYMBOLS[s]!()}</svg>
                   </div>
                 ))}
               </div>
