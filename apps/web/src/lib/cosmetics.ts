@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from 'react';
+import { useLook } from './looks';
 
 /**
  * Cosméticos en el navegador: clases CSS de marcos y colores de nombre y el
- * dorso de cartas equipado (se aplica a todas las cartas boca abajo).
+ * dorso de cartas de cada jugador.
  */
 
 export const frameClass = (frame: string | null | undefined): string => (frame ? `pf-frame pf-${frame.replace('frame:', '')}` : '');
@@ -29,22 +29,13 @@ export const CARD_BACKS: Record<string, BackPalette> = {
   'back:oro': { bg1: '#f4d27a', bg2: '#8a5f18', line: '#fff6d6', accent: '#3a2608', motif: 'a' },
 };
 
-let currentBack = 'default';
-const listeners = new Set<() => void>();
-export function setCardBack(id: string | null): void {
-  const next = id && CARD_BACKS[id] ? id : 'default';
-  if (next === currentBack) return;
-  currentBack = next;
-  for (const l of listeners) l();
-}
-export function useCardBack(): BackPalette {
-  const id = useSyncExternalStore(
-    (fn) => {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
-    },
-    () => currentBack,
-    () => 'default',
-  );
-  return CARD_BACKS[id] ?? CARD_BACKS.default!;
+/**
+ * Dorso de las cartas de un jugador: cada uno ve en las cartas boca abajo de
+ * los demás el dorso que ESE jugador tenga equipado (así se nota quién lo ha
+ * conseguido). Sin dueño (crupier, mazo, bots) o sin dorso equipado, el de Aurum.
+ */
+export function useCardBack(owner?: string | null): BackPalette {
+  const look = useLook(owner ?? null, !!owner);
+  const id = look?.cardBack;
+  return (id && CARD_BACKS[id]) || CARD_BACKS.default!;
 }

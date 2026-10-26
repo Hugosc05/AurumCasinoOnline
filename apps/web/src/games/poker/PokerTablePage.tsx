@@ -498,6 +498,7 @@ function PokerTableInner({ tableId: tableIdProp, embedded = false }: { tableId?:
                   key={`${vis.handId}-${seat}-${i}`}
                   card={card}
                   faceUp={card !== null}
+                  owner={snap.seats[seat] && !snap.seats[seat]!.isBot ? snap.seats[seat]!.name : null}
                   x={p.x}
                   y={p.y}
                   rotate={p.rotate}

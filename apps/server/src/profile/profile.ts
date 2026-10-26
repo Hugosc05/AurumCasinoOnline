@@ -33,6 +33,8 @@ export interface PublicLook {
   avatarUrl: string | null;
   frame: string | null;
   nameColor: string | null;
+  /** Dorso de cartas equipado: lo ven todos en las cartas boca abajo de este jugador. */
+  cardBack: string | null;
 }
 
 /** Aspecto público por nombre de usuario, con caché en memoria (se invalida al cambiarlo). */
@@ -48,11 +50,11 @@ export class LookService {
   byUsername(username: string): PublicLook | null {
     const key = username.toLowerCase();
     if (this.cache.has(key)) return this.cache.get(key)!;
-    const row = this.db.get<{ id: string; username: string; avatar_version: number | null; frame: string | null; name_color: string | null }>(
-      `SELECT u.id, u.username, p.avatar_version, p.frame, p.name_color FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id WHERE lower(u.username) = ?`, key,
+    const row = this.db.get<{ id: string; username: string; avatar_version: number | null; frame: string | null; name_color: string | null; card_back: string | null }>(
+      `SELECT u.id, u.username, p.avatar_version, p.frame, p.name_color, p.card_back FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id WHERE lower(u.username) = ?`, key,
     );
     const look = row
-      ? { username: row.username, avatarUrl: row.avatar_version ? `/api/avatars/${row.id}?v=${row.avatar_version}` : null, frame: row.frame, nameColor: row.name_color }
+      ? { username: row.username, avatarUrl: row.avatar_version ? `/api/avatars/${row.id}?v=${row.avatar_version}` : null, frame: row.frame, nameColor: row.name_color, cardBack: row.card_back }
       : null;
     if (this.cache.size > 5000) this.cache.clear();
     this.cache.set(key, look);

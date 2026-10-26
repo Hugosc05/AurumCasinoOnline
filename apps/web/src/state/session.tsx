@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 import { audio } from '../lib/audio';
+import { music } from '../lib/music';
 import { speedFor, type MotionLevel } from '../lib/anim/tokens';
 import { socket } from '../lib/ws';
 import type { Balance, Preferences, User } from './types';
 
-const DEFAULT_PREFS: Preferences = { sound: false, volume: 0.6, music: false, animations: 'full', effects: 'full', pokerAssist: 'beginner', invisible: false, showOddsNotes: true };
+const DEFAULT_PREFS: Preferences = { sound: false, volume: 0.6, music: false, soundtrack: true, musicVolume: 0.35, animations: 'full', effects: 'full', pokerAssist: 'beginner', invisible: false, showOddsNotes: true };
 const GUEST_KEY = 'aurum.guestPrefs';
 
 interface SessionValue {
@@ -87,11 +88,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     audio.configure(prefs.sound, prefs.volume);
   }, [prefs.sound, prefs.volume]);
+  useEffect(() => {
+    music.configure(prefs.soundtrack ?? true, prefs.musicVolume ?? 0.35);
+  }, [prefs.soundtrack, prefs.musicVolume]);
+  useEffect(() => {
+    const vis = (): void => music.setVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', vis);
+    return () => document.removeEventListener('visibilitychange', vis);
+  }, []);
 
   // Desbloquea el audio con las interacciones del usuario (nunca antes). Si el sonido
   // está desactivado no se crea nada; al activarlo, se crea en ese momento.
   useEffect(() => {
-    const unlock = (): void => audio.unlock();
+    const unlock = (): void => {
+      audio.unlock();
+      music.unlock();
+    };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
     return () => {

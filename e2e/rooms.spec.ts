@@ -22,7 +22,13 @@ test('salas privadas: crear, entrar con código, ver miembros y cerrar', async (
   await host.page.goto('/poker');
   await host.page.getByRole('button', { name: 'Crear sala privada' }).click();
   await expect(host.page).toHaveURL(/\/salas\?crear=poker/);
-  await host.page.getByTestId('room-name').fill('Partida del jueves');
+  // Tecla a tecla (no fill): el modal no debe robar el foco al escribir.
+  const nameField = host.page.getByTestId('room-name');
+  await nameField.click();
+  await nameField.press('Control+A');
+  await host.page.keyboard.type('Partida del jueves', { delay: 15 });
+  await expect(nameField).toHaveValue('Partida del jueves');
+  await expect(nameField).toBeFocused();
   await host.page.getByTestId('room-create-submit').click();
   await expect(host.page).toHaveURL(/\/salas\/[\w-]+$/);
   const roomUrl = new URL(host.page.url()).pathname;

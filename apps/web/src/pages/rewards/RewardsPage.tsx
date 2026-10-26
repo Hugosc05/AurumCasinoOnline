@@ -5,7 +5,6 @@ import { useSearchParams } from 'react-router-dom';
 import { CASE_BY_ID, COSMETICS, COSMETIC_KIND_LABEL, RARITY_INFO, RARITIES, type CaseDrop, type CosmeticKind, type Rarity } from '@aurum/engine';
 import { Button, Segmented } from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
-import { setCardBack } from '../../lib/cosmetics';
 import { credits, cx } from '../../lib/format';
 import { invalidateLook } from '../../lib/looks';
 import { useNotify } from '../../state/notify';
@@ -118,7 +117,6 @@ export default function RewardsPage() {
     try {
       const r = await api.post<Inventory>('/api/rewards/equip', { kind, itemId });
       setInv(r);
-      if (kind === 'cardBack') setCardBack(itemId);
       if (user) invalidateLook(user.username);
     } catch (err) {
       notify('error', err instanceof ApiError ? err.message : 'No se pudo equipar.');

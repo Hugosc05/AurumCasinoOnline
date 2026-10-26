@@ -449,6 +449,7 @@ function BlackjackTableInner({ tableId: tableIdProp, embedded = false }: { table
                   key={c.id}
                   card={c.card}
                   faceUp={c.faceUp}
+                  owner={c.owner !== 'dealer' && snap.seats[c.owner.seat] && !snap.seats[c.owner.seat]!.isBot ? snap.seats[c.owner.seat]!.name : null}
                   x={p.x}
                   y={p.y}
                   rotate={p.rotate}

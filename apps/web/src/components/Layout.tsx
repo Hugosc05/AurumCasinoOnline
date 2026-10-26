@@ -1,5 +1,5 @@
 import { AnimatePresence, animate, motion, useMotionValue } from 'motion/react';
-import { Coins, DoorOpen, Gift, LogOut, Menu, Settings2, Shield, User as UserIcon, Users, Volume2, VolumeX, X } from 'lucide-react';
+import { Coins, DoorOpen, Gift, LogOut, Menu, Music, Settings2, Shield, User as UserIcon, Users, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { credits, cx } from '../lib/format';
@@ -7,7 +7,7 @@ import { socket, type WsStatus } from '../lib/ws';
 import { LOW_BALANCE } from '../lib/economy';
 import { NotificationBell } from '../social/NotificationBell';
 import { api } from '../lib/api';
-import { setCardBack } from '../lib/cosmetics';
+import { music } from '../lib/music';
 import { PlayerCardProvider } from './social/PlayerCard';
 import { PlayerAvatar } from './social/PlayerAvatar';
 import { useRewardsSummary } from '../pages/rewards/summary';
@@ -129,6 +129,28 @@ function SoundToggle() {
   );
 }
 
+/** Banda sonora del salón: encendida o apagada (baja sola dentro de los juegos). */
+function MusicToggle() {
+  const { prefs, updatePrefs } = useSession();
+  const on = prefs.soundtrack ?? true;
+  return (
+    <button
+      onClick={() => void updatePrefs({ soundtrack: !on })}
+      className={cx('relative grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-white/5', on ? 'text-oro-claro' : 'text-niebla hover:text-marfil')}
+      aria-label={on ? 'Apagar la música' : 'Encender la música'}
+      aria-pressed={on}
+      title={on ? 'Apagar la música' : 'Encender la música'}
+      data-testid="music-toggle"
+    >
+      <Music className="h-5 w-5" />
+      {!on && <span className="absolute h-[2px] w-6 rotate-45 rounded bg-current" aria-hidden />}
+    </button>
+  );
+}
+
+/** Rutas de mesa o juego: ahí la música baja para no distraer. */
+const GAME_ROUTE = /^\/(poker\/|blackjack\/|ruleta|slots\/|plinko|cohete|bingo\/|salas\/)/;
+
 function ConnectionDot() {
   const [status, setStatus] = useState<WsStatus>(socket.status);
   useEffect(() => socket.onStatus(setStatus), []);
@@ -179,6 +201,7 @@ function Header() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <ConnectionDot />
+          <MusicToggle />
           <SoundToggle />
           {user ? (
             <>
@@ -351,14 +374,9 @@ export function Layout() {
   const loc = useLocation();
   const { speed } = useSession();
   const { user } = useSession();
-  // Dorso de cartas equipado: se aplica a todas las cartas boca abajo.
   useEffect(() => {
-    if (!user) {
-      setCardBack(null);
-      return;
-    }
-    api.get<{ equipped: { cardBack: string | null } }>('/api/profile/look').then((r) => setCardBack(r.equipped.cardBack)).catch(() => {});
-  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    music.setDucked(GAME_ROUTE.test(loc.pathname));
+  }, [loc.pathname]);
   return (
     <PlayerCardProvider>
     <div className="flex min-h-screen flex-col overflow-x-clip">

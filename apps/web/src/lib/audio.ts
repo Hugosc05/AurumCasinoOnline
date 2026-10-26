@@ -40,7 +40,10 @@ type SoundName =
   | 'bucket'
   | 'cashout'
   | 'crash'
-  | 'bingoBall';
+  | 'bingoBall'
+  | 'caseOpen'
+  | 'caseTick'
+  | 'caseReveal';
 
 export interface PlayOptions {
   /** Panorama estéreo (−1 izquierda … 1 derecha). */
@@ -59,7 +62,7 @@ const NOOP_LOOP: LoopHandle = { setIntensity: () => {}, stop: () => {} };
 /** Separación mínima (s) entre dos instancias del mismo sonido: evita saturación y efectos "metralleta". */
 const MIN_GAP: Partial<Record<SoundName, number>> = {
   chip: 0.04, chips: 0.08, cardSlide: 0.05, cardLand: 0.05, cardFlip: 0.06, ballTick: 0.03, reelStop: 0.05,
-  lineWin: 0.12, winSmall: 0.4, winMedium: 0.6, winBig: 1.5, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03, anticipation: 0.8, peg: 0.012, bucket: 0.03, cashout: 0.15, crash: 0.5, bingoBall: 0.3,
+  lineWin: 0.12, winSmall: 0.4, winMedium: 0.6, winBig: 1.5, lose: 0.5, firework: 0.12, coins: 0.3, click: 0.03, anticipation: 0.8, peg: 0.012, bucket: 0.03, cashout: 0.15, crash: 0.5, bingoBall: 0.3, caseOpen: 0.5, caseTick: 0.018, caseReveal: 0.8,
 };
 
 class AudioEngine {
@@ -367,6 +370,31 @@ class AudioEngine {
         this.burst(t + 0.2, 0.35, 900, 0.8, 0.05, 'bandpass', { sweepTo: 600, pan });
         this.tone(880, t + 0.55, 0.3, 'sine', 0.03);
         break;
+      case 'caseOpen':
+        // Cierre metálico que salta y la tapa que se abre (inspirado en las cajas de CS:GO, sintetizado).
+        this.burst(t, 0.02, 2400, 4, 0.12, 'bandpass', { pan });
+        this.tone(320, t, 0.06, 'square', 0.03, { glideTo: 180, pan });
+        this.burst(t + 0.09, 0.025, 3200, 5, 0.09, 'bandpass', { pan });
+        this.tone(1250, t + 0.09, 0.08, 'triangle', 0.03, { pan });
+        this.burst(t + 0.14, 0.45, 600, 0.7, 0.07, 'bandpass', { sweepTo: 3800, pan, attack: 0.12, send: 0.2 });
+        break;
+      case 'caseTick': {
+        // «Tic» seco de la cinta al pasar cada casilla por la línea central.
+        const r = opts.rate ?? 1;
+        this.burst(t, 0.006, 5200 * r, 6, 0.09, 'bandpass', { pan });
+        this.tone(1750 * r, t, 0.018, 'square', 0.012, { pan });
+        this.tone(880 * r, t, 0.012, 'triangle', 0.02, { pan });
+        break;
+      }
+      case 'caseReveal': {
+        // Golpe y acorde brillante al detenerse; más alto y largo cuanto más rara (opts.rate).
+        const r = opts.rate ?? 1;
+        this.burst(t, 0.05, 1800, 1, 0.1, 'lowpass', { send: 0.3 });
+        this.tone(110 * r, t, 0.25, 'sine', 0.12, { glideTo: 70 });
+        [659.3, 830.6, 987.8, 1318.5].forEach((f, i) => this.bell(f * r, t + 0.04 + i * 0.05, 1 + r * 0.4, 0.045, (i - 1.5) * 0.3));
+        this.burst(t + 0.05, 0.8, 7000, 0.6, 0.03, 'highpass', { send: 0.5 });
+        break;
+      }
       case 'anticipation':
         // Tensión ascendente con trémolo (dura lo que la espera extra del rodillo).
         this.tremolo(t, 0.9, 440, 880, 0.05, pan);

@@ -18,6 +18,8 @@ export interface PlayingCardProps {
   card: string | null;
   /** Boca arriba. Si no hay carta, siempre se muestra el reverso. */
   faceUp?: boolean;
+  /** Jugador al que pertenece la carta: su dorso equipado se ve boca abajo. Sin dueño, el dorso de Aurum. */
+  owner?: string | null;
   /** Ancho en unidades CSS del contenedor. La altura es 1,4 × ancho. */
   width?: number;
   /** Escala real en pantalla (p. ej. la del escenario) para elegir la variante legible. */
@@ -48,6 +50,7 @@ export interface PlayingCardProps {
 export const PlayingCard = memo(function PlayingCard({
   card,
   faceUp = true,
+  owner,
   width = 84,
   screenScale = 1,
   variant = 'auto',
@@ -109,7 +112,7 @@ export const PlayingCard = memo(function PlayingCard({
     >
       <div ref={scope} className="absolute inset-0" style={{ willChange: 'transform' }}>
         <div className={cx('absolute inset-0 overflow-hidden', radius)}>
-          {shownFace && card ? <CardFace card={card} variant={resolved} /> : <CardBackFace />}
+          {shownFace && card ? <CardFace card={card} variant={resolved} /> : <CardBackFace owner={owner} />}
         </div>
       </div>
       <div

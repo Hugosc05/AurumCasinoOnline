@@ -419,3 +419,7 @@ html[data-motion='off'] *::after {
 button, a, [role='button'], input, label { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 /* Las listas largas solo se pintan cuando están cerca de la pantalla. */
 .cv-auto { content-visibility: auto; contain-intrinsic-size: 1px 600px; }
+/* La cinta de la caja: una sola capa que mueve el compositor; dentro, nada animado ni filtros caros. */
+.case-strip { will-change: transform; backface-visibility: hidden; }
+.case-strip *, .case-strip *::before, .case-strip *::after { animation: none !important; filter: none !important; }
+.case-window { contain: layout paint; }

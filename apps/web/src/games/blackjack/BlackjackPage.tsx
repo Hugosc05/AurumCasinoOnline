@@ -405,6 +405,7 @@ export default function BlackjackPage() {
                 key={c.id}
                 card={c.card}
                 faceUp={c.faceUp}
+                owner={c.owner === 'dealer' ? null : user?.username ?? null}
                 x={p.x}
                 y={p.y}
                 rotate={p.rotate}

@@ -170,6 +170,16 @@ export default function ProfilePage() {
               </div>
             </div>
             <div>
+              <p className="mb-2 text-marfil">Música del salón <span className="text-xs text-niebla">(baja sola dentro de las mesas y juegos)</span></p>
+              <div className="flex flex-wrap items-center gap-4">
+                <Segmented label="Música" value={(prefs.soundtrack ?? true) ? 'on' : 'off'} onChange={(v) => void updatePrefs({ soundtrack: v === 'on' })} options={[{ value: 'on', label: 'Encendida' }, { value: 'off', label: 'Apagada' }]} />
+                <label className="flex items-center gap-3 text-sm text-niebla">
+                  Volumen
+                  <input type="range" min={0} max={1} step={0.05} value={prefs.musicVolume ?? 0.35} onChange={(e) => void updatePrefs({ musicVolume: Number(e.target.value) })} className="w-40 accent-[#cfae6b]" aria-label="Volumen de la música" />
+                </label>
+              </div>
+            </div>
+            <div>
               <p className="mb-2 text-marfil">Recordatorios</p>
               <Segmented label="Notas de independencia de resultados" value={prefs.showOddsNotes ? 'on' : 'off'} onChange={(v) => void updatePrefs({ showOddsNotes: v === 'on' })} options={[{ value: 'on', label: 'Mostrar' }, { value: 'off', label: 'Ocultar' }]} />
             </div>

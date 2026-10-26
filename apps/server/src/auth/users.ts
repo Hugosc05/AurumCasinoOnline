@@ -6,6 +6,9 @@ export interface Preferences {
   sound: boolean;
   volume: number;
   music: boolean;
+  /** Banda sonora del salón (baja de volumen dentro de los juegos). */
+  soundtrack: boolean;
+  musicVolume: number;
   animations: 'full' | 'reduced' | 'off';
   effects: 'full' | 'reduced' | 'off';
   /** Asistente de manos de póker. */
@@ -21,6 +24,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sound: false,
   volume: 0.6,
   music: false,
+  soundtrack: true,
+  musicVolume: 0.35,
   animations: 'full',
   effects: 'full',
   pokerAssist: 'beginner',
@@ -32,6 +37,8 @@ export const preferencesSchema = z.object({
   sound: z.boolean().optional(),
   volume: z.number().min(0).max(1).optional(),
   music: z.boolean().optional(),
+  soundtrack: z.boolean().optional(),
+  musicVolume: z.number().min(0).max(1).optional(),
   animations: z.enum(['full', 'reduced', 'off']).optional(),
   effects: z.enum(['full', 'reduced', 'off']).optional(),
   pokerAssist: z.enum(['beginner', 'standard', 'advanced']).optional(),

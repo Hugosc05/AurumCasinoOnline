@@ -11,6 +11,7 @@ export interface Look {
   avatarUrl: string | null;
   frame: string | null;
   nameColor: string | null;
+  cardBack?: string | null;
 }
 
 const cache = new Map<string, { look: Look | null; at: number }>();

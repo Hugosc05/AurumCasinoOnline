@@ -70,19 +70,24 @@ export function Spinner({ label = 'Cargando…' }: { label?: string }) {
 
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  // onClose suele ser una función nueva en cada render: se guarda en una ref para que
+  // el efecto de foco solo se ejecute al abrir/cerrar (si no, cada tecla robaba el foco del campo).
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    // Respeta el autoFocus de un campo del modal; si no hay, enfoca el diálogo.
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
       prev?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   // Portal: un ancestro con transform o backdrop-filter (p. ej., .panel) atraparía el modal fijo.
   return createPortal(
     <AnimatePresence>

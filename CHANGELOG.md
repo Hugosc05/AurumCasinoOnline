@@ -2,6 +2,19 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.8.1] — 2026-10-26
+
+### Añadido
+- **Banda sonora del salón**: jazz lounge original generado en directo (piano eléctrico, contrabajo, escobillas y vibráfono), nunca se repite igual. Baja de volumen al entrar en una mesa o juego y se pausa con la pestaña oculta. Botón en la cabecera y volumen en Perfil.
+- Sonidos de apertura de cajas al estilo CS:GO (sintetizados, no son los originales de Valve): cierre al abrir, «tic» por casilla y golpe final según la rareza.
+
+### Cambiado
+- **Dorsos de cartas por jugador**: cada uno ve en las cartas boca abajo de los demás el dorso que ESE jugador tenga equipado; quien no tenga ninguno, el de Aurum. El crupier y los bots usan siempre el de Aurum.
+- Apertura de cajas mucho más fluida: la cinta la mueve el compositor del navegador (transición CSS) en vez de JavaScript, con menos casillas y sin animaciones ni filtros dentro de la cinta.
+
+### Corregido
+- En los formularios dentro de ventanas (crear sala, formaciones, administración…) cada tecla quitaba el foco del campo.
+
 ## [1.8.0] — 2026-10-26
 
 ### Añadido

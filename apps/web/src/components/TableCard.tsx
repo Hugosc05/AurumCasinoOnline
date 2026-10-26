@@ -13,6 +13,8 @@ export interface Point {
 interface Props {
   card: string | null;
   faceUp: boolean;
+  /** Jugador dueño de la carta (su dorso equipado); sin dueño, el dorso de Aurum. */
+  owner?: string | null;
   /** Centro de destino (coordenadas del escenario). */
   x: number;
   y: number;
@@ -54,6 +56,7 @@ interface Props {
 export const TableCard = memo(function TableCard({
   card,
   faceUp,
+  owner,
   x,
   y,
   rotate = 0,
@@ -194,6 +197,7 @@ export const TableCard = memo(function TableCard({
         <PlayingCard
           card={card}
           faceUp={landed && faceUp && !collectTo}
+          owner={owner}
           width={width}
           screenScale={stageScale}
           highlight={highlight}

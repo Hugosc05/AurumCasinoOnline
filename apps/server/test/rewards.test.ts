@@ -106,4 +106,13 @@ describe('misiones y cajas', () => {
     const card = await client.get(`/api/players/${user.username}`);
     expect(card.body.frame).toBe('frame:oro');
   });
+
+  it('el dorso equipado es público: los demás lo ven en el aspecto del jugador', async () => {
+    const { client, user } = await registerUser(s.base);
+    const other = await registerUser(s.base);
+    expect((await other.client.get(`/api/looks?names=${user.username}`)).body.looks[user.username].cardBack).toBeNull();
+    db().run(`INSERT INTO user_items (user_id, item_id, source, created_at) VALUES (?, 'back:dragon', 'test', '2026-01-01')`, user.id);
+    expect((await client.post('/api/rewards/equip', { kind: 'cardBack', itemId: 'back:dragon' })).status).toBe(200);
+    expect((await other.client.get(`/api/looks?names=${user.username}`)).body.looks[user.username].cardBack).toBe('back:dragon');
+  });
 });

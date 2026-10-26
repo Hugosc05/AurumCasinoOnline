@@ -237,10 +237,10 @@ export const CardFace = memo(function CardFace({ card, variant = 'full' }: { car
 });
 
 /** Reverso propio de Aurum (no revela información). */
-export const CardBackFace = memo(function CardBackFace() {
+export const CardBackFace = memo(function CardBackFace({ owner }: { owner?: string | null }) {
   const uid = useId().replace(/:/g, '');
-  // Dorso equipado por el jugador (recompensa de las cajas); por defecto, el azul y oro de Aurum.
-  const b = useCardBack();
+  // Dorso que tiene equipado el dueño de la carta (recompensa de las cajas); por defecto, el azul y oro de Aurum.
+  const b = useCardBack(owner);
   return (
     <svg viewBox="0 0 100 140" className="block h-full w-full" aria-hidden data-back>
       <defs>

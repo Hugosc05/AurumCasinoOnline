@@ -2,6 +2,8 @@ export interface Preferences {
   sound: boolean;
   volume: number;
   music: boolean;
+  soundtrack: boolean;
+  musicVolume: number;
   animations: 'full' | 'reduced' | 'off';
   /** Partículas y celebraciones visuales. */
   effects: 'full' | 'reduced' | 'off';
