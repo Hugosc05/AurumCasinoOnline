@@ -4,6 +4,9 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useParams } from 'react-router-dom';
 import { bingoMissing, type BingoCard } from '@aurum/engine';
 import { OddsNote } from '../../components/GameKit';
+import { ChatProvider, TableChat } from '../../components/chat/TableChat';
+import { PlayerName } from '../../components/social/PlayerAvatar';
+import { usePlayerCard } from '../../components/social/PlayerCard';
 import { Button } from '../../components/ui';
 import { audio } from '../../lib/audio';
 import { credits, cx } from '../../lib/format';
@@ -114,9 +117,10 @@ function CardView({ card, id, drawn, winner, index }: { card: BingoCard; id: str
 
 /* ---------------------------------- Página ---------------------------------- */
 
-export default function BingoRoomPage({ roomId: forcedId, embedded = false }: { roomId?: string; embedded?: boolean }) {
+function BingoRoomInner({ roomId: forcedId, embedded = false }: { roomId?: string; embedded?: boolean }) {
   const params = useParams();
   const roomId = forcedId ?? params.roomId ?? 'bingo-sol';
+  const openCard = usePlayerCard();
   const { user, motion: level, prefs } = useSession();
   const { notify } = useNotify();
   const [view, setView] = useState<BingoState | null>(null);
@@ -343,7 +347,11 @@ export default function BingoRoomPage({ roomId: forcedId, embedded = false }: { 
             </div>
             <ul className="flex flex-wrap gap-1.5">
               {(view?.players ?? []).map((p, i) => (
-                <li key={i} className={cx('rounded-full px-2.5 py-1 text-xs', p.you ? 'bg-oro/20 text-oro-claro' : 'bg-white/5 text-marfil')}>{p.you ? 'Tú' : p.name} · {p.cards}</li>
+                <li key={i}>
+                  <button type="button" onClick={() => openCard(p.name)} className={cx('rounded-full px-2.5 py-1 text-xs hover:ring-1 hover:ring-oro/60', p.you ? 'bg-oro/20 text-oro-claro' : 'bg-white/5 text-marfil')}>
+                    {p.you ? 'Tú' : <PlayerName name={p.name} />} · {p.cards}
+                  </button>
+                </li>
               ))}
               {view && view.houseCards > 0 && <li className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-xs text-niebla"><Bot className="h-3 w-3" /> Casa · {view.houseCards}</li>}
               {view && view.players.length === 0 && <li className="text-niebla">Nadie ha comprado todavía.</li>}
@@ -380,5 +388,17 @@ export default function BingoRoomPage({ roomId: forcedId, embedded = false }: { 
         <OddsNote />
       </section>
     </div>
+  );
+}
+
+/** Sala de bingo con su chat. */
+export default function BingoRoomPage(props: { roomId?: string; embedded?: boolean }) {
+  const params = useParams();
+  const id = props.roomId ?? params.roomId ?? 'bingo-sol';
+  return (
+    <ChatProvider channel={`bingo:${id}`}>
+      <BingoRoomInner {...props} />
+      <TableChat />
+    </ChatProvider>
   );
 }

@@ -1,3 +1,4 @@
+import { useCardBack } from '../../lib/cosmetics';
 import { memo, useId } from 'react';
 import {
   PIP_LAYOUT,
@@ -238,25 +239,36 @@ export const CardFace = memo(function CardFace({ card, variant = 'full' }: { car
 /** Reverso propio de Aurum (no revela información). */
 export const CardBackFace = memo(function CardBackFace() {
   const uid = useId().replace(/:/g, '');
+  // Dorso equipado por el jugador (recompensa de las cajas); por defecto, el azul y oro de Aurum.
+  const b = useCardBack();
   return (
     <svg viewBox="0 0 100 140" className="block h-full w-full" aria-hidden data-back>
       <defs>
         <pattern id={`${uid}-deco`} width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="9" height="9" fill="#14224A" />
-          <path d="M0 4.5 H9 M4.5 0 V9" stroke="#D2A443" strokeOpacity="0.32" strokeWidth="0.7" />
-          <circle cx="4.5" cy="4.5" r="0.9" fill="#D2A443" fillOpacity="0.45" />
+          <rect width="9" height="9" fill={b.bg1} opacity="0.85" />
+          <path d="M0 4.5 H9 M4.5 0 V9" stroke={b.line} strokeOpacity="0.32" strokeWidth="0.7" />
+          <circle cx="4.5" cy="4.5" r="0.9" fill={b.line} fillOpacity="0.45" />
         </pattern>
         <radialGradient id={`${uid}-glow`} cx="50%" cy="45%" r="62%">
-          <stop offset="0" stopColor="#22356A" />
-          <stop offset="1" stopColor="#0A1124" />
+          <stop offset="0" stopColor={b.bg1} />
+          <stop offset="1" stopColor={b.bg2} />
         </radialGradient>
       </defs>
-      <rect x="0.6" y="0.6" width="98.8" height="138.8" rx="7.5" fill={`url(#${uid}-glow)`} stroke="#D2A443" strokeOpacity="0.75" strokeWidth="1.2" />
-      <rect x="6.5" y="6.5" width="87" height="127" rx="4.5" fill={`url(#${uid}-deco)`} stroke="#D2A443" strokeOpacity="0.8" strokeWidth="0.9" />
-      <rect x="10" y="10" width="80" height="120" rx="3" fill="none" stroke="#D2A443" strokeOpacity="0.35" strokeWidth="0.5" />
-      <circle cx="50" cy="70" r="19" fill="#0A1124" stroke="#D2A443" strokeWidth="1.2" />
-      <circle cx="50" cy="70" r="15.5" fill="none" stroke="#D2A443" strokeOpacity="0.45" strokeWidth="0.6" />
-      <path d="M50 57.5 L59.6 81.5 H55.2 L53 75.8 H47 L44.8 81.5 H40.4 Z M48.3 72.4 H51.7 L50 67.6 Z" fill="#E6CA8E" />
+      <rect x="0.6" y="0.6" width="98.8" height="138.8" rx="7.5" fill={`url(#${uid}-glow)`} stroke={b.line} strokeOpacity="0.75" strokeWidth="1.2" />
+      <rect x="6.5" y="6.5" width="87" height="127" rx="4.5" fill={`url(#${uid}-deco)`} stroke={b.line} strokeOpacity="0.8" strokeWidth="0.9" />
+      <rect x="10" y="10" width="80" height="120" rx="3" fill="none" stroke={b.line} strokeOpacity="0.35" strokeWidth="0.5" />
+      <circle cx="50" cy="70" r="19" fill={b.bg2} stroke={b.line} strokeWidth="1.2" />
+      <circle cx="50" cy="70" r="15.5" fill="none" stroke={b.line} strokeOpacity="0.45" strokeWidth="0.6" />
+      {b.motif === 'a' && <path d="M50 57.5 L59.6 81.5 H55.2 L53 75.8 H47 L44.8 81.5 H40.4 Z M48.3 72.4 H51.7 L50 67.6 Z" fill={b.accent} />}
+      {b.motif === 'diamond' && <path d="M50 56 L61 70 L50 84 L39 70 Z M50 61 L56 70 L50 79 L44 70 Z" fill={b.accent} fillRule="evenodd" />}
+      {b.motif === 'star' && <path d="M50 55 L53.8 65.6 L65 66 L56.2 72.8 L59.4 83.6 L50 77.2 L40.6 83.6 L43.8 72.8 L35 66 L46.2 65.6 Z" fill={b.accent} />}
+      {b.motif === 'dragon' && (
+        <g fill="none" stroke={b.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M38 78 C 40 64 52 60 58 63 C 64 66 62 74 56 74 C 51 74 50 68 54 67" />
+          <path d="M58 63 L 62 57 L 60 64 M 58 63 L 64 61" />
+          <path d="M40 76 C 44 80 50 81 55 79" />
+        </g>
+      )}
     </svg>
   );
 });

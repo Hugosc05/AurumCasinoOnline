@@ -3,6 +3,9 @@ import { Bot, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CRASH_LIMITS, CRASH_MAX, crashPayout, crashPointFromHex, formatMultiplier } from '@aurum/engine';
 import { GameHeader, OddsNote } from '../../components/GameKit';
+import { ChatProvider, TableChat } from '../../components/chat/TableChat';
+import { PlayerName } from '../../components/social/PlayerAvatar';
+import { usePlayerCard } from '../../components/social/PlayerCard';
 import { Button } from '../../components/ui';
 import { audio, type LoopHandle } from '../../lib/audio';
 import { credits, cx } from '../../lib/format';
@@ -243,7 +246,8 @@ function Rocket() {
 
 /* -------------------------------- Página -------------------------------- */
 
-export default function CrashPage() {
+function CrashInner() {
+  const openCard = usePlayerCard();
   const { user, motion: level } = useSession();
   const { notify } = useNotify();
   const [state, setState] = useState<CrashState | null>(null);
@@ -459,7 +463,9 @@ export default function CrashPage() {
                 <li key={`${b.name}-${i}`} className={cx('flex items-center justify-between gap-2 rounded-lg px-2 py-1.5', b.you ? 'bg-oro/10' : b.cashedAt ? 'bg-exito/10' : '')}>
                   <span className="flex min-w-0 items-center gap-1.5 truncate text-marfil">
                     {b.bot && <Bot className="h-3.5 w-3.5 shrink-0 text-niebla" aria-label="Bot" />}
-                    <span className="truncate">{b.you ? 'Tú' : b.name}</span>
+                    {b.you || b.bot ? <span className="truncate">{b.you ? 'Tú' : b.name}</span> : (
+                      <button type="button" className="truncate hover:underline" onClick={() => openCard(b.name)}><PlayerName name={b.name} /></button>
+                    )}
                   </span>
                   <span className="tabular-nums text-niebla">{credits(b.amount)}</span>
                   <span className={cx('w-20 text-right tabular-nums', b.cashedAt ? 'text-exito' : state?.phase === 'crashed' ? 'text-[#f1a3ad]' : 'text-niebla')}>
@@ -491,5 +497,15 @@ export default function CrashPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Cohete con su chat. */
+export default function CrashPage() {
+  return (
+    <ChatProvider channel="crash">
+      <CrashInner />
+      <TableChat />
+    </ChatProvider>
   );
 }

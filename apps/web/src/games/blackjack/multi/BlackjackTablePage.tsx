@@ -3,6 +3,8 @@ import { ArrowLeft, Bot, Eraser, Hand, LogOut, PlusCircle, Repeat2, Split, Squar
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { BotAvatar } from '../../../components/BotAvatar';
+import { ChatBubble, ChatProvider, TableChat } from '../../../components/chat/TableChat';
+import { PlayerAvatar, PlayerName } from '../../../components/social/PlayerAvatar';
 import { Celebration, type CelebrationHandle } from '../../../components/Celebration';
 import { ChipStack } from '../../../components/Chip';
 import { ChipRack, OddsNote, SkipButton } from '../../../components/GameKit';
@@ -85,15 +87,13 @@ function SeatPlate({ seat, index, n, g, isTurn, onSit, canSit }: {
           ) : seat.isBot ? (
             <div className="grid h-14 w-14 place-items-center rounded-full bg-[#1f2a44]"><Bot className="h-6 w-6 text-niebla" /></div>
           ) : (
-            <div className={cx('grid h-14 w-14 place-items-center rounded-full bg-gradient-to-b', seat.isYou ? 'from-marino to-abismo' : 'from-[#2a2238] to-[#120d1c]')}>
-              <span className="font-display text-2xl text-marfil">{seat.name[0]!.toUpperCase()}</span>
-            </div>
+            <PlayerAvatar name={seat.name} size={56} />
           )}
           {!seat.connected && !seat.isBot && <WifiOff className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-noche p-0.5 text-aviso" aria-label="Desconectado" />}
         </div>
         <div className="mt-1 w-full rounded-xl border border-white/10 bg-[#070b14]/90 px-2 py-1 text-center" title={seat.bot ? `${seat.bot.tagline} · ${seat.bot.strategy} · ${seat.bot.experience}` : undefined}>
           <p className="flex items-center justify-center gap-1 truncate text-[13px] text-marfil">
-            <span className="truncate">{seat.name}</span>
+            {seat.isBot ? <span className="truncate">{seat.name}</span> : <PlayerName name={seat.name} className="truncate" />}
             {seat.isBot && <span className="rounded bg-white/10 px-1 text-[9px] text-niebla">BOT</span>}
             {seat.isYou && <span className="rounded bg-oro/20 px-1 text-[9px] text-oro-claro">TÚ</span>}
           </p>
@@ -101,6 +101,7 @@ function SeatPlate({ seat, index, n, g, isTurn, onSit, canSit }: {
             {seat.leaving ? 'Saliendo…' : seat.isBot ? `${seat.bot?.strategy ?? 'Bot'} · ${credits(seat.stack ?? 0)}` : seat.isYou ? 'Tu asiento' : 'Jugador'}
           </p>
         </div>
+        {!seat.isBot && <ChatBubble name={seat.name} className="-top-12 left-1/2 -translate-x-1/2" />}
         <AnimatePresence>
           {isTurn && seat.isBot && (
             <motion.span key="think" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute -top-6 flex gap-1 rounded-full bg-black/60 px-2.5 py-1.5" aria-label="Pensando">
@@ -115,7 +116,7 @@ function SeatPlate({ seat, index, n, g, isTurn, onSit, canSit }: {
   );
 }
 
-export default function BlackjackTablePage({ tableId: tableIdProp, embedded = false }: { tableId?: string; embedded?: boolean } = {}) {
+function BlackjackTableInner({ tableId: tableIdProp, embedded = false }: { tableId?: string; embedded?: boolean } = {}) {
   const params = useParams();
   const tableId = tableIdProp ?? params.tableId ?? '';
   const nav = useNavigate();
@@ -594,5 +595,17 @@ export default function BlackjackTablePage({ tableId: tableIdProp, embedded = fa
         </section>
       )}
     </div>
+  );
+}
+
+/** Mesa de blackjack con su chat. */
+export default function BlackjackTablePage(props: { tableId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const id = props.tableId ?? params.tableId ?? '';
+  return (
+    <ChatProvider channel={id ? `bj:${id}` : null}>
+      <BlackjackTableInner {...props} />
+      <TableChat />
+    </ChatProvider>
   );
 }

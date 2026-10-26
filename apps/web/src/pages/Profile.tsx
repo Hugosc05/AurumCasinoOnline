@@ -1,3 +1,5 @@
+import { AvatarEditor } from '../components/social/AvatarEditor';
+import { PlayerName } from '../components/social/PlayerAvatar';
 import { motion } from 'motion/react';
 import { Award, Flame, Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -60,9 +62,9 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="flex flex-wrap items-end gap-6">
-        <div className="grid h-20 w-20 place-items-center rounded-full border-2 border-oro bg-marino font-display text-4xl text-oro-claro">{user.username[0]!.toUpperCase()}</div>
+        <AvatarEditor />
         <div>
-          <h1 className="text-4xl text-marfil">{user.username}</h1>
+          <h1 className="text-4xl text-marfil"><PlayerName name={user.username} /></h1>
           <p className="text-sm text-niebla">Miembro desde {new Date(user.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}{user.role === 'admin' && ' — administrador con saldo ilimitado'}</p>
         </div>
         <div className="ml-auto text-right">

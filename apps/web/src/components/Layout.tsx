@@ -6,6 +6,10 @@ import { credits, cx } from '../lib/format';
 import { socket, type WsStatus } from '../lib/ws';
 import { LOW_BALANCE } from '../lib/economy';
 import { NotificationBell } from '../social/NotificationBell';
+import { api } from '../lib/api';
+import { setCardBack } from '../lib/cosmetics';
+import { PlayerCardProvider } from './social/PlayerCard';
+import { PlayerAvatar } from './social/PlayerAvatar';
 import { useSession } from '../state/session';
 import { Button } from './ui';
 
@@ -186,7 +190,7 @@ function Header() {
                   aria-expanded={menu}
                   aria-label="Menú de la cuenta"
                 >
-                  <span className="font-display text-lg">{user.username[0]!.toUpperCase()}</span>
+                  <PlayerAvatar name={user.username} size={38} interactive={false} />
                 </button>
                 <AnimatePresence>
                   {menu && (
@@ -327,7 +331,17 @@ function FooterCol({ title, links }: { title: string; links: [string, string][] 
 export function Layout() {
   const loc = useLocation();
   const { speed } = useSession();
+  const { user } = useSession();
+  // Dorso de cartas equipado: se aplica a todas las cartas boca abajo.
+  useEffect(() => {
+    if (!user) {
+      setCardBack(null);
+      return;
+    }
+    api.get<{ equipped: { cardBack: string | null } }>('/api/profile/look').then((r) => setCardBack(r.equipped.cardBack)).catch(() => {});
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
+    <PlayerCardProvider>
     <div className="flex min-h-screen flex-col overflow-x-clip">
       <a href="#contenido" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-oro focus:px-4 focus:py-2 focus:text-noche">
         Saltar al contenido
@@ -346,6 +360,7 @@ export function Layout() {
       <LowBalanceBanner />
       <Footer />
     </div>
+    </PlayerCardProvider>
   );
 }
 

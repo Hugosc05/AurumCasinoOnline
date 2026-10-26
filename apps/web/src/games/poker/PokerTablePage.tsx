@@ -4,6 +4,8 @@ import { ArrowLeft, Bot, LogOut, Wifi, WifiOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { BotAvatar } from '../../components/BotAvatar';
+import { ChatBubble, ChatProvider, TableChat } from '../../components/chat/TableChat';
+import { PlayerAvatar, PlayerName } from '../../components/social/PlayerAvatar';
 import { ChipStack } from '../../components/Chip';
 import { OddsNote, SkipButton } from '../../components/GameKit';
 import { CardBack } from '../../components/PlayingCard';
@@ -140,7 +142,7 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
         <div className={cx('relative grid h-16 w-16 place-items-center rounded-full border-2 bg-gradient-to-b shadow-hondo', seat.isYou ? 'border-oro-claro from-marino to-abismo' : 'border-white/20 from-[#1f2a44] to-[#0c1222]', isTurn && 'turn-ring', won !== undefined && 'shadow-[0_0_0_3px_#ebd9a6,0_0_30px_rgba(235,217,166,0.6)]')}>
           {seat.isBot && seat.avatar ? (
             <BotAvatar spec={seat.avatar} size={60} title={`Avatar de ${seat.name} (bot)`} />
-          ) : seat.isBot ? <Bot className="h-7 w-7 text-niebla" /> : <span className="font-display text-2xl text-marfil">{seat.name[0]!.toUpperCase()}</span>}
+          ) : seat.isBot ? <Bot className="h-7 w-7 text-niebla" /> : <PlayerAvatar name={seat.name} size={60} />}
           {remaining !== null && (
             <svg className="absolute -inset-1.5" viewBox="0 0 100 100" aria-hidden>
               <circle cx="50" cy="50" r="47" fill="none" stroke={pct < 0.25 ? '#e0a84b' : '#ebd9a6'} strokeWidth="4" strokeDasharray={`${pct * 295} 295`} transform="rotate(-90 50 50)" strokeLinecap="round" />
@@ -150,13 +152,14 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
         </div>
         <div className="mt-1 w-full rounded-xl border border-white/10 bg-[#070b14]/90 px-2 py-1 text-center">
           <p className="flex items-center justify-center gap-1 truncate text-[13px] text-marfil">
-            {seat.name}
+            {seat.isBot ? seat.name : <PlayerName name={seat.name} />}
             {seat.isBot && <span className="rounded bg-white/10 px-1 text-[9px] text-niebla" title={`Bot automatizado · ${seat.profile ?? ''}${seat.tagline ? ` · ${seat.tagline}` : ''}`}>BOT</span>}
             {seat.isYou && <span className="rounded bg-oro/20 px-1 text-[9px] text-oro-claro">TÚ</span>}
           </p>
           <p className="font-display text-base text-oro-claro tabular-nums">{credits(stack)}</p>
           {seat.isBot && seat.profile && <p className="text-[10px] text-niebla">{seat.profile}</p>}
         </div>
+        {!seat.isBot && <ChatBubble name={seat.name} className="-top-12 left-1/2 -translate-x-1/2" />}
         <AnimatePresence>
           {action && (
             <motion.span
@@ -187,7 +190,7 @@ function SeatBadge({ seat, pos, vis, isTurn, deadline, clockOffset, onSit, canSi
   );
 }
 
-export default function PokerTablePage({ tableId: tableIdProp, embedded = false }: { tableId?: string; embedded?: boolean } = {}) {
+function PokerTableInner({ tableId: tableIdProp, embedded = false }: { tableId?: string; embedded?: boolean } = {}) {
   const params = useParams();
   const tableId = tableIdProp ?? params.tableId ?? '';
   const nav = useNavigate();
@@ -670,5 +673,17 @@ export default function PokerTablePage({ tableId: tableIdProp, embedded = false 
         </div>
       </Modal>
     </div>
+  );
+}
+
+/** Mesa de póker con su chat. */
+export default function PokerTablePage(props: { tableId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const id = props.tableId ?? params.tableId ?? '';
+  return (
+    <ChatProvider channel={id ? `poker:${id}` : null}>
+      <PokerTableInner {...props} />
+      <TableChat />
+    </ChatProvider>
   );
 }
