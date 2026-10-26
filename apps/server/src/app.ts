@@ -29,6 +29,7 @@ import { RoomService } from './rooms/rooms';
 import { CrashGame } from './crash/crash';
 import { BingoManager } from './bingo/bingo';
 import { LookService } from './profile/profile';
+import { ChatService } from './chat/chat';
 import { avatarRoutes, profileRoutes } from './routes/profile';
 import { roomRoutes } from './routes/rooms';
 import { AdsService, createAdProvider } from './ads/ads';
@@ -73,12 +74,23 @@ export function buildApp(config: AppConfig, db?: Database): RunningApp {
   const bingo = new BingoManager(database, realtime, fast ? { countdownMs: 600, drawMs: 25, finishedMs: 150 } : { countdownMs: 25_000, drawMs: 2800, finishedMs: 9000 }, fast);
   const rooms = new RoomService(database, realtime, poker, blackjack, social, bingo);
   const crash = new CrashGame(database, realtime, fast ? { bettingMs: 1500, crashedMs: 300, tickMs: 20 } : { bettingMs: 7000, crashedMs: 3500, tickMs: 50 });
+  // Chat de mesa: canales de mesas existentes; las salas privadas, solo para sus miembros.
+  const chat = new ChatService(realtime, (channel, userId) => {
+    if (channel === 'crash') return true;
+    const [kind, id] = channel.split(':') as [string, string];
+    if (id.startsWith('room-')) return !!userId && rooms.isMember(id.slice(5), userId);
+    if (kind === 'poker') return poker.tables.has(id);
+    if (kind === 'bj') return blackjack.tables.has(id);
+    if (kind === 'bingo') return bingo.rooms.has(id);
+    return false;
+  });
   const ctx: AppContext = { config, db: database, realtime, poker, blackjack, bots, ads, social, rooms, crash, bingo, looks: new LookService(database), startedAt: Date.now() };
   poker.init();
   blackjack.init();
   bingo.init();
   rooms.init();
   crash.init();
+  chat.init();
 
   const app = express();
   app.disable('x-powered-by');
