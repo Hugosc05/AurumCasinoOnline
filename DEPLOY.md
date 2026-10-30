@@ -10,6 +10,8 @@ Con esto el casino queda en una dirección pública del tipo `https://aurum-casi
 
 Tiempo aproximado: 15 minutos. No hace falta tarjeta.
 
+> El plan gratuito de Render se suspende si se agotan sus horas del mes. Si tienes un PC en casa que pueda estar siempre encendido, la alternativa sin límites es [DEPLOY-CASA.md](DEPLOY-CASA.md).
+
 ## 1. Sube el código a GitHub
 
 En tu PC, dentro de `C:\PROYECTOS\Casino`:

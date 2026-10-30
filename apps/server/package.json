@@ -1,6 +1,6 @@
 {
   "name": "@aurum/server",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,9 @@
     "typecheck": "tsc -p tsconfig.json",
     "db:migrate": "tsx --no-warnings=ExperimentalWarning src/cli/migrate.ts",
     "db:seed": "tsx --no-warnings=ExperimentalWarning src/cli/seed.ts",
-    "admin:create": "tsx --no-warnings=ExperimentalWarning src/cli/createAdmin.ts"
+    "admin:create": "tsx --no-warnings=ExperimentalWarning src/cli/createAdmin.ts",
+    "db:import": "tsx --no-warnings=ExperimentalWarning src/cli/importPostgres.ts",
+    "db:backup": "tsx --no-warnings=ExperimentalWarning src/cli/backup.ts"
   },
   "dependencies": {
     "@aurum/engine": "*",

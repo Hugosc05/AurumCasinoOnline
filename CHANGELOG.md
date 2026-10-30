@@ -2,6 +2,16 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.9.0] — 2026-10-30
+
+### Añadido
+- **Servidor en casa** ([DEPLOY-CASA.md](DEPLOY-CASA.md)): `deploy/windows/instalar-servidor.ps1` convierte un PC con Windows en el servidor (Git, Node, servicio de Windows con NSSM, Tailscale Funnel para una dirección HTTPS pública gratuita, copias diarias, sin suspensión). `actualizar.ps1` y `estado.ps1` para el día a día.
+- `npm run db:import`: copia todos los datos de PostgreSQL (Supabase) a SQLite, comprobando la versión del esquema y las referencias; no modifica el origen.
+- `npm run db:backup`: copia de seguridad en caliente de SQLite (`VACUUM INTO`) con rotación y copia opcional a otra carpeta (OneDrive, Google Drive…).
+
+### Cambiado
+- El `.env` se lee aunque lleve marca BOM (como lo guardan algunos editores de Windows).
+
 ## [1.8.1] — 2026-10-26
 
 ### Añadido

@@ -11,7 +11,8 @@ export const REPO_ROOT = path.resolve(SERVER_ROOT, '..', '..');
 function loadDotEnv(): void {
   for (const file of [path.join(REPO_ROOT, '.env'), path.join(SERVER_ROOT, '.env')]) {
     if (!existsSync(file)) continue;
-    for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    // Sin la marca BOM que añaden algunos editores de Windows (si no, la primera clave no se reconocería).
+    for (const raw of readFileSync(file, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/)) {
       const line = raw.trim();
       if (!line || line.startsWith('#')) continue;
       const eq = line.indexOf('=');

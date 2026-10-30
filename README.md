@@ -2,7 +2,7 @@
 
 Plataforma de casino **exclusivamente de demostración**: blackjack individual y multijugador con crupier animado, Texas Hold'em en tiempo real con asistente de manos, ruleta europea con bola física y apuestas pintadas a mano, dos máquinas de slots con funciones especiales, amigos y salas privadas. Se juega con créditos virtuales sin valor económico: no hay pagos, depósitos, retiradas ni conversión a dinero real.
 
-Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pago y sin binarios nativos que compilar. Para jugar con amigos por internet sin tener tu PC encendido, se puede publicar gratis en **Render + Supabase**: guía paso a paso en [DEPLOY.md](DEPLOY.md).
+Todo funciona en local, con coste 0 €: sin servicios externos, sin APIs de pago y sin binarios nativos que compilar. Para jugar con amigos por internet sin tener tu PC encendido, se puede publicar gratis en **Render + Supabase**: guía paso a paso en [DEPLOY.md](DEPLOY.md). O en un PC de tu casa que esté siempre encendido, también gratis y sin los límites del plan gratuito: [DEPLOY-CASA.md](DEPLOY-CASA.md).
 
 ![Portada](docs/screenshots/home.png)
 
@@ -64,6 +64,8 @@ Equivale a `npm run build` seguido de `npm start`.
 ### Publicarlo en internet (Render + Supabase)
 
 Sigue [DEPLOY.md](DEPLOY.md): el servidor queda en Render y la base de datos en Supabase (PostgreSQL), los dos gratis y sin tu PC encendido.
+
+Con un PC de casa siempre encendido (por ejemplo, un mini PC con Windows) sigue [DEPLOY-CASA.md](DEPLOY-CASA.md): un script lo instala todo (servicio de Windows, Tailscale Funnel para la dirección HTTPS pública, copias diarias) y trae tus datos de Supabase.
 
 ### Jugar online desde tu PC (túnel temporal)
 
@@ -128,6 +130,7 @@ docs              Guía de animación y capturas
 ## Documentación
 
 - [DEPLOY.md](DEPLOY.md): publicarlo gratis en Render + Supabase
+- [DEPLOY-CASA.md](DEPLOY-CASA.md): servidor propio en un PC con Windows (Tailscale Funnel, 0 €)
 - [ARCHITECTURE.md](ARCHITECTURE.md): arquitectura, diagramas y decisiones técnicas
 - [GAME_RULES.md](GAME_RULES.md): reglas, pagos y RTP de los cuatro juegos
 - [SECURITY.md](SECURITY.md): modelo de seguridad

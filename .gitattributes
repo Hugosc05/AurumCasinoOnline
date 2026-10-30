@@ -1,0 +1,2 @@
+# Scripts de PowerShell: CRLF en Windows (y se conservan con BOM UTF-8, necesario en PowerShell 5.1).
+*.ps1 text eol=crlf
