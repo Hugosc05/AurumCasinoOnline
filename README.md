@@ -7,7 +7,7 @@
 </picture>
 
 <p align="center">
-  <img alt="Versión" src="https://img.shields.io/badge/versión-1.10.1-cfae6b?style=flat-square">
+  <img alt="Versión" src="https://img.shields.io/badge/versión-1.10.2-cfae6b?style=flat-square">
   <img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-cfae6b?style=flat-square">
   <img alt="Node 22.13 o superior" src="https://img.shields.io/badge/node-%E2%89%A522.13-3c873a?style=flat-square&logo=nodedotjs&logoColor=white">
   <img alt="TypeScript estricto" src="https://img.shields.io/badge/TypeScript-estricto-3178c6?style=flat-square&logo=typescript&logoColor=white">

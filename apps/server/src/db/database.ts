@@ -239,8 +239,11 @@ export interface MigrationInfo {
   name: string;
 }
 
-/** Aplica en orden las migraciones SQL pendientes (`NNN_nombre.sql`). */
-export function migrate(db: Database): MigrationInfo[] {
+/**
+ * Aplica en orden las migraciones SQL pendientes (`NNN_nombre.sql`).
+ * `upTo` limita hasta qué versión (para importar datos de una base más antigua).
+ */
+export function migrate(db: Database, upTo = Infinity): MigrationInfo[] {
   if (db.dialect === 'postgres') db.exec('CREATE EXTENSION IF NOT EXISTS citext');
   db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL
@@ -250,7 +253,7 @@ export function migrate(db: Database): MigrationInfo[] {
   const done: MigrationInfo[] = [];
   for (const file of files) {
     const version = Number.parseInt(file, 10);
-    if (applied.has(version)) continue;
+    if (applied.has(version) || version > upTo) continue;
     const source = readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
     const sql = db.dialect === 'postgres' ? migrationToPostgres(source) : source;
     db.tx(() => {

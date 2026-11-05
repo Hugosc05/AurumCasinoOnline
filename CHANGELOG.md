@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.10.2] — 2026-11-05
+
+### Corregido
+- `npm run db:import` ya no falla cuando la base de origen (Supabase) está en una versión del esquema más antigua que el código: crea el destino en esa misma versión, copia los datos y después aplica las migraciones que falten. Un destino vacío de un intento anterior se rehace sin pedir `--force`.
+
 ## [1.10.1] — 2026-11-05
 
 ### Cambiado
