@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.10.3] — 2026-11-05
+
+### Corregido
+- Instalador del servidor en casa: si el puerto lo ocupa un casino arrancado a mano (`npm run dev`), lo cierra antes de arrancar el servicio; ya no falla por el estado «START_PENDING» de NSSM (espera a que el servidor responda) y, si no arranca, muestra las últimas líneas del registro.
+- El instalador indica cuántas cuentas tiene una base de datos existente y, si está vacía, ofrece importar desde Supabase. `actualizar.ps1` también muestra el registro si el servidor no arranca.
+
 ## [1.10.2] — 2026-11-05
 
 ### Corregido

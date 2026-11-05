@@ -88,6 +88,42 @@ function Poner-Env([string]$archivo, [string]$clave, [string]$valor) {
   [IO.File]::WriteAllText($archivo, (($nuevas -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding $false))
 }
 
+# Número de cuentas de una base SQLite (para saber si ya tiene datos).
+function Contar-Cuentas([string]$archivo) {
+  $js = Join-Path $env:TEMP 'aurum-contar.mjs'
+  Set-Content -LiteralPath $js -Encoding ASCII -Value @'
+import { DatabaseSync } from 'node:sqlite';
+try {
+  const d = new DatabaseSync(process.argv[2]);
+  console.log(d.prepare('SELECT COUNT(*) AS n FROM users').get().n);
+} catch { console.log(-1); }
+'@
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $n = (& node --no-warnings $js $archivo 2>$null | Select-Object -Last 1) } finally { $ErrorActionPreference = $prev }
+  Remove-Item -LiteralPath $js -ErrorAction SilentlyContinue
+  if ($n -match '^-?\d+$') { return [int]$n } else { return -1 }
+}
+
+# Si otro proceso ocupa el puerto (p. ej., un «npm run dev» olvidado), el servicio no puede arrancar.
+function Liberar-Puerto {
+  $con = Get-NetTCPConnection -LocalPort $Puerto -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $con) { return }
+  $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$($con.OwningProcess)" -ErrorAction SilentlyContinue
+  $cmd = [string]$proc.CommandLine
+  if ($cmd -match 'src[\\/]index\.ts|tsx|scripts[\\/]dev\.mjs|aurum') {
+    Write-Host "    El puerto $Puerto lo usa un casino arrancado a mano (proceso $($con.OwningProcess)); se cierra para que lo lleve el servicio."
+    Stop-Process -Id $con.OwningProcess -Force -ErrorAction SilentlyContinue
+    # «npm run dev» lanza varios procesos: se cierran también los del mismo árbol que sigan vivos.
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+      Where-Object { $_.CommandLine -match 'scripts[\\/]dev\.mjs|src[\\/]index\.ts|vite' -and $_.CommandLine -match [regex]::Escape($Code) } |
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Seconds 2
+  } else {
+    Falla "El puerto $Puerto lo está usando otro programa: $($proc.Name) (proceso $($con.OwningProcess)). Ciérralo o elige otro puerto con -Puerto."
+  }
+}
+
 function Esperar-Salud([int]$segundos) {
   for ($i = 0; $i -lt $segundos; $i += 2) {
     try {
@@ -234,12 +270,19 @@ Ok "$envFile ($(if ($nuevo) { 'creado' } else { 'actualizado' }))"
 
 # 5. Datos -----------------------------------------------------------------
 Paso 'Base de datos'
-if (Test-Path $dbFile) {
-  Ok "Ya existe ${dbFile}: se conserva"
+$cuentas = if (Test-Path $dbFile) { Contar-Cuentas $dbFile } else { -1 }
+$importar = $false
+if ($cuentas -gt 0) {
+  Ok "Ya existe ${dbFile} con $cuentas cuentas: se conserva"
 } else {
+  if (Test-Path $dbFile) { Write-Host "    ${dbFile} existe pero no tiene cuentas." }
+  $importar = $true
+}
+if ($importar) {
   Write-Host '    Puedes traer TODO lo que hay en Supabase (cuentas, saldos, historial, amigos, cosméticos…).'
   Write-Host '    Si eliges que no, el casino empieza vacío.'
   if (Leer-Si '    ¿Importar los datos de Supabase?') {
+    if ($servicioExiste) { Silencioso { & $Nssm stop $Servicio } }
     Write-Host '    Pega la cadena de conexión de Supabase (Connect > Session pooler, con tu contraseña).'
     Write-Host '    No se guarda en ningún sitio: solo se usa para esta copia.'
     $seguro = Read-Host '    Cadena postgresql://…' -AsSecureString
@@ -257,7 +300,7 @@ if (Test-Path $dbFile) {
       Remove-Item -LiteralPath $dbFile, "$dbFile-wal", "$dbFile-shm" -ErrorAction SilentlyContinue
       Falla 'La importación no se completó (revisa la cadena de conexión). Vuelve a ejecutar el script.'
     }
-    Ok 'Datos importados'
+    Ok "Datos importados ($(Contar-Cuentas $dbFile) cuentas)"
   } else {
     $vacia = $true
     Ok 'Se empezará con una base de datos vacía'
@@ -287,8 +330,19 @@ $cfg = @(
 )
 foreach ($c in $cfg) { Ejecutar $Nssm (@('set', $Servicio) + $c) "No se pudo configurar $($c[0])" }
 Ejecutar $Nssm @('set', $Servicio, 'AppExit', 'Default', 'Restart') 'No se pudo configurar el reinicio automático'
-Ejecutar $Nssm @('start', $Servicio) 'No se pudo arrancar el servicio'
-if (-not (Esperar-Salud 90)) { Falla "El servidor no responde. Mira el registro: $Logs\servidor.log" }
+Silencioso { & $Nssm stop $Servicio }
+Liberar-Puerto
+# nssm puede devolver «START_PENDING» si Node tarda en arrancar: lo que cuenta es que responda.
+Silencioso { & $Nssm start $Servicio }
+if (-not (Esperar-Salud 90)) {
+  $log = Join-Path $Logs 'servidor.log'
+  if (Test-Path $log) {
+    Write-Host ''
+    Write-Host '    Últimas líneas del registro del servidor:' -ForegroundColor Yellow
+    Get-Content -LiteralPath $log -Tail 25 -Encoding UTF8 | ForEach-Object { Write-Host "    $_" }
+  }
+  Falla "El servidor no responde en el puerto $Puerto. Registro completo: $log"
+}
 Ok "Funcionando en http://127.0.0.1:$Puerto"
 
 if ($vacia -and (Leer-Si '    Base de datos nueva: ¿crear ahora tu cuenta de administrador?')) {

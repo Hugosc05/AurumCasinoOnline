@@ -76,7 +76,13 @@ try {
   }
 } finally { Pop-Location }
 
-& $Nssm start $Servicio | Out-Null
-if (-not (Esperar-Salud 90)) { Falla "El casino no arranca. Mira $Carpeta\logs\servidor.log (y si hace falta, vuelve a la versión anterior con: git -C $Code reset --hard $antes)." }
+$prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+& $Nssm start $Servicio 2>&1 | Out-Null
+$ErrorActionPreference = $prev
+if (-not (Esperar-Salud 90)) {
+  $log = Join-Path $Carpeta 'logs\servidor.log'
+  if (Test-Path $log) { Get-Content -LiteralPath $log -Tail 25 -Encoding UTF8 | ForEach-Object { Write-Host "   $_" } }
+  Falla "El casino no arranca. Mira $Carpeta\logs\servidor.log (y si hace falta, vuelve a la versión anterior con: git -C $Code reset --hard $antes)."
+}
 if (-not $ok) { Falla 'La instalación o la compilación falló; el casino sigue con lo que había. Revisa los mensajes de arriba.' }
 Ok "Casino actualizado a $despues y funcionando."
