@@ -309,6 +309,7 @@ export function adminRoutes(ctx: AppContext): Router {
     adsDailyLimit: z.number().int().min(0).max(100).optional(),
     adsMinWatchSeconds: z.number().int().min(5).max(120).optional(),
     maintenanceMessage: z.string().max(300).optional(),
+    alertBigWin: z.number().int().min(0).max(1_000_000_000).optional(),
   }).strict();
   r.patch('/settings', (req, res) => {
     const body = parse(settingsSchema, req.body);

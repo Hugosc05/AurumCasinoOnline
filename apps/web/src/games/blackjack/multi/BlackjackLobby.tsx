@@ -7,6 +7,7 @@ import { api } from '../../../lib/api';
 import { credits, cx } from '../../../lib/format';
 import { socket } from '../../../lib/ws';
 import type { LobbyTable } from './model';
+import { AdSlot } from '../../../components/AdSlot';
 
 export const MODE_INFO = {
   bots: { label: 'Demo con bots', tone: 'muted' as const, text: 'Bots automatizados ocupan asientos libres. Puedes sentarte en cualquier momento.' },
@@ -101,6 +102,7 @@ export default function BlackjackLobby() {
         <p className="flex gap-2"><Bot className="mt-0.5 h-4 w-4 shrink-0" /> Los bots son jugadores automatizados del casino, no personas. Llevan siempre la etiqueta BOT, apuestan dentro de los límites y juegan con estrategias legales. No ven las cartas ocultas y no influyen en las reglas del crupier.</p>
         <p className="flex gap-2"><Lock className="mt-0.5 h-4 w-4 shrink-0" /> <span>¿Con amigos? <Link to="/salas?crear=blackjack" className="text-oro-claro hover:underline">Crea una sala privada</Link> y comparte el código.</span></p>
       </div>
+      <AdSlot placement="lobby" className="mt-10" />
     </div>
   );
 }

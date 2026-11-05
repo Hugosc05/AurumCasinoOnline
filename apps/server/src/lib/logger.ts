@@ -10,6 +10,13 @@ const ORDER: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 
  */
 export class Logger {
   private db: Database | null = null;
+  private errorListeners = new Set<(message: string, context?: Record<string, unknown>) => void>();
+
+  /** Se llama con cada error registrado (avisos al móvil). Devuelve la función para quitarlo. */
+  onError(fn: (message: string, context?: Record<string, unknown>) => void): () => void {
+    this.errorListeners.add(fn);
+    return () => this.errorListeners.delete(fn);
+  }
   constructor(private level: Level = 'info') {}
 
   attach(db: Database, level: Level): void {
@@ -48,7 +55,15 @@ export class Logger {
     this.write('warn', message, context, err);
   }
   error(message: string, err?: unknown, context?: Record<string, unknown>): void {
-    this.write('error', message, { ...context, error: err instanceof Error ? err.message : String(err) }, err);
+    const ctx = { ...context, error: err instanceof Error ? err.message : String(err) };
+    this.write('error', message, ctx, err);
+    for (const fn of this.errorListeners) {
+      try {
+        fn(message, ctx);
+      } catch {
+        /* un aviso nunca rompe el registro */
+      }
+    }
   }
 }
 

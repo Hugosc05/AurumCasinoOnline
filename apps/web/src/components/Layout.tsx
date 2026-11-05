@@ -370,12 +370,25 @@ function RewardsNavLink({ mobile = false }: { mobile?: boolean }) {
   );
 }
 
+/**
+ * Sección que se está viendo, para el panel «En directo» y las visitas por
+ * sección. Se reenvía al reconectar (el servidor solo cuenta visita si cambia).
+ */
+let currentPage = '/';
+socket.onOpen(() => socket.send({ t: 'nav', path: currentPage }));
+function reportPage(path: string): void {
+  if (path === currentPage && socket.status === 'open') return;
+  currentPage = path;
+  socket.send({ t: 'nav', path });
+}
+
 export function Layout() {
   const loc = useLocation();
   const { speed } = useSession();
   const { user } = useSession();
   useEffect(() => {
     music.setDucked(GAME_ROUTE.test(loc.pathname));
+    reportPage(loc.pathname);
   }, [loc.pathname]);
   return (
     <PlayerCardProvider>

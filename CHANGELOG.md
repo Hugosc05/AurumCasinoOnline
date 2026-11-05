@@ -2,6 +2,22 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.10.0] — 2026-11-03
+
+### Añadido
+- **Panel de administración ampliado**:
+  - *En directo*: quién está conectado, en qué sección o mesa, desde qué dispositivo e IP y cuánto tiempo; expulsar; aviso de varias cuentas en la misma conexión.
+  - *Actividad*: activos por día, semana y mes, registros, retención (D1 y D7), visitantes únicos y visitas por sección, pico de conectados, partidas y beneficio de la casa por día, economía de créditos (creados, retirados, en circulación) y jugadores destacados.
+  - *Ingresos*: conexión con la API de AdSense (OAuth, solo lectura) con ganancias reales por día, páginas vistas, clics y RPM; bloques de anuncio configurables en portada, vestíbulos y recompensas (desactivados por defecto), `/ads.txt` automático y CSP que solo abre los dominios de AdSense si se activan.
+  - *Seguridad*: comprobaciones automáticas (configuración, 2FA, copias, disco, integridad, libro mayor, avisos), registro de eventos (inicios de sesión fallidos, bloqueos, CSRF, sondeos de vulnerabilidades como `/.env` o `/wp-admin`, 2FA), IP con más incidencias, posibles multicuentas y `npm audit` diario.
+  - *Servidor*: CPU, memoria, disco, tiempos de respuesta, retraso interno, peticiones y conectados en la última hora.
+- **Verificación en dos pasos (TOTP) para administradores**, obligatoria en producción: QR, 8 códigos de recuperación, verificación cada 12 h por sesión, protección contra reutilización y fuerza bruta, y `npm run admin:reset-2fa` para recuperar el acceso desde el servidor.
+- **Avisos al móvil por Telegram** (ataques, 2FA, administrador desde IP nueva, premios grandes, saldos descuadrados, vulnerabilidades, disco, memoria, lentitud, errores, arranques) con ventana anti-repetición, y **latido** para servicios como healthchecks.io que avisan si el servidor se cae.
+- Credenciales externas (Telegram, AdSense) cifradas en reposo con AES-256-GCM.
+
+### Seguridad
+- Dependencias actualizadas para corregir vulnerabilidades publicadas: `zod` 4.6.7 (agotamiento de memoria, alta), `body-parser` 2.4.0 (denegación de servicio, alta) y `qs` 6.17.1 (moderada). `npm audit`: 0 vulnerabilidades.
+
 ## [1.9.0] — 2026-10-30
 
 ### Añadido

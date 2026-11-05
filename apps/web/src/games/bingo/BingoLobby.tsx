@@ -5,6 +5,7 @@ import { Button } from '../../components/ui';
 import { credits, cx } from '../../lib/format';
 import { socket } from '../../lib/ws';
 import { Ball } from './BingoBall';
+import { AdSlot } from '../../components/AdSlot';
 
 interface RoomSummary {
   id: string;
@@ -65,6 +66,7 @@ export default function BingoLobby() {
         </div>
         <Link to="/salas?crear=bingo"><Button variant="outline">Crear sala de bingo</Button></Link>
       </div>
+      <AdSlot placement="lobby" className="mt-10" />
     </div>
   );
 }

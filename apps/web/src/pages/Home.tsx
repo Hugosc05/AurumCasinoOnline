@@ -12,6 +12,7 @@ import { api } from '../lib/api';
 import { GAME_NAMES, credits, cx, relativeTime, signed } from '../lib/format';
 import { socket } from '../lib/ws';
 import { useSession } from '../state/session';
+import { AdSlot } from '../components/AdSlot';
 
 interface LobbyTable {
   id: string;
@@ -304,6 +305,7 @@ export function HomePage() {
       </section>
 
       {user && <YourStats />}
+      <AdSlot placement="home" className="mx-auto mt-12 max-w-4xl px-4" />
     </div>
   );
 }

@@ -34,6 +34,12 @@ export function publicRoutes(ctx: AppContext): Router {
     res.status(database ? 200 : 503).json({ ok: database, database, uptimeSec: Math.round((Date.now() - ctx.startedAt) / 1000) });
   });
 
+  /** Anuncios en la web: solo se publican los datos si están activados (AdSense). */
+  r.get('/ads-display', (_req, res) => {
+    const a = getSetting(db, 'adsDisplay');
+    res.json(a.enabled && a.publisherId ? { enabled: true, publisherId: a.publisherId, slots: a.slots } : { enabled: false });
+  });
+
   /** Datos de la portada: juegos habilitados, mesas reales y presencia real. */
   r.get('/lobby', (_req, res) => {
     const registered = db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE role = 'player'`)!.n;

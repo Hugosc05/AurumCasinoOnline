@@ -29,7 +29,25 @@ export interface UnlockedAchievement extends AchievementDef {
  * Actualiza estadísticas, racha y logros a partir de un resultado ya liquidado.
  * Ganar = recibir más de lo apostado; perder = menos; igual = empate (no rompe la racha).
  */
+/** Escuchas de resultados (avisos de premios grandes). Se llaman fuera de la transacción. */
+const outcomeListeners = new Set<(o: OutcomeInput) => void>();
+export function onOutcome(fn: (o: OutcomeInput) => void): () => void {
+  outcomeListeners.add(fn);
+  return () => outcomeListeners.delete(fn);
+}
+
 export function recordOutcome(db: Database, input: OutcomeInput): { unlocked: UnlockedAchievement[]; streak: number } {
+  if (outcomeListeners.size) {
+    setImmediate(() => {
+      for (const fn of outcomeListeners) {
+        try {
+          fn(input);
+        } catch {
+          /* un aviso nunca afecta al juego */
+        }
+      }
+    });
+  }
   return db.tx(() => {
     const now = nowIso();
     const net = input.payout - input.bet;

@@ -31,7 +31,21 @@ export const DEFAULT_SETTINGS = {
   adsDailyLimit: 5,
   adsMinWatchSeconds: 15,
   maintenanceMessage: '' as string,
+  /** Aviso al móvil cuando alguien gana de una vez al menos esta cantidad neta (0 = sin aviso). */
+  alertBigWin: 250_000,
+  /**
+   * Anuncios en la web (AdSense). Desactivados hasta tener dominio propio y
+   * cuenta aprobada. `slots`: id de bloque de anuncio por ubicación.
+   */
+  adsDisplay: { enabled: false, publisherId: '', slots: { home: '', lobby: '', rewards: '' } } as AdsDisplay,
 };
+
+export interface AdsDisplay {
+  enabled: boolean;
+  /** ca-pub-XXXXXXXXXXXXXXXX */
+  publisherId: string;
+  slots: { home: string; lobby: string; rewards: string };
+}
 export type SettingsShape = typeof DEFAULT_SETTINGS;
 
 const DEMO_TABLES = [

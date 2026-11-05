@@ -81,6 +81,40 @@ Hazlo **antes del día 1**: si no, Render volvería a arrancar con la base de da
 
 ---
 
+## Parte D — El panel de administración (10 minutos)
+
+Entra en `https://tu-casino…/admin` con tu cuenta de administrador.
+
+1. **Verificación en dos pasos (obligatoria).** La primera vez te pedirá activarla: instala Google Authenticator, Microsoft Authenticator o Authy en el móvil, escanea el QR y escribe el código. Guarda los **8 códigos de recuperación** fuera del móvil (papel o gestor de contraseñas). Desde entonces, cada sesión nueva del panel pide un código (vale 12 horas).
+   ¿Perdiste el móvil y los códigos? En el mini PC: `cd C:\Aurum\casino; npm run admin:reset-2fa -w '@aurum/server' '--' --username TU_NOMBRE`.
+2. **Avisos al móvil por Telegram** (*Seguridad → Avisos al móvil*): crea un bot con [@BotFather](https://t.me/BotFather) (`/newbot`), pega el token, abre tu bot y pulsa *Iniciar*, luego *Buscar mi chat* → *Guardar y enviar prueba*.
+3. **Aviso si el servidor se cae**: crea una cuenta gratuita en [healthchecks.io](https://healthchecks.io), un *check* con periodo de 5 minutos y margen de 5 minutos, conecta tu Telegram en *Integrations* y pega la URL de ping en el mismo apartado. Si el mini PC se apaga o se queda sin internet, healthchecks.io te avisa.
+
+Qué hay en cada sección:
+
+| Sección | Qué ves |
+| --- | --- |
+| **En directo** | Quién está conectado, en qué juego o mesa, desde qué dispositivo e IP, cuánto tiempo lleva; botón para expulsar; aviso si varias cuentas comparten conexión |
+| **Actividad** | Activos por día/semana/mes, registros, retención (vuelven al día siguiente y a la semana), visitas por sección, pico de conectados, partidas, beneficio de la casa, economía de créditos y jugadores destacados |
+| **Ingresos** | Ganancias reales de AdSense (hoy, 7 días, mes, por día, RPM) y dónde se muestran los anuncios |
+| **Seguridad** | Comprobaciones automáticas, intentos de acceso fallidos, escaneos de vulnerabilidades, IP sospechosas, posibles multicuentas, vulnerabilidades en dependencias (`npm audit` diario), libro mayor, 2FA y avisos |
+| **Servidor** | CPU, memoria, disco, tiempos de respuesta y retraso del mini PC en la última hora |
+
+Avisos automáticos que llegan a Telegram: ataques de fuerza bruta y escaneos, códigos 2FA incorrectos, entrada de un administrador desde una IP nueva, 2FA desactivada, premios grandes (umbral configurable), saldos que no cuadran, vulnerabilidades graves nuevas, disco o memoria casi llenos, servidor lento, errores del servidor y cada arranque (para saber si ha habido un corte).
+
+### Anuncios (AdSense)
+
+AdSense **solo aprueba sitios con dominio propio**: con la dirección gratuita `*.ts.net` no se puede. Cuando quieras monetizar:
+
+1. Compra un dominio (≈10 €/año, p. ej. en Cloudflare) y pídeme que cambie el túnel a Cloudflare Tunnel (gratis), que sí admite dominio propio.
+2. Da de alta el dominio en [AdSense](https://adsense.google.com) y espera la aprobación (días o semanas; el sitio debe tener contenido propio, política de privacidad y aviso de cookies).
+3. En *Ingresos → Anuncios en la web*: pega tu ID de editor (`ca-pub-…`) y los números de los bloques de anuncio, y actívalos. La web publica sola `/ads.txt`.
+4. En *Ingresos → Conectar AdSense* sigue los 5 pasos (proyecto de Google Cloud gratuito) para ver las ganancias en el panel.
+
+Los anuncios solo aparecen en la portada, los vestíbulos de juegos y recompensas, nunca dentro de una partida.
+
+> Mientras el casino sea solo con créditos virtuales sin valor (no se compran ni se canjean por dinero), AdSense no lo trata como «juego con dinero real», que tiene la publicidad muy limitada. Si algún día se vendieran créditos o se dieran premios reales, eso cambiaría.
+
 ## Día a día
 
 Todos los scripts se ejecutan en **PowerShell como administrador** en el mini PC.
@@ -103,6 +137,7 @@ Todos los scripts se ejecutan en **PowerShell como administrador** en el mini PC
 | `C:\Aurum\casino` | El código (con su `.env`, que solo pueden leer los administradores) |
 | `C:\Aurum\datos\aurum.db` | La base de datos |
 | `C:\Aurum\datos\copias` | Copias diarias (05:00), se guardan las 14 últimas |
+| `C:\Aurum\datos\secrets.key` | Clave que cifra los tokens de Telegram y AdSense guardados en la base de datos (si se pierde, solo hay que volver a configurarlos) |
 | `C:\Aurum\logs` | Registro del servidor (rota a los 10 MB) |
 
 ### Copias fuera de casa (recomendado)

@@ -7,6 +7,7 @@ import { MODE_INFO } from '../blackjack/multi/BlackjackLobby';
 import { api } from '../../lib/api';
 import { credits, cx } from '../../lib/format';
 import { socket } from '../../lib/ws';
+import { AdSlot } from '../../components/AdSlot';
 
 interface TableSummary {
   id: string;
@@ -79,6 +80,7 @@ export default function PokerLobby() {
       <p className="mt-8 max-w-3xl text-sm text-niebla">
         Los bots son jugadores automatizados del casino, no personas: llevan siempre la etiqueta BOT. Juegan con estrategias propias (conservador, agresivo, equilibrado o analítico), usan solo sus cartas y la información pública, y no son invencibles. Las mesas «solo personas» no tienen bots. <Link to="/bots" className="text-oro-claro underline-offset-2 hover:underline">Ver los perfiles de los bots</Link>.
       </p>
+      <AdSlot placement="lobby" className="mt-10" />
     </div>
   );
 }

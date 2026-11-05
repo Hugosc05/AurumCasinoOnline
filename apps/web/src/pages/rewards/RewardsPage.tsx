@@ -12,6 +12,7 @@ import { useSession } from '../../state/session';
 import { CaseOpener, type OpenResult } from './CaseOpener';
 import { DropIcon, RewardTile, dropTitle } from './RewardItem';
 import { emitRewardsChanged } from './summary';
+import { AdSlot } from '../../components/AdSlot';
 
 interface Mission { id: string; period: string; scope: 'daily' | 'weekly'; text: string; target: number; progress: number; done: boolean; claimed: boolean; reward: string }
 interface Missions { daily: Mission[]; weekly: Mission[]; dailyResetAt: string; weeklyResetAt: string }
@@ -294,6 +295,7 @@ export default function RewardsPage() {
           } : undefined}
         />
       )}
+      <AdSlot placement="rewards" className="mt-10" />
     </div>
   );
 }

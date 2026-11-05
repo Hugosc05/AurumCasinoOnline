@@ -46,12 +46,16 @@ export const requireAdmin: RequestHandler = (req, _res, next) => {
  *    (un formulario de otro sitio no puede añadirla y fetch entre orígenes requiere preflight CORS);
  *  - si llega cabecera Origin, debe estar en la lista permitida.
  */
-export function csrfGuard(allowedOrigins: string[]): RequestHandler {
+export function csrfGuard(allowedOrigins: string[], onBlock?: (req: Request, why: string) => void): RequestHandler {
   return (req, _res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
-    if (req.get('x-requested-with') !== 'aurum') return next(forbidden('Petición rechazada (CSRF)'));
+    if (req.get('x-requested-with') !== 'aurum') {
+      onBlock?.(req, `sin cabecera X-Requested-With: ${req.method} ${req.path}`);
+      return next(forbidden('Petición rechazada (CSRF)'));
+    }
     const origin = req.get('origin');
     if (origin && !allowedOrigins.includes(origin) && origin !== `${req.protocol}://${req.get('host')}`) {
+      onBlock?.(req, `origen ${origin}: ${req.method} ${req.path}`);
       return next(forbidden('Origen no permitido'));
     }
     next();

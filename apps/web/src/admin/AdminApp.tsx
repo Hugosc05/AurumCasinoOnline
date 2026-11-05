@@ -1,43 +1,18 @@
-import { Activity, ArrowLeft, Bot, Gauge, LayoutDashboard, ScrollText, Settings, Table2, Users } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Activity, ArrowLeft, Bot, Cpu, Euro, Gauge, LayoutDashboard, LineChart, Radio, ScrollText, Settings, ShieldAlert, ShieldCheck, Table2, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
 import { Logo } from '../components/Layout';
-import { Badge, Button, EmptyState, ErrorBox, Field, Modal, Spinner } from '../components/ui';
+import { Badge, Button, EmptyState, Field, Modal, Spinner } from '../components/ui';
 import { ApiError, api } from '../lib/api';
 import { GAME_NAMES, credits, cx, dateTime, signed } from '../lib/format';
 import { useNotify } from '../state/notify';
-
-function useLoad<T>(url: string): { data: T | null; error: string | null; reload: () => void } {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const reload = useCallback(() => {
-    setError(null);
-    api.get<T>(url).then(setData).catch((e: ApiError) => setError(e.message));
-  }, [url]);
-  useEffect(reload, [reload]);
-  return { data, error, reload };
-}
-
-function Loadable<T>({ state, children }: { state: { data: T | null; error: string | null; reload: () => void }; children: (d: T) => ReactNode }) {
-  if (state.error) return <ErrorBox message={state.error} onRetry={state.reload} />;
-  if (!state.data) return <Spinner />;
-  return <>{children(state.data)}</>;
-}
-
-function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-linea bg-abismo p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="font-display text-xl text-marfil">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-const th = 'pb-2 text-left font-normal text-niebla';
-const td = 'border-t border-linea/50 py-2 pr-3';
+import { MfaGate, type MfaStatus } from './Mfa';
+import { Card, Loadable, td, th, useLoad } from './shared';
+import LivePage from './LivePage';
+import ActivityPage from './ActivityPage';
+import RevenuePage from './RevenuePage';
+import SecurityPage from './SecurityPage';
+import ServerPage from './ServerPage';
 
 /* --------------------------------- Resumen --------------------------------- */
 interface Overview {
@@ -674,15 +649,24 @@ function DiagnosticsPage() {
 
 const NAV = [
   { to: '/admin', label: 'Resumen', icon: LayoutDashboard, end: true },
+  { to: '/admin/directo', label: 'En directo', icon: Radio },
+  { to: '/admin/actividad', label: 'Actividad', icon: LineChart },
+  { to: '/admin/ingresos', label: 'Ingresos', icon: Euro },
   { to: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { to: '/admin/partidas', label: 'Partidas', icon: Activity },
   { to: '/admin/bots', label: 'Bots', icon: Bot },
   { to: '/admin/mesas', label: 'Mesas', icon: Table2 },
+  { to: '/admin/seguridad', label: 'Seguridad', icon: ShieldCheck },
+  { to: '/admin/servidor', label: 'Servidor', icon: Cpu },
   { to: '/admin/ajustes', label: 'Ajustes', icon: Settings },
   { to: '/admin/diagnostico', label: 'Diagnóstico', icon: Gauge },
 ];
 
 export default function AdminApp() {
+  return <MfaGate>{(mfa, refresh) => <AdminShell mfa={mfa} refresh={refresh} />}</MfaGate>;
+}
+
+function AdminShell({ mfa, refresh }: { mfa: MfaStatus; refresh: () => void }) {
   return (
     <div className="min-h-screen bg-[#070b14] lg:grid lg:grid-cols-[230px_1fr]">
       <aside className="border-b border-linea bg-abismo p-4 lg:min-h-screen lg:border-b-0 lg:border-r">
@@ -699,9 +683,19 @@ export default function AdminApp() {
         </nav>
         <Link to="/" className="mt-6 hidden items-center gap-1.5 text-sm text-niebla hover:text-marfil lg:flex"><ScrollText className="h-4 w-4" /> Volver al casino</Link>
       </aside>
-      <main className="p-4 sm:p-6">
+      <main className="min-w-0 p-4 sm:p-6">
+        {!mfa.enabled && (
+          <Link to="/admin/seguridad" className="mb-5 flex items-center gap-2 rounded-2xl border border-rubi/50 bg-rubi/10 px-4 py-3 text-sm text-marfil hover:border-rubi" data-testid="mfa-banner">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-[#f1a3ad]" /> Activa la verificación en dos pasos: ahora el panel solo lo protege tu contraseña.
+          </Link>
+        )}
         <Routes>
           <Route index element={<Dashboard />} />
+          <Route path="directo" element={<LivePage />} />
+          <Route path="actividad" element={<ActivityPage />} />
+          <Route path="ingresos" element={<RevenuePage />} />
+          <Route path="seguridad" element={<SecurityPage mfa={mfa} onMfaChange={refresh} />} />
+          <Route path="servidor" element={<ServerPage />} />
           <Route path="usuarios" element={<UsersPage />} />
           <Route path="usuarios/:id" element={<UserDetail />} />
           <Route path="partidas" element={<RoundsPage />} />

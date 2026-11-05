@@ -78,6 +78,13 @@ const schema = z.object({
   ADS_PROVIDER: z.enum(['none', 'dev-simulation', 'signed-callback']).default('none'),
   ADS_CALLBACK_SECRET: z.string().min(32, 'ADS_CALLBACK_SECRET debe tener al menos 32 caracteres').optional(),
   ADS_CALLBACK_MAX_AGE_SEC: z.coerce.number().int().min(30).max(3600).default(300),
+  /**
+   * Verificación en dos pasos obligatoria para usar el panel de administración.
+   * Por defecto: sí en producción, no en desarrollo y pruebas.
+   */
+  ADMIN_MFA_REQUIRED: bool.optional(),
+  /** Tareas de fondo del panel (salud del equipo, npm audit diario, revisión del libro mayor). */
+  MONITORING: bool.optional(),
 });
 
 export type AppConfig = z.infer<typeof schema> & {
@@ -88,6 +95,8 @@ export type AppConfig = z.infer<typeof schema> & {
   keepAliveUrl: string | null;
   cookieSecure: boolean;
   allowedOrigins: string[];
+  adminMfaRequired: boolean;
+  monitoring: boolean;
 };
 
 export function loadConfig(overrides: Partial<Record<keyof z.infer<typeof schema>, string>> = {}): AppConfig {
@@ -119,5 +128,7 @@ export function loadConfig(overrides: Partial<Record<keyof z.infer<typeof schema
     keepAliveUrl: c.KEEPALIVE && keepAliveBase && c.NODE_ENV !== 'test' ? `${keepAliveBase.replace(/\/$/, '')}/api/health` : null,
     cookieSecure: c.COOKIE_SECURE ?? c.NODE_ENV === 'production',
     allowedOrigins: [...new Set(origins)],
+    adminMfaRequired: c.ADMIN_MFA_REQUIRED ?? c.NODE_ENV === 'production',
+    monitoring: c.MONITORING ?? c.NODE_ENV !== 'test',
   };
 }

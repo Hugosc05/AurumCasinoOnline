@@ -18,6 +18,22 @@ export interface RtClient {
   /** Mesa de blackjack multijugador que está mirando. */
   bjWatching: string | null;
   connectedAt: number;
+  /** IP real (a través del túnel si TRUST_PROXY) y navegador, para el panel «En directo». */
+  ip: string | null;
+  ua: string | null;
+  /** Sección de la web que está viendo (la envía el navegador al navegar). */
+  path: string | null;
+  pathSince: number;
+}
+
+/** IP del cliente con la misma regla que Express con `trust proxy = 1` (último salto de X-Forwarded-For). */
+export function requestIp(req: IncomingMessage, trustProxy: boolean): string | null {
+  const xff = req.headers['x-forwarded-for'];
+  if (trustProxy && xff) {
+    const parts = (Array.isArray(xff) ? xff.join(',') : xff).split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length) return parts.at(-1)!.replace(/^::ffff:/, '');
+  }
+  return req.socket.remoteAddress?.replace(/^::ffff:/, '') ?? null;
 }
 
 export type ServerMessage = { t: string } & Record<string, unknown>;
@@ -64,6 +80,9 @@ export class RealtimeHub {
   private presenceTimer: NodeJS.Timeout | null = null;
   /** Al apagar, los cierres de socket ya no notifican a nadie (la base de datos se cierra después). */
   private closing = false;
+  /** Avisos para el registro de seguridad y las estadísticas (los conecta app.ts). */
+  onBlockedOrigin: ((ip: string | null, origin: string) => void) | null = null;
+  onPresenceChange: ((online: number) => void) | null = null;
 
   constructor(private readonly db: Database, private readonly config: AppConfig) {}
 
@@ -110,6 +129,7 @@ export class RealtimeHub {
       const host = req.headers.host;
       const sameHost = origin && host && (origin === `http://${host}` || origin === `https://${host}`);
       if (origin && !sameHost && !this.config.allowedOrigins.includes(origin)) {
+        this.onBlockedOrigin?.(requestIp(req, this.config.TRUST_PROXY), origin);
         socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
         return;
@@ -145,6 +165,10 @@ export class RealtimeHub {
       watching: null,
       bjWatching: null,
       connectedAt: Date.now(),
+      ip: requestIp(req, this.config.TRUST_PROXY),
+      ua: (req.headers['user-agent'] ?? '').slice(0, 300) || null,
+      path: null,
+      pathSince: Date.now(),
     };
     this.clients.add(client);
     ws.on('pong', () => {
@@ -237,6 +261,11 @@ export class RealtimeHub {
     return this.clients.size;
   }
 
+  /** Conexiones abiertas ahora mismo (para el panel de administración). */
+  liveClients(): readonly RtClient[] {
+    return [...this.clients];
+  }
+
   isUserConnected(userId: string): boolean {
     for (const c of this.clients) if (c.userId === userId) return true;
     return false;
@@ -251,7 +280,9 @@ export class RealtimeHub {
     if (this.presenceTimer) return;
     this.presenceTimer = setTimeout(() => {
       this.presenceTimer = null;
-      this.broadcast({ t: 'presence', online: this.onlineCount() });
+      const online = this.onlineCount();
+      this.broadcast({ t: 'presence', online });
+      this.onPresenceChange?.(online);
     }, 500);
   }
 

@@ -48,6 +48,10 @@ export function authRoutes(ctx: AppContext): Router {
 
   r.post(
     '/register',
+    (req, _res, next) => {
+      if (registerLimiter.blocked(clientIp(req)) > 0) ctx.security.record('rate_limited', { ip: clientIp(req), detail: 'registros' });
+      next();
+    },
     rateLimit(registerLimiter, (req) => clientIp(req), 'Demasiados registros desde esta conexión. Inténtalo más tarde.'),
     async (req, res) => {
       const body = parse(registerSchema, req.body);
@@ -101,20 +105,33 @@ export function authRoutes(ctx: AppContext): Router {
   r.post('/login', async (req, res) => {
     const ip = clientIp(req);
     const ipWait = ipLoginLimiter.hit(ip);
+    if (ipWait > 0) ctx.security.record('rate_limited', { ip, detail: 'inicios de sesión' });
     if (ipWait > 0) throw new AppError(429, 'RATE_LIMITED', 'Demasiados intentos. Espera unos minutos.', { retryAfterSec: ipWait });
     const body = parse(loginSchema, req.body);
     const key = body.identifier.toLowerCase();
     const lockWait = failedByIdentifier.blocked(key);
     if (lockWait > 0) {
+      ctx.security.record('login_locked', { ip, detail: body.identifier.slice(0, 60) });
       throw new AppError(429, 'ACCOUNT_LOCKED', 'Cuenta bloqueada temporalmente por intentos fallidos.', { retryAfterSec: lockWait });
     }
     const user = db.get<UserRow>('SELECT * FROM users WHERE username = ? OR email = ?', body.identifier, body.identifier.toLowerCase());
     const ok = user ? await verifyPassword(body.password, user.password_hash) : (await verifyPassword(body.password, await getDummyHash()), false);
     if (!user || !ok) {
       failedByIdentifier.hit(key);
+      ctx.security.record('login_failed', { ip, userId: user?.id ?? null, detail: user ? user.username : `cuenta inexistente: ${body.identifier.slice(0, 60)}` });
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Usuario o contraseña incorrectos');
     }
-    if (user.status !== 'active') throw new AppError(403, 'ACCOUNT_DISABLED', 'Esta cuenta está suspendida');
+    if (user.status !== 'active') {
+      ctx.security.record('login_banned', { ip, userId: user.id, detail: user.username });
+      throw new AppError(403, 'ACCOUNT_DISABLED', 'Esta cuenta está suspendida');
+    }
+    if (user.role === 'admin') {
+      // ¿Desde una IP desde la que este administrador no había entrado nunca? (avisa al móvil)
+      const seenIp = db.get('SELECT 1 AS x FROM security_events WHERE kind = ? AND user_id = ? AND ip = ?', 'admin_login', user.id, ip);
+      const anyBefore = db.get('SELECT 1 AS x FROM security_events WHERE kind = ? AND user_id = ?', 'admin_login', user.id);
+      ctx.security.record('admin_login', { ip, userId: user.id, detail: user.username });
+      if (anyBefore && !seenIp) ctx.security.record('admin_new_ip', { ip, userId: user.id, detail: user.username });
+    }
     failedByIdentifier.reset(key);
     db.run('UPDATE users SET last_login_at = ? WHERE id = ?', nowIso(), user.id);
     // Rotación: cada inicio de sesión genera un token nuevo.

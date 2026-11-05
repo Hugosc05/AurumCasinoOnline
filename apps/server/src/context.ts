@@ -10,6 +10,14 @@ import type { RealtimeHub } from './realtime/hub';
 import type { CrashGame } from './crash/crash';
 import type { BingoManager } from './bingo/bingo';
 import type { LookService } from './profile/profile';
+import type { SecretStore } from './admin/secrets';
+import type { Alerter } from './admin/alerts';
+import type { SecurityLog } from './admin/security';
+import type { ActivityTracker } from './admin/activity';
+import type { HealthMonitor } from './admin/health';
+import type { MfaService } from './admin/mfa';
+import type { AdsenseClient } from './admin/adsense';
+import type { DependencyAudit, LedgerWatch } from './admin/checks';
 
 export interface AppContext {
   config: AppConfig;
@@ -24,5 +32,14 @@ export interface AppContext {
   crash: CrashGame;
   bingo: BingoManager;
   looks: LookService;
+  secrets: SecretStore;
+  alerts: Alerter;
+  security: SecurityLog;
+  activity: ActivityTracker;
+  health: HealthMonitor;
+  mfa: MfaService;
+  adsense: AdsenseClient;
+  depAudit: DependencyAudit;
+  ledgerWatch: LedgerWatch;
   startedAt: number;
 }
