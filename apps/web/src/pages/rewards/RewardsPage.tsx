@@ -11,17 +11,13 @@ import { useNotify } from '../../state/notify';
 import { useSession } from '../../state/session';
 import { CaseOpener, type OpenResult } from './CaseOpener';
 import { DropIcon, RewardTile, dropTitle } from './RewardItem';
+import { InventoryGrid, type Inventory } from './InventoryGrid';
 import { emitRewardsChanged } from './summary';
 import { AdSlot } from '../../components/AdSlot';
 
 interface Mission { id: string; period: string; scope: 'daily' | 'weekly'; text: string; target: number; progress: number; done: boolean; claimed: boolean; reward: string }
 interface Missions { daily: Mission[]; weekly: Mission[]; dailyResetAt: string; weeklyResetAt: string }
 interface CaseInfo { id: string; name: string; price: number | null; color: string; drops: CaseDrop[]; odds: Record<Rarity, number>; expectedCredits: number; cosmeticChance: number }
-interface Inventory {
-  cases: { id: string; caseId: string; source: string; createdAt: string }[];
-  items: { id: string; kind: CosmeticKind; name: string; rarity: Rarity }[];
-  equipped: { frame: string | null; nameColor: string | null; cardBack: string | null };
-}
 
 type Tab = 'misiones' | 'cajas' | 'tienda' | 'inventario';
 
@@ -248,34 +244,8 @@ export default function RewardsPage() {
       )}
 
       {tab === 'inventario' && inv && (
-        <div className="mt-6 space-y-8">
-          {(['frame', 'nameColor', 'cardBack'] as CosmeticKind[]).map((kind) => {
-            const all = COSMETICS.filter((x) => x.kind === kind);
-            const owned = new Set(inv.items.map((i) => i.id));
-            const equippedId = kind === 'frame' ? inv.equipped.frame : kind === 'nameColor' ? inv.equipped.nameColor : inv.equipped.cardBack;
-            return (
-              <section key={kind}>
-                <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className="text-2xl text-marfil">{COSMETIC_KIND_LABEL[kind]}</h2>
-                  <span className="text-xs text-niebla">{all.filter((x) => owned.has(x.id)).length} de {all.length}</span>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <button type="button" onClick={() => void equip(kind, null)} className={cx('grid h-[118px] w-[128px] place-items-center rounded-md border text-sm', equippedId === null ? 'border-oro text-oro-claro' : 'border-white/10 text-niebla hover:border-white/30')}>
-                    Sin {COSMETIC_KIND_LABEL[kind].toLowerCase()}
-                  </button>
-                  {all.map((x) => {
-                    const has = owned.has(x.id);
-                    return (
-                      <button key={x.id} type="button" disabled={!has} onClick={() => void equip(kind, x.id)} className={cx('relative rounded-md transition-transform', has ? 'hover:-translate-y-0.5' : 'opacity-50 saturate-50', equippedId === x.id && 'ring-2 ring-oro-claro ring-offset-2 ring-offset-noche')} title={has ? `Equipar ${x.name}` : `${x.name} (aún no lo tienes)`} data-testid={`item-${x.id}`}>
-                        <RewardTile drop={{ kind: 'cosmetic', id: x.id, rarity: x.rarity, weight: 1 }} width={128} />
-                        {equippedId === x.id && <span className="absolute left-1.5 top-1.5 rounded bg-oro px-1.5 text-[10px] font-bold text-noche">EQUIPADO</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
+        <div className="mt-6">
+          <InventoryGrid inv={inv} onEquip={(kind, id) => void equip(kind, id)} />
         </div>
       )}
 

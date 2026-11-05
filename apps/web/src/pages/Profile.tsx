@@ -9,6 +9,7 @@ import { api } from '../lib/api';
 import { GAME_NAMES, credits, cx, dateTime, signed } from '../lib/format';
 import { useSession } from '../state/session';
 import type { Achievement } from '../state/types';
+import { ProfileInventory } from './rewards/InventoryGrid';
 
 interface Stats {
   stats: { rounds: number; wins: number; losses: number; pushes: number; totalBet: number; totalPayout: number; currentStreak: number; bestStreak: number; biggestWin: number; net: number };
@@ -44,7 +45,7 @@ const REASONS: Record<string, string> = {
   poker_buyin: 'Entrada a mesa de póker', poker_cashout: 'Salida de mesa de póker', admin_adjustment: 'Ajuste de administración', refund: 'Reembolso',
 };
 
-type Tab = 'resumen' | 'historial' | 'movimientos' | 'logros' | 'ajustes';
+type Tab = 'resumen' | 'inventario' | 'historial' | 'movimientos' | 'logros' | 'ajustes';
 
 export default function ProfilePage() {
   const { user, prefs, updatePrefs } = useSession();
@@ -79,6 +80,7 @@ export default function ProfilePage() {
           onChange={setTab}
           options={[
             { value: 'resumen', label: 'Resumen' },
+            { value: 'inventario', label: 'Inventario' },
             { value: 'historial', label: 'Partidas' },
             { value: 'movimientos', label: 'Movimientos' },
             { value: 'logros', label: 'Logros' },
@@ -134,6 +136,7 @@ export default function ProfilePage() {
             </div>
           </div>
         ))}
+        {tab === 'inventario' && <ProfileInventory />}
         {tab === 'historial' && <HistoryTab />}
         {tab === 'movimientos' && <TxTab />}
         {tab === 'logros' && <AchievementsTab />}

@@ -182,15 +182,23 @@ export interface Look {
   avatarVersion: number;
 }
 
+/** Los administradores tienen todos los cosméticos desbloqueados (sin escribir nada en user_items). */
+const isAdmin = (db: Database, userId: string): boolean => db.get<{ role: string }>('SELECT role FROM users WHERE id = ?', userId)?.role === 'admin';
+
 export function inventory(db: Database, userId: string) {
   const cases = db.all<{ id: string; case_id: string; source: string; created_at: string }>(
     `SELECT id, case_id, source, created_at FROM user_cases WHERE user_id = ? AND status = 'unopened' ORDER BY created_at`, userId,
   );
   const items = db.all<{ item_id: string; created_at: string }>('SELECT item_id, created_at FROM user_items WHERE user_id = ? ORDER BY created_at DESC', userId);
   const p = db.get<{ frame: string | null; name_color: string | null; card_back: string | null }>('SELECT frame, name_color, card_back FROM user_profiles WHERE user_id = ?', userId);
+  const admin = isAdmin(db, userId);
+  const got = new Map(items.map((i) => [i.item_id, i.created_at]));
   return {
     cases: cases.map((c) => ({ id: c.id, caseId: c.case_id, source: c.source, createdAt: c.created_at })),
-    items: items.filter((i) => COSMETIC_BY_ID[i.item_id]).map((i) => ({ ...COSMETIC_BY_ID[i.item_id]!, obtainedAt: i.created_at })),
+    items: admin
+      ? COSMETICS.map((c) => ({ ...c, obtainedAt: got.get(c.id) ?? null }))
+      : items.filter((i) => COSMETIC_BY_ID[i.item_id]).map((i) => ({ ...COSMETIC_BY_ID[i.item_id]!, obtainedAt: i.created_at })),
+    allUnlocked: admin,
     equipped: { frame: p?.frame ?? null, nameColor: p?.name_color ?? null, cardBack: p?.card_back ?? null },
     catalogSize: COSMETICS.length,
   };
@@ -202,7 +210,7 @@ export function equip(db: Database, userId: string, kind: CosmeticKind, itemId: 
   if (itemId !== null) {
     const item = COSMETIC_BY_ID[itemId];
     if (!item || item.kind !== kind) throw new AppError(400, 'INVALID_ITEM', 'Ese objeto no corresponde');
-    if (!db.get('SELECT 1 AS x FROM user_items WHERE user_id = ? AND item_id = ?', userId, itemId)) throw new AppError(403, 'NOT_OWNED', 'Todavía no tienes ese objeto');
+    if (!isAdmin(db, userId) && !db.get('SELECT 1 AS x FROM user_items WHERE user_id = ? AND item_id = ?', userId, itemId)) throw new AppError(403, 'NOT_OWNED', 'Todavía no tienes ese objeto');
   }
   db.run('INSERT INTO user_profiles (user_id, updated_at) VALUES (?, ?) ON CONFLICT DO NOTHING', userId, nowIso());
   db.run(`UPDATE user_profiles SET ${COLUMN[kind]} = ?, updated_at = ? WHERE user_id = ?`, itemId, nowIso(), userId);

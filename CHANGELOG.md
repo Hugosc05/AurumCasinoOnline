@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.10.1] — 2026-11-05
+
+### Cambiado
+- **README nuevo**: banner animado (ruleta girando, título con brillo dorado; versión clara y oscura), GIF reales de cada juego y del panel, tabla de juegos, diagrama de arquitectura, inicio rápido, opciones de publicación, pruebas, seguridad y documentación. Generador del banner en `docs/readme/make_banner.py`.
+- **Inventario en el perfil**: nueva pestaña Inventario en Perfil para ver y equipar dorsos, marcos y colores (el mismo componente que en Recompensas).
+- **Los administradores tienen todos los cosméticos desbloqueados** (sin escribir objetos falsos en la base de datos).
+
 ## [1.10.0] — 2026-11-03
 
 ### Añadido

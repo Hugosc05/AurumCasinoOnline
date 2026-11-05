@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CASE_BY_ID, COSMETIC_BY_ID, MISSION_BY_ID } from '@aurum/engine';
 import { verifyLedger } from '../src/wallet/wallet';
-import { key, registerUser, startServer, type TestServer } from './helpers';
+import { createAdmin, key, registerUser, startServer, type TestServer } from './helpers';
 
 let s: TestServer;
 beforeAll(async () => {
@@ -114,5 +114,21 @@ describe('misiones y cajas', () => {
     db().run(`INSERT INTO user_items (user_id, item_id, source, created_at) VALUES (?, 'back:dragon', 'test', '2026-01-01')`, user.id);
     expect((await client.post('/api/rewards/equip', { kind: 'cardBack', itemId: 'back:dragon' })).status).toBe(200);
     expect((await other.client.get(`/api/looks?names=${user.username}`)).body.looks[user.username].cardBack).toBe('back:dragon');
+  });
+
+  it('el administrador tiene todo el catálogo desbloqueado y puede equiparlo', async () => {
+    const admin = await createAdmin(s);
+    const inv = await admin.client.get('/api/rewards/inventory');
+    expect(inv.body.allUnlocked).toBe(true);
+    expect(inv.body.items).toHaveLength(inv.body.catalogSize);
+    const eq = await admin.client.post('/api/rewards/equip', { kind: 'cardBack', itemId: 'back:dragon' });
+    expect(eq.status).toBe(200);
+    expect(eq.body.equipped.cardBack).toBe('back:dragon');
+    // No se escriben objetos falsos en la base de datos.
+    expect(db().get('SELECT COUNT(*) AS n FROM user_items WHERE user_id = ?', admin.id)).toEqual({ n: 0 });
+    // Un jugador sigue sin poder equipar lo que no tiene.
+    const { client } = await registerUser(s.base);
+    expect((await client.get('/api/rewards/inventory')).body.allUnlocked).toBe(false);
+    expect((await client.post('/api/rewards/equip', { kind: 'cardBack', itemId: 'back:dragon' })).body.error.code).toBe('NOT_OWNED');
   });
 });
