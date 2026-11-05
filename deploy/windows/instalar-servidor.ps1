@@ -303,14 +303,24 @@ if ($importar) {
   Write-Host '    Si eliges que no, el casino empieza vacío.'
   if (Leer-Si '    ¿Importar los datos de Supabase?') {
     if ($servicioExiste) { Parar-Servicio }
-    Write-Host '    Pega la cadena de conexión de Supabase (Connect > Session pooler, con tu contraseña).'
-    Write-Host '    No se guarda en ningún sitio: solo se usa para esta copia.'
-    $seguro = Read-Host '    Cadena postgresql://…' -AsSecureString
-    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($seguro)
-    try { $env:IMPORT_FROM_URL = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    # Opción 1: archivo exportado desde el SQL Editor de Supabase (deploy/supabase-export.sql) en la carpeta de datos.
+    $archivo = Get-ChildItem -LiteralPath $Datos -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Extension -in '.csv', '.json' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $usarArchivo = $false
+    if ($archivo) { $usarArchivo = Leer-Si "    He encontrado $($archivo.Name) en $Datos. ¿Importar desde ese archivo?" }
+    if (-not $usarArchivo) {
+      # Opción 2: conexión directa.
+      Write-Host '    Pega la cadena de conexión de Supabase (Connect > Session pooler, con tu contraseña).'
+      Write-Host '    No se guarda en ningún sitio: solo se usa para esta copia.'
+      Write-Host '    (¿Prefieres un archivo? Sigue «Traer los datos con un archivo» en DEPLOY-CASA.md.)'
+      $seguro = Read-Host '    Cadena postgresql://…' -AsSecureString
+      $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($seguro)
+      try { $env:IMPORT_FROM_URL = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    }
     Push-Location $Code
     try {
-      & npm run -s db:import -w '@aurum/server'
+      if ($usarArchivo) { & npm run -s db:import -w '@aurum/server' '--' --file $archivo.FullName --force }
+      else { & npm run -s db:import -w '@aurum/server' '--' --force }
       $codigo = $LASTEXITCODE
     } finally {
       Remove-Item Env:IMPORT_FROM_URL -ErrorAction SilentlyContinue
@@ -318,7 +328,7 @@ if ($importar) {
     }
     if ($codigo -ne 0) {
       Remove-Item -LiteralPath $dbFile, "$dbFile-wal", "$dbFile-shm" -ErrorAction SilentlyContinue
-      Falla 'La importación no se completó (revisa la cadena de conexión). Vuelve a ejecutar el script.'
+      Falla 'La importación no se completó (revisa la cadena de conexión o el archivo). Vuelve a ejecutar el script.'
     }
     Ok "Datos importados ($(Contar-Cuentas $dbFile) cuentas)"
   } else {

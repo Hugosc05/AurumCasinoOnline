@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Database, migrate, nowIso } from '../src/db/database';
-import { ImportError, importFromPostgres } from '../src/db/importer';
+import { ImportError, importFromFile, importFromPostgres, parseCsv } from '../src/db/importer';
 import { verifyLedger } from '../src/wallet/wallet';
 
 /**
@@ -85,5 +85,50 @@ describe('importar desde PostgreSQL', () => {
       s.run('DELETE FROM schema_migrations WHERE version = 99');
       s.close();
     }
+  });
+
+  it('importa el CSV que descarga el SQL Editor de Supabase con deploy/supabase-export.sql', () => {
+    // La consulta del repositorio, ejecutada tal cual contra PostgreSQL.
+    const sql = readFileSync(path.join(__dirname, '../../../deploy/supabase-export.sql'), 'utf8');
+    const createFn = sql.slice(sql.indexOf('create or replace function'), sql.indexOf('select * from pg_temp.aurum_export()'));
+    const src = new Database(srcUrl);
+    src.exec(createFn);
+    const rows = src.all<{ tabla: string; datos: string }>('select * from pg_temp.aurum_export()');
+    src.close();
+    expect(rows.map((r) => r.tabla)).toEqual(expect.arrayContaining(['users', 'wallet_transactions', 'schema_migrations']));
+    // CSV como el de Supabase: cabecera, comillas dobles escapadas y fin de línea CRLF.
+    const q = (v: string): string => `"${v.replace(/"/g, '""')}"`;
+    const csv = ['tabla,datos', ...rows.map((r) => `${r.tabla},${q(r.datos)}`)].join('\r\n') + '\r\n';
+    const file = path.join(dir, 'supabase-export.csv');
+    writeFileSync(file, `﻿${csv}`);
+
+    const target = path.join(dir, 'desde-archivo.db');
+    const r = importFromFile(file, target);
+    expect(r).toMatchObject({ users: 1, sourceVersion: 10 });
+    expect(r.finalVersion).toBeGreaterThan(10);
+    const db = new Database(target);
+    expect(db.get('SELECT username, email, balance FROM users')).toEqual({ username: 'Lucia', email: 'lucia@example.com', balance: 10500 });
+    expect(verifyLedger(db, 'u1').ok).toBe(true);
+    expect(db.get<{ card_back: string }>('SELECT card_back FROM user_profiles')!.card_back).toBe('back:oro');
+    db.close();
+
+    // También vale el mismo contenido en JSON.
+    const json = path.join(dir, 'export.json');
+    writeFileSync(json, JSON.stringify(rows));
+    expect(importFromFile(json, path.join(dir, 'desde-json.db')).users).toBe(1);
+  });
+
+  it('rechaza archivos que no son una exportación de Aurum', () => {
+    const bad = path.join(dir, 'malo.csv');
+    writeFileSync(bad, 'nombre,email\nAna,a@b.c\n');
+    expect(() => importFromFile(bad, path.join(dir, 'x.db'))).toThrow(/columnas «tabla» y «datos»/);
+    const partial = path.join(dir, 'parcial.csv');
+    writeFileSync(partial, 'tabla,datos\nusers,"[]"\n');
+    expect(() => importFromFile(partial, path.join(dir, 'y.db'))).toThrow(/schema_migrations/);
+    expect(() => importFromFile(path.join(dir, 'no-existe.csv'), path.join(dir, 'z.db'))).toThrow(/No encuentro/);
+  });
+
+  it('lee CSV con comillas, comas y saltos de línea dentro de los campos', () => {
+    expect(parseCsv('a,b\r\n"x, y","línea 1\nlínea 2 con ""comillas"""\r\n')).toEqual([['a', 'b'], ['x, y', 'línea 1\nlínea 2 con "comillas"']]);
   });
 });

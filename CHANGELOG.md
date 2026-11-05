@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.10.5] — 2026-11-05
+
+### Añadido
+- Importar los datos de Supabase **con un archivo**, sin cadena de conexión: `deploy/supabase-export.sql` exporta todas las tablas desde el SQL Editor (también en el plan gratuito) y `npm run db:import -- --file export.csv` las carga (CSV o JSON). El instalador ofrece usar un archivo exportado si lo encuentra en `C:\Aurum\datos`.
+
 ## [1.10.4] — 2026-11-05
 
 ### Corregido

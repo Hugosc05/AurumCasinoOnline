@@ -64,6 +64,30 @@ Tiempo aproximado: 20–30 minutos (casi todo es esperar a que se instalen cosas
 
    Ábrela desde el móvil con los datos (no con el wifi de casa) para comprobar que se ve desde fuera. La primera vez puede tardar 1–2 minutos.
 
+### Traer los datos con un archivo (sin cadena de conexión)
+
+En el plan gratuito, Supabase no deja descargar copias de seguridad, pero sí exportar todo con una consulta:
+
+1. Supabase → tu proyecto → **SQL Editor** → **New query**.
+2. Pega el contenido de [`deploy/supabase-export.sql`](deploy/supabase-export.sql) y pulsa **Run**. Sale una fila por tabla. La consulta solo lee: no cambia nada en Supabase.
+3. En el resultado: **Export** → **Download CSV**.
+4. Copia ese archivo `.csv` a `C:\Aurum\datos\` en el mini PC.
+5. Importa (PowerShell como administrador):
+
+   ```powershell
+   cd C:\Aurum\casino
+   Stop-Service AurumCasino -Force
+   npm run -s db:backup -w '@aurum/server'
+   npm run db:import -w '@aurum/server' '--' --file C:\Aurum\datos\NOMBRE_DEL_ARCHIVO.csv --force
+   Start-Service AurumCasino
+   ```
+
+   `--force` sustituye la base actual (la línea anterior guarda antes una copia en `C:\Aurum\datos\copias`). Si Supabase estaba en una versión anterior del esquema, el importador la actualiza solo.
+
+El instalador también lo detecta: si al llegar a «Base de datos» hay un `.csv` exportado en `C:\Aurum\datos`, ofrece importar desde él.
+
+> Si el proyecto de Supabase lleva más de una semana sin uso, puede estar **pausado**: entra en el panel y pulsa **Restore project** antes de exportar.
+
 ### Tres ajustes a mano (5 minutos)
 
 1. **Que Tailscale no caduque** (si no, a los 180 días el casino deja de verse):
