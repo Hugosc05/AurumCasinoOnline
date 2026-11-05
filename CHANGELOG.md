@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado semántico.
 
+## [1.10.4] — 2026-11-05
+
+### Corregido
+- El instalador y `actualizar.ps1` ya no se quedan colgados al parar un servicio atascado en «arrancando»: le dan 20 s y, si no se detiene, lo cierran a la fuerza.
+
 ## [1.10.3] — 2026-11-05
 
 ### Corregido

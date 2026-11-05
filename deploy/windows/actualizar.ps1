@@ -61,9 +61,15 @@ try {
   if ($LASTEXITCODE -ne 0) { Falla 'No se pudo hacer la copia de seguridad; no se actualiza.' }
 
   Write-Host 'Parando el casino…'
-  $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  & $Nssm stop $Servicio 2>&1 | Out-Null
-  $ErrorActionPreference = $prev
+  Stop-Service -Name $Servicio -Force -NoWait -ErrorAction SilentlyContinue
+  $svc = Get-Service -Name $Servicio -ErrorAction SilentlyContinue
+  for ($i = 0; $i -lt 20 -and $svc -and $svc.Status -ne 'Stopped'; $i++) { Start-Sleep -Seconds 1; $svc.Refresh() }
+  if ($svc -and $svc.Status -ne 'Stopped') {
+    # Atascado (p. ej., en «arrancando»): se cierra a la fuerza para poder actualizar.
+    $info = Get-CimInstance Win32_Service -Filter "Name='$Servicio'" -ErrorAction SilentlyContinue
+    if ($info -and $info.ProcessId) { & taskkill.exe /F /T /PID $info.ProcessId 2>&1 | Out-Null }
+    Start-Sleep -Seconds 2
+  }
 
   $ok = $true
   Write-Host 'Instalando dependencias…'

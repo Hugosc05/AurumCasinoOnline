@@ -105,6 +105,26 @@ try {
   if ($n -match '^-?\d+$') { return [int]$n } else { return -1 }
 }
 
+# Para el servicio sin quedarse colgado: si no se detiene en 20 s (p. ej., atascado en
+# «arrancando»), se cierran a la fuerza nssm y el Node del casino.
+function Parar-Servicio {
+  $svc = Get-Service -Name $Servicio -ErrorAction SilentlyContinue
+  if (-not $svc -or $svc.Status -eq 'Stopped') { return }
+  Stop-Service -Name $Servicio -Force -NoWait -ErrorAction SilentlyContinue
+  for ($i = 0; $i -lt 20; $i++) {
+    Start-Sleep -Seconds 1
+    $svc.Refresh()
+    if ($svc.Status -eq 'Stopped') { return }
+  }
+  Write-Host '    El servicio no se detenía: se cierra a la fuerza.'
+  $info = Get-CimInstance Win32_Service -Filter "Name='$Servicio'" -ErrorAction SilentlyContinue
+  if ($info -and $info.ProcessId) { & taskkill.exe /F /T /PID $info.ProcessId 2>&1 | Out-Null }
+  Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match [regex]::Escape($Code) } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+  Start-Sleep -Seconds 2
+}
+
 # Si otro proceso ocupa el puerto (p. ej., un «npm run dev» olvidado), el servicio no puede arrancar.
 function Liberar-Puerto {
   $con = Get-NetTCPConnection -LocalPort $Puerto -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -195,7 +215,7 @@ Ok "Código en $Code ($((& git -C $Code log -1 --format='%h %s')))"
 $servicioExiste = [bool](Get-Service $Servicio -ErrorAction SilentlyContinue)
 if ($servicioExiste) {
   # Windows bloquea los archivos en uso: hay que parar el servidor antes de reinstalar dependencias.
-  Silencioso { & $Nssm stop $Servicio }
+  Parar-Servicio
 }
 
 Push-Location $Code
@@ -282,7 +302,7 @@ if ($importar) {
   Write-Host '    Puedes traer TODO lo que hay en Supabase (cuentas, saldos, historial, amigos, cosméticos…).'
   Write-Host '    Si eliges que no, el casino empieza vacío.'
   if (Leer-Si '    ¿Importar los datos de Supabase?') {
-    if ($servicioExiste) { Silencioso { & $Nssm stop $Servicio } }
+    if ($servicioExiste) { Parar-Servicio }
     Write-Host '    Pega la cadena de conexión de Supabase (Connect > Session pooler, con tu contraseña).'
     Write-Host '    No se guarda en ningún sitio: solo se usa para esta copia.'
     $seguro = Read-Host '    Cadena postgresql://…' -AsSecureString
@@ -330,7 +350,7 @@ $cfg = @(
 )
 foreach ($c in $cfg) { Ejecutar $Nssm (@('set', $Servicio) + $c) "No se pudo configurar $($c[0])" }
 Ejecutar $Nssm @('set', $Servicio, 'AppExit', 'Default', 'Restart') 'No se pudo configurar el reinicio automático'
-Silencioso { & $Nssm stop $Servicio }
+Parar-Servicio
 Liberar-Puerto
 # nssm puede devolver «START_PENDING» si Node tarda en arrancar: lo que cuenta es que responda.
 Silencioso { & $Nssm start $Servicio }
